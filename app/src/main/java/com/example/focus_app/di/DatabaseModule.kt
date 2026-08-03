@@ -16,6 +16,9 @@ import com.example.focus_app.data.repository.SettingsRepository
 import com.example.focus_app.data.repository.TaskRepository
 import com.example.focus_app.domain.time.SystemClock
 import com.example.focus_app.service.AppSessionCoordinator
+import com.example.focus_app.service.AndroidReminderLauncher
+import com.example.focus_app.service.ReminderLauncher
+import com.example.focus_app.service.ReminderScheduler
 import com.example.focus_app.service.RepositoryAppSessionContextProvider
 import dagger.Module
 import dagger.Provides
@@ -53,10 +56,16 @@ object DatabaseModule {
     fun provideAppSessionCoordinator(
         repository: AppSessionRepository,
         settingsRepository: SettingsRepository,
-        taskRepository: TaskRepository
+        taskRepository: TaskRepository,
+        reminderScheduler: ReminderScheduler
     ): AppSessionCoordinator = AppSessionCoordinator(
         repository = repository,
         contextProvider = RepositoryAppSessionContextProvider(settingsRepository, taskRepository),
-        clock = SystemClock
+        clock = SystemClock,
+        reminderScheduler = reminderScheduler
     )
+
+    @Provides
+    @Singleton
+    fun provideReminderLauncher(launcher: AndroidReminderLauncher): ReminderLauncher = launcher
 }

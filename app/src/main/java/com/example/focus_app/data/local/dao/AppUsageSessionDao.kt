@@ -28,4 +28,19 @@ interface AppUsageSessionDao {
 
     @Query("SELECT COUNT(*) FROM app_usage_sessions WHERE remindedAt >= :since")
     suspend fun countRemindersSince(since: Long): Int
+
+    @Query(
+        "SELECT remindedAt FROM app_usage_sessions " +
+            "WHERE remindedAt IS NOT NULL AND remindedAt >= :since"
+    )
+    suspend fun reminderTimesSince(since: Long): List<Long?>
+
+    @Query(
+        "UPDATE app_usage_sessions SET remindedAt = :remindedAt " +
+            "WHERE id = :sessionId AND remindedAt IS NULL"
+    )
+    suspend fun markRemindedIfNeeded(sessionId: Long, remindedAt: Long): Int
+
+    @Query("UPDATE app_usage_sessions SET userAction = :action WHERE id = :sessionId")
+    suspend fun markUserAction(sessionId: Long, action: String): Int
 }

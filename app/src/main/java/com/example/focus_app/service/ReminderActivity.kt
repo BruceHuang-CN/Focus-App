@@ -1,9 +1,9 @@
 package com.example.focus_app.service
 
-import android.app.ActivityManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import com.example.focus_app.domain.model.ReturnDestination
 import com.example.focus_app.ui.reminder.ReminderOverlay
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -11,24 +11,28 @@ import dagger.hilt.android.AndroidEntryPoint
 class ReminderActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val eventId = intent.getLongExtra("event_id", 0)
-        val appName = intent.getStringExtra("app_name") ?: "目标App"
-        val packageName = intent.getStringExtra("package_name") ?: ""
+        val taskId = if (intent.hasExtra(ReminderLaunchData.EXTRA_TASK_ID)) {
+            intent.getLongExtra(ReminderLaunchData.EXTRA_TASK_ID, 0L)
+        } else {
+            null
+        }
+        val data = ReminderLaunchData(
+            sessionId = intent.getLongExtra(ReminderLaunchData.EXTRA_SESSION_ID, 0L),
+            taskId = taskId,
+            taskTitle = intent.getStringExtra(ReminderLaunchData.EXTRA_TASK_TITLE),
+            appName = intent.getStringExtra(ReminderLaunchData.EXTRA_APP_NAME) ?: "目标应用",
+            message = intent.getStringExtra(ReminderLaunchData.EXTRA_MESSAGE)
+                ?: "停一下，想想你原本准备完成什么。",
+            showBreathing = intent.getBooleanExtra(ReminderLaunchData.EXTRA_SHOW_BREATHING, false),
+            returnDestination = ReturnDestination.fromKey(
+                intent.getStringExtra(ReminderLaunchData.EXTRA_RETURN_DESTINATION).orEmpty()
+            )
+        )
 
         setContent {
             ReminderOverlay(
-                eventId = eventId,
-                appName = appName,
-                onExited = {
-                    if (packageName.isNotEmpty()) {
-                        val am = getSystemService(ACTIVITY_SERVICE) as ActivityManager
-                        am.killBackgroundProcesses(packageName)
-                    }
-                    finish()
-                },
-                onContinued = {
-                    finish()
-                }
+                data = data,
+                onDismiss = { finishAndRemoveTask() }
             )
         }
     }

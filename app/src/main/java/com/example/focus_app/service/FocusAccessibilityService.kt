@@ -29,6 +29,7 @@ class FocusAccessibilityService : AccessibilityService() {
 
     override fun onServiceConnected() {
         super.onServiceConnected()
+        activeService = this
         if (monitoringStarted) return
         monitoringStarted = true
 
@@ -53,8 +54,16 @@ class FocusAccessibilityService : AccessibilityService() {
     override fun onInterrupt() {}
 
     override fun onDestroy() {
+        if (activeService === this) activeService = null
         packageChanges.close()
         scope.cancel()
         super.onDestroy()
+    }
+
+    companion object {
+        @Volatile private var activeService: FocusAccessibilityService? = null
+
+        fun performHomeAction(): Boolean =
+            activeService?.performGlobalAction(GLOBAL_ACTION_HOME) == true
     }
 }

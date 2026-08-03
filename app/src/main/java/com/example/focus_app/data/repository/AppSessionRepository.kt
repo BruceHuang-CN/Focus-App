@@ -18,6 +18,12 @@ interface AppSessionRepository {
     suspend fun closeSession(sessionId: Long, endedAt: Long)
 
     suspend fun currentOpenSession(): AppUsageSession?
+
+    suspend fun reminderTimesSince(since: Long): List<Long>
+
+    suspend fun markRemindedIfNeeded(sessionId: Long, remindedAt: Long): Boolean
+
+    suspend fun markUserAction(sessionId: Long, action: String)
 }
 
 class RoomAppSessionRepository @Inject constructor(
@@ -46,4 +52,14 @@ class RoomAppSessionRepository @Inject constructor(
 
     override suspend fun currentOpenSession(): AppUsageSession? =
         dao.currentOpen()?.toDomain()
+
+    override suspend fun reminderTimesSince(since: Long): List<Long> =
+        dao.reminderTimesSince(since).filterNotNull()
+
+    override suspend fun markRemindedIfNeeded(sessionId: Long, remindedAt: Long): Boolean =
+        dao.markRemindedIfNeeded(sessionId, remindedAt) == 1
+
+    override suspend fun markUserAction(sessionId: Long, action: String) {
+        dao.markUserAction(sessionId, action)
+    }
 }

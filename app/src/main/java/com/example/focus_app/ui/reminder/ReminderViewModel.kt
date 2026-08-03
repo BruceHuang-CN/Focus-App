@@ -2,42 +2,77 @@ package com.example.focus_app.ui.reminder
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.focus_app.data.repository.AppUsageRepository
-import com.example.focus_app.data.repository.SettingsRepository
-import com.example.focus_app.domain.usecase.BuildReminderContextUseCase
-import com.example.focus_app.domain.usecase.GenerateAiReminderUseCase
+import com.example.focus_app.data.repository.AppSessionRepository
+import com.example.focus_app.domain.model.ReturnDestination
+import com.example.focus_app.service.ReminderLaunchData
+import com.example.focus_app.service.ReminderLauncher
 import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
-data class ReminderUiState(val aiMessage: String = "正在分析...", val isLoading: Boolean = true, val showBreathing: Boolean = false, val breathingStep: Int = 5, val remindedCount: Int = 0, val maxReminds: Int = 3)
+data class ReminderUiState(
+    val message: String = "",
+    val taskTitle: String? = null,
+    val appName: String = "目标应用",
+    val showBreathing: Boolean = false,
+    val breathingStep: Int = 5,
+    val returnDestination: ReturnDestination = ReturnDestination.FOCUS
+)
 
 @HiltViewModel
 class ReminderViewModel @Inject constructor(
-    private val generateAiReminderUseCase: GenerateAiReminderUseCase, private val buildReminderContextUseCase: BuildReminderContextUseCase,
-    private val appUsageRepository: AppUsageRepository, private val settingsRepository: SettingsRepository
+    private val sessionRepository: AppSessionRepository,
+    private val launcher: ReminderLauncher
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ReminderUiState())
     val uiState: StateFlow<ReminderUiState> = _uiState.asStateFlow()
+    private var launchData: ReminderLaunchData? = null
 
-    fun init(eventId: Long, appName: String, personality: String, showBreathing: Boolean) {
-        _uiState.value = _uiState.value.copy(showBreathing = showBreathing)
+    fun init(data: ReminderLaunchData) {
+        launchData = data
+        _uiState.value = ReminderUiState(
+            message = data.message,
+            taskTitle = data.taskTitle,
+            appName = data.appName,
+            showBreathing = data.showBreathing,
+            returnDestination = data.returnDestination
+        )
+    }
+
+    fun onBreathingTick(step: Int) {
+        _uiState.value = _uiState.value.copy(breathingStep = step)
+    }
+
+    fun fadeBreathing() {
+        _uiState.value = _uiState.value.copy(showBreathing = false)
+    }
+
+    fun returnToFocus(sessionId: Long, onComplete: () -> Unit = {}) {
+        val data = launchData?.takeIf { it.sessionId == sessionId } ?: return
         viewModelScope.launch {
-            val s = settingsRepository.getSettings()
-            _uiState.value = _uiState.value.copy(remindedCount = appUsageRepository.getRemindedCountThisHour(), maxReminds = s.maxRemindsPerHour)
-            try {
-                val ctx = buildReminderContextUseCase(appName, personality)
-                val res = generateAiReminderUseCase(ctx)
-                _uiState.value = _uiState.value.copy(aiMessage = res.getOrDefault("嘿，注意到你又打开 $appName 了。深呼吸一下，想想你本来想做什么？"), isLoading = false)
-            } catch (_: Exception) { _uiState.value = _uiState.value.copy(aiMessage = "嘿，注意到你又打开 $appName 了。深呼吸一下，想想你本来想做什么？", isLoading = false) }
+            sessionRepository.markUserAction(sessionId, "returned_to_focus")
+            launcher.returnToFocus(data.taskId)
+            onComplete()
         }
     }
 
-    fun onBreathingTick(step: Int) { _uiState.value = _uiState.value.copy(breathingStep = step) }
-    fun fadeBreathing() { _uiState.value = _uiState.value.copy(showBreathing = false) }
-    fun onExited(eventId: Long) { viewModelScope.launch { appUsageRepository.markReminded(eventId); appUsageRepository.markUserActionById(eventId, "exited") } }
-    fun onContinued(eventId: Long) { viewModelScope.launch { appUsageRepository.markReminded(eventId); appUsageRepository.markUserActionById(eventId, "continued") } }
+    fun returnHome(sessionId: Long, onComplete: () -> Unit = {}) {
+        if (launchData?.sessionId != sessionId) return
+        viewModelScope.launch {
+            sessionRepository.markUserAction(sessionId, "returned_home")
+            launcher.returnHome()
+            onComplete()
+        }
+    }
+
+    fun continueTargetApp(sessionId: Long, onComplete: () -> Unit = {}) {
+        if (launchData?.sessionId != sessionId) return
+        viewModelScope.launch {
+            sessionRepository.markUserAction(sessionId, "continued")
+            onComplete()
+        }
+    }
 }

@@ -36,11 +36,12 @@ class RepositoryAppSessionContextProvider(
 class AppSessionCoordinator(
     private val repository: AppSessionRepository,
     private val contextProvider: AppSessionContextProvider,
-    private val clock: Clock
+    private val clock: Clock,
+    private val reminderScheduler: SessionReminderScheduler
 ) {
     private val eventMutex = Mutex()
     private var initialized = false
-    private var foregroundPackage: String? = null
+    @Volatile private var foregroundPackage: String? = null
     private var openSession: AppUsageSession? = null
 
     suspend fun onPackageChanged(packageName: String?) = eventMutex.withLock {
@@ -50,6 +51,7 @@ class AppSessionCoordinator(
         if (packageName == foregroundPackage) return@withLock
 
         openSession?.let { session ->
+            reminderScheduler.cancel(session.id)
             repository.closeSession(session.id, now)
             openSession = null
         }
@@ -64,14 +66,18 @@ class AppSessionCoordinator(
             foregroundPackage = packageName
             return@withLock
         }
-        openSession = repository.openSession(
+        val session = repository.openSession(
             packageName = packageName,
             appName = appName,
             startedAt = now,
             taskId = context.activeTaskId,
             toneKey = context.toneKey
         )
+        openSession = session
         foregroundPackage = packageName
+        reminderScheduler.onSessionStarted(session) {
+            foregroundPackage == session.packageName
+        }
     }
 
     private suspend fun recoverStaleSession(now: Long) {

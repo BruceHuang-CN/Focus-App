@@ -72,6 +72,18 @@ class AppSessionCoordinatorTest {
     }
 
     @Test
+    fun target_session_starts_one_reminder_job_and_leaving_cancels_it() = runTest {
+        val fixture = fixture()
+
+        fixture.coordinator.onPackageChanged(TARGET_A)
+        val sessionId = fixture.repository.sessions.single().id
+        fixture.coordinator.onPackageChanged(LAUNCHER)
+
+        assertEquals(listOf(sessionId), fixture.reminderScheduler.startedSessionIds)
+        assertEquals(listOf(sessionId), fixture.reminderScheduler.cancelledSessionIds)
+    }
+
+    @Test
     fun startup_closes_a_stale_session_at_observation_time_capped_to_24_hours() = runTest {
         val recentlyStale = staleFixture(observedAfter = 2 * HOUR_MS)
         recentlyStale.coordinator.onPackageChanged(LAUNCHER)
@@ -94,7 +106,8 @@ class AppSessionCoordinatorTest {
         activeTaskId: Long? = 7L,
         toneKey: String = ReminderTone.GENTLE.key,
         repository: FakeAppSessionRepository = FakeAppSessionRepository(),
-        now: Long = STARTED_AT
+        now: Long = STARTED_AT,
+        reminderScheduler: RecordingSessionReminderScheduler = RecordingSessionReminderScheduler()
     ): Fixture {
         val clock = FakeClock(now)
         val contextProvider = FakeAppSessionContextProvider(
@@ -108,10 +121,16 @@ class AppSessionCoordinatorTest {
             )
         )
         return Fixture(
-            coordinator = AppSessionCoordinator(repository, contextProvider, clock),
+            coordinator = AppSessionCoordinator(
+                repository,
+                contextProvider,
+                clock,
+                reminderScheduler
+            ),
             repository = repository,
             contextProvider = contextProvider,
-            clock = clock
+            clock = clock,
+            reminderScheduler = reminderScheduler
         )
     }
 
@@ -138,7 +157,8 @@ class AppSessionCoordinatorTest {
         val coordinator: AppSessionCoordinator,
         val repository: FakeAppSessionRepository,
         val contextProvider: FakeAppSessionContextProvider,
-        val clock: FakeClock
+        val clock: FakeClock,
+        val reminderScheduler: RecordingSessionReminderScheduler
     )
 
     private companion object {
@@ -192,4 +212,26 @@ private class FakeAppSessionRepository(
 
     override suspend fun currentOpenSession(): AppUsageSession? =
         sessions.lastOrNull { it.endedAt == null }
+
+    override suspend fun reminderTimesSince(since: Long): List<Long> = emptyList()
+
+    override suspend fun markRemindedIfNeeded(sessionId: Long, remindedAt: Long): Boolean = false
+
+    override suspend fun markUserAction(sessionId: Long, action: String) = Unit
+}
+
+private class RecordingSessionReminderScheduler : SessionReminderScheduler {
+    val startedSessionIds = mutableListOf<Long>()
+    val cancelledSessionIds = mutableListOf<Long>()
+
+    override fun onSessionStarted(
+        session: AppUsageSession,
+        appStillForeground: suspend () -> Boolean
+    ) {
+        startedSessionIds += session.id
+    }
+
+    override fun cancel(sessionId: Long) {
+        cancelledSessionIds += sessionId
+    }
 }
