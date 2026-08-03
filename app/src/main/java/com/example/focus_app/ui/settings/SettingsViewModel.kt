@@ -40,10 +40,23 @@ class SettingsViewModel @Inject constructor(private val settingsRepository: Sett
     fun updateCustomToneInstruction(instruction: String) { update { it.copy(customToneInstruction = instruction) } }
 
     fun updateRemindDelay(minutes: Int) {
-        updateReminderDelaySeconds(if (minutes == 0) 3 else minutes * 60)
+        val seconds = if (minutes == 0) 3 else minutes * 60
+        update {
+            it.copy(
+                remindDelayMinutes = minutes,
+                reminderDelaySeconds = seconds.coerceIn(1, 300)
+            )
+        }
     }
 
-    fun updateMaxReminds(count: Int) { updateMaxRemindersPerWindow(count) }
+    fun updateMaxReminds(count: Int) {
+        update {
+            it.copy(
+                maxRemindsPerHour = count,
+                maxRemindersPerWindow = count.coerceIn(1, 20)
+            )
+        }
+    }
     fun updateAiProvider(p: AiProvider) { update { it.copy(aiProvider = p, apiEndpoint = p.defaultEndpoint, aiModel = p.defaultModel) } }
     fun updateApiEndpoint(e: String) { update { it.copy(apiEndpoint = e, aiProvider = AiProvider.CUSTOM) } }
     fun updateApiKey(k: String) { update { it.copy(apiKey = k) } }
@@ -54,6 +67,6 @@ class SettingsViewModel @Inject constructor(private val settingsRepository: Sett
     fun updateTargetApps(apps: List<AppInfo>) { update { it.copy(targetApps = apps) } }
 
     private fun update(transform: (AppSettings) -> AppSettings) {
-        viewModelScope.launch { settingsRepository.updateSettings(transform(settingsRepository.getSettings())) }
+        viewModelScope.launch { settingsRepository.update(transform) }
     }
 }

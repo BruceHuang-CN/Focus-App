@@ -8,6 +8,8 @@ import com.example.focus_app.domain.model.ReminderTone
 import com.example.focus_app.domain.model.ReturnDestination
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -38,6 +40,8 @@ data class AppInfo(val packageName: String, val appName: String)
 
 @Singleton
 class SettingsRepository @Inject constructor(private val settingsDao: SettingsDao) {
+    private val updateMutex = Mutex()
+
     fun getSettingsFlow(): Flow<AppSettings> = settingsDao.getSettings().map {
         it?.toAppSettings() ?: AppSettings()
     }
@@ -46,10 +50,17 @@ class SettingsRepository @Inject constructor(private val settingsDao: SettingsDa
         settingsDao.getSettingsOnce()?.toAppSettings() ?: AppSettings()
 
     suspend fun updateSettings(settings: AppSettings) {
-        val existing = settingsDao.getSettingsOnce() ?: SettingsEntity(
-            targetApps = "[]",
-            legacyApiKey = ""
-        )
-        settingsDao.insertOrUpdate(settings.toEntity(existing))
+        update { settings }
+    }
+
+    suspend fun update(transform: (AppSettings) -> AppSettings) {
+        updateMutex.withLock {
+            val existing = settingsDao.getSettingsOnce() ?: SettingsEntity(
+                targetApps = "[]",
+                legacyApiKey = ""
+            )
+            val updated = transform(existing.toAppSettings())
+            settingsDao.insertOrUpdate(updated.toEntity(existing))
+        }
     }
 }
