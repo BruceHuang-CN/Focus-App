@@ -97,9 +97,10 @@ class ReminderBatchCoordinator(
         }
             .distinctUntilChanged { old, new -> old?.key == new?.key }
             .collectLatest { activation ->
+                val isColdStart = coldStartPending
+                coldStartPending = false
                 if (activation == null) return@collectLatest
-                val targetApps = if (coldStartPending) {
-                    coldStartPending = false
+                val targetApps = if (isColdStart) {
                     activation.targetApps.filter { app ->
                         !cacheReady(
                             activation.task.id,

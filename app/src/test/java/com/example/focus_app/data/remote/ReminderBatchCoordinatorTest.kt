@@ -116,7 +116,7 @@ class ReminderBatchCoordinatorTest {
     }
 
     @Test
-    fun cold_start_checks_cache_on_the_first_later_nonnull_activation() = runTest {
+    fun initial_null_consumes_cold_start_and_later_activation_generates_all_targets() = runTest {
         val tasks = MutableStateFlow<FocusTask?>(null)
         val settings = MutableStateFlow(
             AppSettings(targetApps = listOf(AppInfo("douyin", "抖音")))
@@ -137,8 +137,8 @@ class ReminderBatchCoordinatorTest {
         tasks.value = FocusTask(id = 7L, title = "写方案", isManualActive = true)
         runCurrent()
 
-        assertEquals(0, generated)
-        assertEquals(listOf("douyin"), checkedPackages)
+        assertEquals(1, generated)
+        assertEquals(emptyList<String>(), checkedPackages)
     }
 
     @Test
