@@ -14,6 +14,10 @@ import com.example.focus_app.data.repository.AppSessionRepository
 import com.example.focus_app.data.repository.RoomAppSessionRepository
 import com.example.focus_app.data.repository.SettingsRepository
 import com.example.focus_app.data.repository.TaskRepository
+import com.example.focus_app.data.security.ApiKeyStore
+import com.example.focus_app.data.security.EncryptedApiKeyStore
+import com.example.focus_app.data.security.MigratingApiKeyStore
+import com.example.focus_app.data.security.RoomLegacyApiKeySource
 import com.example.focus_app.domain.time.SystemClock
 import com.example.focus_app.service.AppSessionCoordinator
 import com.example.focus_app.service.AndroidReminderLauncher
@@ -45,6 +49,13 @@ object DatabaseModule {
     @Provides fun provideFocusTaskDao(db: AppDatabase): FocusTaskDao = db.focusTaskDao()
     @Provides fun provideAppUsageSessionDao(db: AppDatabase): AppUsageSessionDao = db.appUsageSessionDao()
     @Provides fun provideAiReminderCacheDao(db: AppDatabase): AiReminderCacheDao = db.aiReminderCacheDao()
+
+    @Provides
+    @Singleton
+    fun provideApiKeyStore(
+        encryptedStore: EncryptedApiKeyStore,
+        legacySource: RoomLegacyApiKeySource
+    ): ApiKeyStore = MigratingApiKeyStore(encryptedStore, legacySource)
 
     @Provides
     @Singleton

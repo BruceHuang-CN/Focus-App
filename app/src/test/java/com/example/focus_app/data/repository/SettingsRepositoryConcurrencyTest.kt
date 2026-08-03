@@ -3,6 +3,7 @@ package com.example.focus_app.data.repository
 import com.example.focus_app.data.local.dao.SettingsDao
 import com.example.focus_app.data.local.entity.SettingsEntity
 import com.example.focus_app.domain.model.ReminderTone
+import com.example.focus_app.data.security.ApiKeyStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
@@ -32,6 +33,26 @@ class SettingsRepositoryConcurrencyTest {
         assertEquals(45, settings.reminderDelaySeconds)
         assertEquals(ReminderTone.DIRECT, settings.toneKey)
     }
+
+    @Test
+    fun saving_or_clearing_key_increments_only_a_non_secret_revision() = runTest {
+        val repository = SettingsRepository(
+            FakeSettingsDao(SettingsEntity(targetApps = "[]", legacyApiKey = "")),
+            RecordingSettingsApiKeyStore()
+        )
+
+        repository.saveApiKey("secret")
+        assertEquals(1L, repository.apiKeyRevision.value)
+        repository.clearApiKey()
+        assertEquals(2L, repository.apiKeyRevision.value)
+    }
+}
+
+private class RecordingSettingsApiKeyStore : ApiKeyStore {
+    private var value = ""
+    override suspend fun read(): String = value
+    override suspend fun write(value: String) { this.value = value }
+    override suspend fun clear() { value = "" }
 }
 
 private class FakeSettingsDao(initial: SettingsEntity) : SettingsDao {
@@ -47,5 +68,9 @@ private class FakeSettingsDao(initial: SettingsEntity) : SettingsDao {
         val snapshot = settings.value
         yield()
         return snapshot
+    }
+
+    override suspend fun clearLegacyApiKey() {
+        settings.value = settings.value?.copy(legacyApiKey = "")
     }
 }

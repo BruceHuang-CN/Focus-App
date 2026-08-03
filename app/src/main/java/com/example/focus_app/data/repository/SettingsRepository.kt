@@ -6,8 +6,13 @@ import com.example.focus_app.domain.model.AiProvider
 import com.example.focus_app.domain.model.DetectionMode
 import com.example.focus_app.domain.model.ReminderTone
 import com.example.focus_app.domain.model.ReturnDestination
+import com.example.focus_app.data.security.ApiKeyStore
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
@@ -19,8 +24,7 @@ data class AppSettings(
     val maxRemindsPerHour: Int = 3,
     val aiProvider: AiProvider = AiProvider.DEEPSEEK,
     val apiEndpoint: String = "https://api.deepseek.com",
-    val apiKey: String = "",
-    val aiModel: String = "deepseek-chat",
+    val aiModel: String = "deepseek-v4-flash",
     val aiPersonality: String = "gentle",
     val enableAccessibility: Boolean = false,
     val enableBreathingPause: Boolean = true,
@@ -32,15 +36,19 @@ data class AppSettings(
     val toneKey: ReminderTone = ReminderTone.GENTLE,
     val customToneInstruction: String = "",
     val dailyShortVideoLimitMinutes: Int = 30
-) {
-    val isAiConfigured: Boolean get() = apiKey.isNotBlank()
-}
+)
 
 data class AppInfo(val packageName: String, val appName: String)
 
 @Singleton
-class SettingsRepository @Inject constructor(private val settingsDao: SettingsDao) {
+class SettingsRepository @Inject constructor(
+    private val settingsDao: SettingsDao,
+    private val apiKeyStore: ApiKeyStore
+) {
+    constructor(settingsDao: SettingsDao) : this(settingsDao, EmptyApiKeyStore)
     private val updateMutex = Mutex()
+    private val mutableApiKeyRevision = MutableStateFlow(0L)
+    val apiKeyRevision: StateFlow<Long> = mutableApiKeyRevision.asStateFlow()
 
     fun getSettingsFlow(): Flow<AppSettings> = settingsDao.getSettings().map {
         it?.toAppSettings() ?: AppSettings()
@@ -53,6 +61,18 @@ class SettingsRepository @Inject constructor(private val settingsDao: SettingsDa
         update { settings }
     }
 
+    suspend fun saveApiKey(value: String) {
+        apiKeyStore.write(value.trim())
+        mutableApiKeyRevision.update { it + 1 }
+    }
+
+    suspend fun clearApiKey() {
+        apiKeyStore.clear()
+        mutableApiKeyRevision.update { it + 1 }
+    }
+
+    suspend fun readApiKey(): String = apiKeyStore.read()
+
     suspend fun update(transform: (AppSettings) -> AppSettings) {
         updateMutex.withLock {
             val existing = settingsDao.getSettingsOnce() ?: SettingsEntity(
@@ -62,5 +82,11 @@ class SettingsRepository @Inject constructor(private val settingsDao: SettingsDa
             val updated = transform(existing.toAppSettings())
             settingsDao.insertOrUpdate(updated.toEntity(existing))
         }
+    }
+
+    private object EmptyApiKeyStore : ApiKeyStore {
+        override suspend fun read(): String = ""
+        override suspend fun write(value: String) = Unit
+        override suspend fun clear() = Unit
     }
 }

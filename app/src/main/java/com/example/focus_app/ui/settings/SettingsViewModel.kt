@@ -59,7 +59,13 @@ class SettingsViewModel @Inject constructor(private val settingsRepository: Sett
     }
     fun updateAiProvider(p: AiProvider) { update { it.copy(aiProvider = p, apiEndpoint = p.defaultEndpoint, aiModel = p.defaultModel) } }
     fun updateApiEndpoint(e: String) { update { it.copy(apiEndpoint = e, aiProvider = AiProvider.CUSTOM) } }
-    fun updateApiKey(k: String) { update { it.copy(apiKey = k) } }
+    fun updateApiKey(k: String) {
+        viewModelScope.launch { settingsRepository.saveApiKey(k) }
+    }
+
+    fun clearApiKey() {
+        viewModelScope.launch { settingsRepository.clearApiKey() }
+    }
     fun updateAiModel(m: String) { update { it.copy(aiModel = m) } }
     fun updatePersonality(p: String) { update { it.copy(aiPersonality = p, toneKey = ReminderTone.fromKey(p)) } }
     fun toggleBreathingPause() { update { it.copy(enableBreathingPause = !it.enableBreathingPause) } }

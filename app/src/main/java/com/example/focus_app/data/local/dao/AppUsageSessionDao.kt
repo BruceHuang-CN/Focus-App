@@ -43,4 +43,19 @@ interface AppUsageSessionDao {
 
     @Query("UPDATE app_usage_sessions SET userAction = :action WHERE id = :sessionId")
     suspend fun markUserAction(sessionId: Long, action: String): Int
+
+    @Query(
+        "SELECT COUNT(*) FROM app_usage_sessions " +
+            "WHERE packageName = :packageName AND startedAt >= :since"
+    )
+    suspend fun countOpensSince(packageName: String, since: Long): Int
+
+    @Query("SELECT COUNT(*) FROM app_usage_sessions WHERE remindedAt >= :since")
+    suspend fun countShownRemindersSince(since: Long): Int
+
+    @Query(
+        "SELECT COUNT(*) FROM app_usage_sessions WHERE startedAt >= :since " +
+            "AND userAction IN ('returned_to_focus', 'returned_home')"
+    )
+    suspend fun countActiveExitsSince(since: Long): Int
 }

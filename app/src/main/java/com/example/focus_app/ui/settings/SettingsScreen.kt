@@ -23,6 +23,7 @@ fun SettingsScreen(onBack: () -> Unit, navigateToTargetApps: () -> Unit, viewMod
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     var lastChange by remember { mutableStateOf("") }
+    var apiKeyInput by remember { mutableStateOf("") }
 
     fun onSettingChanged(label: String) {
         lastChange = label
@@ -95,7 +96,29 @@ fun SettingsScreen(onBack: () -> Unit, navigateToTargetApps: () -> Unit, viewMod
                 }
             }
             OutlinedTextField(value = s.apiEndpoint, onValueChange = { viewModel.updateApiEndpoint(it) }, label = { Text("API 端点") }, modifier = Modifier.fillMaxWidth())
-            OutlinedTextField(value = s.apiKey, onValueChange = { viewModel.updateApiKey(it) }, label = { Text("API Key（你自己的Key）") }, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(
+                value = apiKeyInput,
+                onValueChange = { apiKeyInput = it },
+                label = { Text("API Key（保存后不会再次显示）") },
+                modifier = Modifier.fillMaxWidth()
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = {
+                        viewModel.updateApiKey(apiKeyInput)
+                        apiKeyInput = ""
+                        onSettingChanged("API Key")
+                    },
+                    enabled = apiKeyInput.isNotBlank()
+                ) { Text("保存 Key") }
+                TextButton(
+                    onClick = {
+                        viewModel.clearApiKey()
+                        apiKeyInput = ""
+                        onSettingChanged("已清除 API Key")
+                    }
+                ) { Text("清除") }
+            }
             OutlinedTextField(value = s.aiModel, onValueChange = { viewModel.updateAiModel(it) }, label = { Text("模型名") }, modifier = Modifier.fillMaxWidth())
             Divider()
             Text("AI 提醒风格", style = MaterialTheme.typography.titleMedium)

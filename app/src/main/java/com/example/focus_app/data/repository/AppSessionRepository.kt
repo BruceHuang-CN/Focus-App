@@ -24,6 +24,12 @@ interface AppSessionRepository {
     suspend fun markRemindedIfNeeded(sessionId: Long, remindedAt: Long): Boolean
 
     suspend fun markUserAction(sessionId: Long, action: String)
+
+    suspend fun countOpensSince(packageName: String, since: Long): Int = 0
+
+    suspend fun countShownRemindersSince(since: Long): Int = 0
+
+    suspend fun countActiveExitsSince(since: Long): Int = 0
 }
 
 class RoomAppSessionRepository @Inject constructor(
@@ -62,4 +68,13 @@ class RoomAppSessionRepository @Inject constructor(
     override suspend fun markUserAction(sessionId: Long, action: String) {
         dao.markUserAction(sessionId, action)
     }
+
+    override suspend fun countOpensSince(packageName: String, since: Long): Int =
+        dao.countOpensSince(packageName, since)
+
+    override suspend fun countShownRemindersSince(since: Long): Int =
+        dao.countShownRemindersSince(since)
+
+    override suspend fun countActiveExitsSince(since: Long): Int =
+        dao.countActiveExitsSince(since)
 }

@@ -15,15 +15,20 @@ internal fun SettingsEntity.toAppSettings(): AppSettings {
     } catch (_: Exception) {
         emptyList()
     }
+    val provider = AiProvider.fromKey(aiProvider)
+    val model = if (provider == AiProvider.DEEPSEEK && aiModel == "deepseek-chat") {
+        AiProvider.DEEPSEEK.defaultModel
+    } else {
+        aiModel
+    }
 
     return AppSettings(
         targetApps = apps,
         remindDelayMinutes = remindDelayMinutes,
         maxRemindsPerHour = maxRemindsPerHour,
-        aiProvider = AiProvider.fromKey(aiProvider),
+        aiProvider = provider,
         apiEndpoint = apiEndpoint,
-        apiKey = legacyApiKey,
-        aiModel = aiModel,
+        aiModel = model,
         aiPersonality = aiPersonality,
         enableAccessibility = enableAccessibility,
         enableBreathingPause = enableBreathingPause,
@@ -44,7 +49,6 @@ internal fun AppSettings.toEntity(existing: SettingsEntity): SettingsEntity = ex
     maxRemindsPerHour = maxRemindsPerHour,
     aiProvider = aiProvider.name.lowercase(),
     apiEndpoint = apiEndpoint,
-    legacyApiKey = apiKey,
     aiModel = aiModel,
     aiPersonality = aiPersonality,
     enableAccessibility = enableAccessibility,

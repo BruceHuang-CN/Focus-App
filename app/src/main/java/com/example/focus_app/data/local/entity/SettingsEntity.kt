@@ -14,7 +14,7 @@ data class SettingsEntity(
     val aiProvider: String = "deepseek",
     val apiEndpoint: String = "https://api.deepseek.com",
     @ColumnInfo(name = "apiKey") val legacyApiKey: String = "",
-    val aiModel: String = "deepseek-chat",
+    val aiModel: String = "deepseek-v4-flash",
     val aiPersonality: String = "gentle",
     val enableAccessibility: Boolean = false,
     val enableBreathingPause: Boolean = true,
@@ -40,7 +40,7 @@ data class SettingsEntity(
         aiProvider: String = "deepseek",
         apiEndpoint: String = "https://api.deepseek.com",
         apiKey: String = "",
-        aiModel: String = "deepseek-chat",
+        aiModel: String = "deepseek-v4-flash",
         aiPersonality: String = "gentle",
         enableAccessibility: Boolean = false,
         enableBreathingPause: Boolean = true

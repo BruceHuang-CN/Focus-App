@@ -1,8 +1,8 @@
 package com.example.focus_app.service
 
-import com.example.focus_app.data.local.dao.AiReminderCacheDao
 import com.example.focus_app.data.repository.AppSessionRepository
 import com.example.focus_app.data.repository.AppSettings
+import com.example.focus_app.data.repository.ReminderCacheRepository
 import com.example.focus_app.data.repository.SettingsRepository
 import com.example.focus_app.data.repository.TaskRepository
 import com.example.focus_app.domain.model.AppUsageSession
@@ -49,7 +49,7 @@ class ReminderScheduler(
         repository: AppSessionRepository,
         settingsRepository: SettingsRepository,
         taskRepository: TaskRepository,
-        cacheDao: AiReminderCacheDao,
+        cacheRepository: ReminderCacheRepository,
         launcher: ReminderLauncher
     ) : this(
         repository = repository,
@@ -62,7 +62,7 @@ class ReminderScheduler(
                 taskRepository.observeAll().first().firstOrNull { it.id == taskId }?.title
             }
             val cachedMessage = session.taskId?.let { taskId ->
-                cacheDao.next(taskId, session.packageName, session.toneKey)?.text
+                cacheRepository.next(taskId, session.packageName, session.toneKey)
             }
             ReminderLaunchData(
                 sessionId = session.id,
@@ -85,12 +85,12 @@ class ReminderScheduler(
             delay(settings.reminderDelaySeconds * 1_000L)
             if (!appStillForeground()) return@launch
 
-            val data = launchDataProvider(session, settings)
             quotaMutex.withLock {
                 val reminderTimes = repository.reminderTimesSince(
                     clock.nowMillis() - settings.reminderWindowMinutes * 60_000L
                 )
                 if (!policy.canShow(reminderTimes, settings)) return@withLock
+                val data = launchDataProvider(session, settings)
                 if (!repository.markRemindedIfNeeded(session.id, clock.nowMillis())) return@withLock
                 launcher.show(data)
             }

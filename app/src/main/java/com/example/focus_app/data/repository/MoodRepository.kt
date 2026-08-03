@@ -11,6 +11,7 @@ import javax.inject.Singleton
 @Singleton
 class MoodRepository @Inject constructor(private val dao: MoodRecordDao) {
     fun getAllMoods(): Flow<List<MoodRecord>> = dao.getAllMoods().map { it.map { e -> e.toDomain() } }
+    fun observeLatestMood(): Flow<MoodRecord?> = dao.observeLatestMood().map { it?.toDomain() }
     suspend fun getLatestMood(): MoodRecord? = dao.getLatestMood()?.toDomain()
     suspend fun recordMood(mood: String, note: String? = null) {
         dao.insert(MoodRecordEntity(timestamp = System.currentTimeMillis(), mood = mood, note = note))

@@ -9,4 +9,6 @@ interface SettingsDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun insertOrUpdate(settings: SettingsEntity)
     @Query("SELECT * FROM settings LIMIT 1") fun getSettings(): Flow<SettingsEntity?>
     @Query("SELECT * FROM settings LIMIT 1") suspend fun getSettingsOnce(): SettingsEntity?
+    @Query("UPDATE settings SET apiKey = '' WHERE apiKey != ''")
+    suspend fun clearLegacyApiKey()
 }

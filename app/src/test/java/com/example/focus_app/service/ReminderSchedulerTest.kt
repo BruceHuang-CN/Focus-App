@@ -73,6 +73,7 @@ class ReminderSchedulerTest {
         assertEquals(0, fixture.launcher.shown.size)
         assertEquals(1, fixture.repository.remindedCount)
         assertEquals(null, fixture.repository.session(fixture.session.id)?.remindedAt)
+        assertEquals(0, fixture.launchDataBuildCount())
     }
 
     @Test
@@ -109,6 +110,7 @@ class ReminderSchedulerTest {
             enableBreathingPause = false,
             returnDestination = ReturnDestination.HOME
         )
+        var launchDataBuildCount = 0
         val scheduler = ReminderScheduler(
             repository = repository,
             launcher = launcher,
@@ -116,6 +118,7 @@ class ReminderSchedulerTest {
             scope = backgroundScope,
             settingsProvider = { settings },
             launchDataProvider = { usageSession, currentSettings ->
+                launchDataBuildCount++
                 ReminderLaunchData(
                     sessionId = usageSession.id,
                     taskId = usageSession.taskId,
@@ -127,14 +130,15 @@ class ReminderSchedulerTest {
                 )
             }
         )
-        return Fixture(scheduler, repository, launcher, session)
+        return Fixture(scheduler, repository, launcher, session, { launchDataBuildCount })
     }
 
     private data class Fixture(
         val scheduler: ReminderScheduler,
         val repository: FakeReminderSessionRepository,
         val launcher: RecordingReminderLauncher,
-        val session: AppUsageSession
+        val session: AppUsageSession,
+        val launchDataBuildCount: () -> Int
     )
 
     private companion object {

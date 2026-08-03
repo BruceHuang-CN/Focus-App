@@ -11,4 +11,6 @@ interface MoodRecordDao {
     suspend fun getLatestMood(): MoodRecordEntity?
     @Query("SELECT * FROM mood_records ORDER BY timestamp DESC")
     fun getAllMoods(): Flow<List<MoodRecordEntity>>
+    @Query("SELECT * FROM mood_records ORDER BY timestamp DESC LIMIT 1")
+    fun observeLatestMood(): Flow<MoodRecordEntity?>
 }

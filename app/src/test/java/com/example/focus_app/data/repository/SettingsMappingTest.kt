@@ -9,6 +9,17 @@ import org.junit.Test
 
 class SettingsMappingTest {
     @Test
+    fun retired_deepseek_model_is_upgraded_for_existing_installations() {
+        val settings = SettingsEntity(
+            targetApps = "[]",
+            aiProvider = "deepseek",
+            aiModel = "deepseek-chat"
+        ).toAppSettings()
+
+        assertEquals("deepseek-v4-flash", settings.aiModel)
+    }
+
+    @Test
     fun corrupt_persisted_v2_values_are_clamped_or_defaulted() {
         val settings = SettingsEntity(
             targetApps = "[]",
