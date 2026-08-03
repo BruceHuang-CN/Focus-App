@@ -13,7 +13,6 @@ import androidx.lifecycle.lifecycleScope
 import com.example.focus_app.data.repository.SettingsRepository
 import com.example.focus_app.domain.model.DetectionMode
 import com.example.focus_app.service.AppDetectionService
-import com.example.focus_app.service.AppSessionCoordinator
 import com.example.focus_app.ui.navigation.NavGraph
 import com.example.focus_app.ui.theme.FocusAppTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -25,7 +24,6 @@ import javax.inject.Inject
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     @Inject lateinit var settingsRepository: SettingsRepository
-    @Inject lateinit var appSessionCoordinator: AppSessionCoordinator
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -33,7 +31,11 @@ class MainActivity : ComponentActivity() {
             settingsRepository.getSettingsFlow()
                 .map { it.detectionMode }
                 .distinctUntilChanged()
-                .collect { mode -> applyDetectionMode(mode) }
+                .collect { mode ->
+                    if (mode == DetectionMode.COMPATIBILITY) {
+                        startCompatibilityService()
+                    }
+                }
         }
         setContent {
             FocusAppTheme {
@@ -47,17 +49,12 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private suspend fun applyDetectionMode(mode: DetectionMode) {
+    private fun startCompatibilityService() {
         val intent = Intent(this, AppDetectionService::class.java)
-        if (mode == DetectionMode.COMPATIBILITY) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                startForegroundService(intent)
-            } else {
-                startService(intent)
-            }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(intent)
         } else {
-            appSessionCoordinator.onPackageChanged(null)
-            stopService(intent)
+            startService(intent)
         }
     }
 }
