@@ -9,6 +9,9 @@ import com.example.focus_app.data.repository.SettingsRepository
 import com.example.focus_app.data.repository.TaskRepository
 import com.example.focus_app.domain.model.FocusTask
 import com.example.focus_app.domain.model.ReminderContext
+import com.example.focus_app.domain.task.MANUAL_ACTIVATION_PERIOD_TOKEN
+import com.example.focus_app.domain.task.activationPeriodToken
+import com.example.focus_app.domain.time.SystemClock
 import com.example.focus_app.domain.usecase.BuildReminderContextUseCase
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -32,7 +35,8 @@ class ReminderBatchCoordinator(
     private val buildContext: suspend (FocusTask, AppInfo, AppSettings) -> ReminderContext,
     private val generate: suspend (ReminderContext, AppSettings) -> Result<List<String>>,
     private val cache: suspend (Long, String, String, List<String>) -> Unit,
-    private val cacheReady: suspend (Long, String, String) -> Boolean = { _, _, _ -> false }
+    private val cacheReady: suspend (Long, String, String) -> Boolean = { _, _, _ -> false },
+    private val periodToken: (FocusTask) -> Long = { MANUAL_ACTIVATION_PERIOD_TOKEN }
 ) {
     @Inject
     constructor(
@@ -43,7 +47,7 @@ class ReminderBatchCoordinator(
         aiRepository: AiRepository,
         cacheRepository: ReminderCacheRepository
     ) : this(
-        activeTasks = taskRepository.observeActive(),
+        activeTasks = taskRepository.observeActiveEvents(),
         settings = settingsRepository.getSettingsFlow(),
         apiKeyRevisions = settingsRepository.apiKeyRevision,
         moodRevisions = moodRepository.observeLatestMood().map { mood -> mood?.id },
@@ -52,15 +56,15 @@ class ReminderBatchCoordinator(
             aiRepository.generateBatch(context, currentSettings, BATCH_SIZE)
         },
         cache = cacheRepository::replace,
-        cacheReady = cacheRepository::isReady
+        cacheReady = cacheRepository::isReady,
+        periodToken = { task -> activationPeriodToken(task, SystemClock.now()) }
     )
 
     fun start(scope: CoroutineScope): Job = scope.launch {
-        var activeRevision = 0L
-        var startupHandled = false
+        var coldStartPending = true
         val versionedTasks = activeTasks.map { task ->
-            ActiveEmission(task, activeRevision++)
-        }
+            ActiveEmission(task, task?.let(periodToken))
+        }.distinctUntilChanged()
         combine(versionedTasks, settings, apiKeyRevisions, moodRevisions) {
                 active, currentSettings, apiKeyRevision, moodRevision ->
             val task = active.task
@@ -74,7 +78,7 @@ class ReminderBatchCoordinator(
                     key = ActivationKey(
                         taskId = task.id,
                         taskUpdatedAt = task.updatedAt,
-                        activeRevision = active.revision,
+                        periodToken = checkNotNull(active.periodToken),
                         targets = targetApps.map { it.packageName to it.appName },
                         toneKey = currentSettings.toneKey.key,
                         customToneInstruction = currentSettings.customToneInstruction,
@@ -93,18 +97,20 @@ class ReminderBatchCoordinator(
         }
             .distinctUntilChanged { old, new -> old?.key == new?.key }
             .collectLatest { activation ->
-                val isStartupEmission = !startupHandled
-                startupHandled = true
                 if (activation == null) return@collectLatest
-                if (isStartupEmission && activation.targetApps.all { app ->
-                        cacheReady(
+                val targetApps = if (coldStartPending) {
+                    coldStartPending = false
+                    activation.targetApps.filter { app ->
+                        !cacheReady(
                             activation.task.id,
                             app.packageName,
                             activation.settings.toneKey.key
                         )
                     }
-                ) return@collectLatest
-                activation.targetApps.forEach { app ->
+                } else {
+                    activation.targetApps
+                }
+                targetApps.forEach { app ->
                     generateAndCache(activation, app)
                 }
             }
@@ -136,12 +142,12 @@ class ReminderBatchCoordinator(
         val targetApps: List<AppInfo>
     )
 
-    private data class ActiveEmission(val task: FocusTask?, val revision: Long)
+    private data class ActiveEmission(val task: FocusTask?, val periodToken: Long?)
 
     private data class ActivationKey(
         val taskId: Long,
         val taskUpdatedAt: Long,
-        val activeRevision: Long,
+        val periodToken: Long,
         val targets: List<Pair<String, String>>,
         val toneKey: String,
         val customToneInstruction: String,

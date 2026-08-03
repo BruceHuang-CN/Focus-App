@@ -10,6 +10,7 @@ import com.example.focus_app.domain.time.SystemClock
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
@@ -41,8 +42,12 @@ class TaskRepository(
         tasks.map { it.toDomain() }
     }
 
+    fun observeActive(): Flow<FocusTask?> = activeTaskFlow().distinctUntilChanged()
+
+    fun observeActiveEvents(): Flow<FocusTask?> = activeTaskFlow()
+
     @OptIn(ExperimentalCoroutinesApi::class)
-    fun observeActive(): Flow<FocusTask?> = observeAll().flatMapLatest { tasks ->
+    private fun activeTaskFlow(): Flow<FocusTask?> = observeAll().flatMapLatest { tasks ->
         flow {
             while (true) {
                 val now = clock.now()

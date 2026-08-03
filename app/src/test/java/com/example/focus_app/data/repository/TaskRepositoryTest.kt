@@ -124,7 +124,7 @@ class TaskRepositoryTest {
     }
 
     @Test
-    fun same_active_task_is_emitted_again_at_its_schedule_boundary() = runTest {
+    fun observe_active_suppresses_the_same_task_at_its_schedule_boundary() = runTest {
         val clock = ControlledClock(mondayAt(8, 59, 59).toInstant().toEpochMilli())
         val repository = TaskRepository(
             FakeFocusTaskDao(
@@ -142,6 +142,35 @@ class TaskRepositoryTest {
         )
         val activeIds = mutableListOf<Long?>()
         val job = launch { repository.observeActive().collect { activeIds += it?.id } }
+
+        runCurrent()
+        clock.advanceBy(1_000L)
+        advanceTimeBy(1_000L)
+        runCurrent()
+
+        assertEquals(listOf(1L), activeIds)
+        job.cancel()
+    }
+
+    @Test
+    fun observe_active_events_emits_same_task_again_at_its_schedule_boundary() = runTest {
+        val clock = ControlledClock(mondayAt(8, 59, 59).toInstant().toEpochMilli())
+        val repository = TaskRepository(
+            FakeFocusTaskDao(
+                taskEntities(
+                    task(
+                        id = 1,
+                        manual = true,
+                        start = 9 * 60,
+                        end = 10 * 60,
+                        days = MONDAY_MASK
+                    )
+                )
+            ),
+            clock
+        )
+        val activeIds = mutableListOf<Long?>()
+        val job = launch { repository.observeActiveEvents().collect { activeIds += it?.id } }
 
         runCurrent()
         clock.advanceBy(1_000L)
