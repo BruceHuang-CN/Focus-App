@@ -3,9 +3,13 @@ package com.example.focus_app.di
 import android.content.Context
 import androidx.room.Room
 import com.example.focus_app.data.local.AppDatabase
+import com.example.focus_app.data.local.dao.AiReminderCacheDao
 import com.example.focus_app.data.local.dao.AppUsageEventDao
+import com.example.focus_app.data.local.dao.AppUsageSessionDao
+import com.example.focus_app.data.local.dao.FocusTaskDao
 import com.example.focus_app.data.local.dao.MoodRecordDao
 import com.example.focus_app.data.local.dao.SettingsDao
+import com.example.focus_app.data.local.migration.MIGRATION_1_2
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -20,10 +24,15 @@ object DatabaseModule {
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): AppDatabase {
-        return Room.databaseBuilder(context, AppDatabase::class.java, "focus_app_db").build()
+        return Room.databaseBuilder(context, AppDatabase::class.java, "focus_app_db")
+            .addMigrations(MIGRATION_1_2)
+            .build()
     }
 
     @Provides fun provideAppUsageEventDao(db: AppDatabase): AppUsageEventDao = db.appUsageEventDao()
     @Provides fun provideMoodRecordDao(db: AppDatabase): MoodRecordDao = db.moodRecordDao()
     @Provides fun provideSettingsDao(db: AppDatabase): SettingsDao = db.settingsDao()
+    @Provides fun provideFocusTaskDao(db: AppDatabase): FocusTaskDao = db.focusTaskDao()
+    @Provides fun provideAppUsageSessionDao(db: AppDatabase): AppUsageSessionDao = db.appUsageSessionDao()
+    @Provides fun provideAiReminderCacheDao(db: AppDatabase): AiReminderCacheDao = db.aiReminderCacheDao()
 }
