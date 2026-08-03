@@ -18,13 +18,21 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class ReminderSchedulerTest {
     @Test
-    fun leaving_before_delay_cancels_without_spending_quota() = runTest {
+    fun trigger_time_verifier_false_does_not_mark_or_show() = runTest {
         val fixture = fixture()
+        var verificationCount = 0
 
-        fixture.scheduler.onSessionStarted(fixture.session, appStillForeground = { false })
+        fixture.scheduler.onSessionStarted(
+            fixture.session,
+            appStillForeground = {
+                verificationCount++
+                false
+            }
+        )
         advanceTimeBy(10_001L)
         runCurrent()
 
+        assertEquals(1, verificationCount)
         assertEquals(0, fixture.launcher.shown.size)
         assertEquals(0, fixture.repository.remindedCount)
     }

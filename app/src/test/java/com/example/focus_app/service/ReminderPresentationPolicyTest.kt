@@ -1,0 +1,36 @@
+package com.example.focus_app.service
+
+import org.junit.Assert.assertEquals
+import org.junit.Test
+
+class ReminderPresentationPolicyTest {
+    @Test
+    fun missing_overlay_permission_posts_notification_without_starting_activity() {
+        var activityStarts = 0
+        var notifications = 0
+
+        presentReminder(
+            canDrawOverlays = false,
+            startActivity = { activityStarts++ },
+            postNotification = { notifications++ }
+        )
+
+        assertEquals(0, activityStarts)
+        assertEquals(1, notifications)
+    }
+
+    @Test
+    fun overlay_permission_allows_direct_reminder_activity() {
+        var activityStarts = 0
+        var notifications = 0
+
+        presentReminder(
+            canDrawOverlays = true,
+            startActivity = { activityStarts++ },
+            postNotification = { notifications++ }
+        )
+
+        assertEquals(1, activityStarts)
+        assertEquals(0, notifications)
+    }
+}

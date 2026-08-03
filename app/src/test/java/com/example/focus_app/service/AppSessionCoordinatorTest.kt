@@ -84,6 +84,23 @@ class AppSessionCoordinatorTest {
     }
 
     @Test
+    fun compatibility_verifier_is_forwarded_to_the_delayed_reminder_check() = runTest {
+        val fixture = fixture()
+        val verifiedPackages = mutableListOf<String>()
+
+        fixture.coordinator.onPackageChanged(
+            packageName = TARGET_A,
+            foregroundVerifier = { expectedPackage ->
+                verifiedPackages += expectedPackage
+                false
+            }
+        )
+
+        assertEquals(false, fixture.reminderScheduler.foregroundChecks.single().invoke())
+        assertEquals(listOf(TARGET_A), verifiedPackages)
+    }
+
+    @Test
     fun startup_closes_a_stale_session_at_observation_time_capped_to_24_hours() = runTest {
         val recentlyStale = staleFixture(observedAfter = 2 * HOUR_MS)
         recentlyStale.coordinator.onPackageChanged(LAUNCHER)
@@ -223,12 +240,14 @@ private class FakeAppSessionRepository(
 private class RecordingSessionReminderScheduler : SessionReminderScheduler {
     val startedSessionIds = mutableListOf<Long>()
     val cancelledSessionIds = mutableListOf<Long>()
+    val foregroundChecks = mutableListOf<suspend () -> Boolean>()
 
     override fun onSessionStarted(
         session: AppUsageSession,
         appStillForeground: suspend () -> Boolean
     ) {
         startedSessionIds += session.id
+        foregroundChecks += appStillForeground
     }
 
     override fun cancel(sessionId: Long) {

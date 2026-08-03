@@ -31,6 +31,11 @@ import javax.inject.Inject
 private const val POLL_INTERVAL_MS = 10_000L
 private const val INITIAL_QUERY_WINDOW_MS = 20_000L
 
+private data class ForegroundObservation(
+    val packageName: String,
+    val timestamp: Long
+)
+
 @AndroidEntryPoint
 class AppDetectionService : Service() {
     @Inject lateinit var settingsRepository: SettingsRepository
@@ -69,36 +74,48 @@ class AppDetectionService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
-    @Suppress("DEPRECATION")
     private suspend fun publishLatestForegroundPackage(queryStartedAt: Long): Long {
         val now = System.currentTimeMillis()
-        try {
-            val usm = getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager
-                ?: return now
-            val events = usm.queryEvents(queryStartedAt, now)
-            val event = UsageEvents.Event()
-            var latestPackage: String? = null
-            var latestTimestamp = Long.MIN_VALUE
-
-            while (events.hasNextEvent()) {
-                events.getNextEvent(event)
-                val isForegroundEvent =
-                    event.eventType == UsageEvents.Event.MOVE_TO_FOREGROUND ||
-                        (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
-                            event.eventType == UsageEvents.Event.ACTIVITY_RESUMED)
-                if (isForegroundEvent && event.timeStamp >= latestTimestamp) {
-                    latestTimestamp = event.timeStamp
-                    latestPackage = event.packageName
+        val observation = queryLatestForeground(queryStartedAt, now)
+        observation?.let { foreground ->
+            appSessionCoordinator.onPackageChanged(
+                packageName = foreground.packageName,
+                foregroundVerifier = { expectedPackage ->
+                    queryLatestForeground(
+                        from = (foreground.timestamp - 1L).coerceAtLeast(0L),
+                        to = System.currentTimeMillis()
+                    )?.packageName == expectedPackage
                 }
-            }
-
-            latestPackage?.let { appSessionCoordinator.onPackageChanged(it) }
-        } catch (error: SecurityException) {
-            Log.w(TAG, "Usage access is not available", error)
-        } catch (error: RuntimeException) {
-            Log.w(TAG, "Unable to query foreground app events", error)
+            )
         }
         return now
+    }
+
+    @Suppress("DEPRECATION")
+    private fun queryLatestForeground(from: Long, to: Long): ForegroundObservation? = try {
+        val usm = getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager
+            ?: return null
+        val events = usm.queryEvents(from, to)
+        val event = UsageEvents.Event()
+        var latest: ForegroundObservation? = null
+
+        while (events.hasNextEvent()) {
+            events.getNextEvent(event)
+            val isForegroundEvent =
+                event.eventType == UsageEvents.Event.MOVE_TO_FOREGROUND ||
+                    (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+                        event.eventType == UsageEvents.Event.ACTIVITY_RESUMED)
+            if (isForegroundEvent && (latest == null || event.timeStamp >= latest.timestamp)) {
+                latest = ForegroundObservation(event.packageName, event.timeStamp)
+            }
+        }
+        latest
+    } catch (error: SecurityException) {
+        Log.w(TAG, "Usage access is not available", error)
+        null
+    } catch (error: RuntimeException) {
+        Log.w(TAG, "Unable to query foreground app events", error)
+        null
     }
 
     private fun buildNotification(): Notification {

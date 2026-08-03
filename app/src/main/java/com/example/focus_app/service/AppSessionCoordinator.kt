@@ -44,7 +44,10 @@ class AppSessionCoordinator(
     @Volatile private var foregroundPackage: String? = null
     private var openSession: AppUsageSession? = null
 
-    suspend fun onPackageChanged(packageName: String?) = eventMutex.withLock {
+    suspend fun onPackageChanged(
+        packageName: String?,
+        foregroundVerifier: (suspend (String) -> Boolean)? = null
+    ) = eventMutex.withLock {
         val now = clock.nowMillis()
         recoverStaleSession(now)
 
@@ -76,7 +79,8 @@ class AppSessionCoordinator(
         openSession = session
         foregroundPackage = packageName
         reminderScheduler.onSessionStarted(session) {
-            foregroundPackage == session.packageName
+            foregroundVerifier?.invoke(session.packageName)
+                ?: (foregroundPackage == session.packageName)
         }
     }
 
