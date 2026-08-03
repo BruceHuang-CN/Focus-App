@@ -58,7 +58,21 @@ class SettingsViewModel @Inject constructor(private val settingsRepository: Sett
         }
     }
     fun updateAiProvider(p: AiProvider) { update { it.copy(aiProvider = p, apiEndpoint = p.defaultEndpoint, aiModel = p.defaultModel) } }
-    fun updateApiEndpoint(e: String) { update { it.copy(apiEndpoint = e, aiProvider = AiProvider.CUSTOM) } }
+    fun updateAiConnection(endpoint: String, model: String) {
+        val savedEndpoint = endpoint.trim()
+        val savedModel = model.trim()
+        update {
+            val provider = AiProvider.entries.firstOrNull { candidate ->
+                candidate != AiProvider.CUSTOM &&
+                    candidate.defaultEndpoint.trimEnd('/') == savedEndpoint.trimEnd('/')
+            } ?: AiProvider.CUSTOM
+            it.copy(
+                aiProvider = provider,
+                apiEndpoint = savedEndpoint,
+                aiModel = savedModel
+            )
+        }
+    }
     fun updateApiKey(k: String) {
         viewModelScope.launch { settingsRepository.saveApiKey(k) }
     }
@@ -66,7 +80,6 @@ class SettingsViewModel @Inject constructor(private val settingsRepository: Sett
     fun clearApiKey() {
         viewModelScope.launch { settingsRepository.clearApiKey() }
     }
-    fun updateAiModel(m: String) { update { it.copy(aiModel = m) } }
     fun updatePersonality(p: String) { update { it.copy(aiPersonality = p, toneKey = ReminderTone.fromKey(p)) } }
     fun toggleBreathingPause() { update { it.copy(enableBreathingPause = !it.enableBreathingPause) } }
     fun toggleAccessibility() { update { it.copy(enableAccessibility = !it.enableAccessibility) } }

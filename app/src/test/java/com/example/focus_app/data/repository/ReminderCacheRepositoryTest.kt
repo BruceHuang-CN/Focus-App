@@ -30,6 +30,37 @@ class ReminderCacheRepositoryTest {
         assertEquals(listOf("第一条", "第二条", "第三条", "第一条"), actual)
         assertEquals(listOf(2_003L, 2_001L, 2_002L), dao.rows.map { it.lastUsedAt })
     }
+
+    @Test
+    fun key_is_ready_only_with_exactly_three_cached_rows() = runTest {
+        val dao = FakeReminderCacheDao()
+        val repository = ReminderCacheRepository(dao, FakeClock(2_000L))
+        dao.insertAll(
+            listOf("一", "二").map {
+                AiReminderCacheEntity(
+                    taskId = 7L,
+                    appPackageName = "video.app",
+                    toneKey = "direct",
+                    text = it,
+                    createdAt = 1L
+                )
+            }
+        )
+        assertEquals(false, repository.isReady(7L, "video.app", "direct"))
+
+        dao.insertAll(
+            listOf(
+                AiReminderCacheEntity(
+                    taskId = 7L,
+                    appPackageName = "video.app",
+                    toneKey = "direct",
+                    text = "三",
+                    createdAt = 1L
+                )
+            )
+        )
+        assertEquals(true, repository.isReady(7L, "video.app", "direct"))
+    }
 }
 
 private class FakeReminderCacheDao : AiReminderCacheDao {
@@ -63,4 +94,9 @@ private class FakeReminderCacheDao : AiReminderCacheDao {
         val index = rows.indexOfFirst { it.id == id }
         rows[index] = rows[index].copy(lastUsedAt = usedAt)
     }
+
+    override suspend fun count(taskId: Long, packageName: String, toneKey: String): Int =
+        rows.count {
+            it.taskId == taskId && it.appPackageName == packageName && it.toneKey == toneKey
+        }
 }

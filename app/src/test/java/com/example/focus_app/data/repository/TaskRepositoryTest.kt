@@ -124,6 +124,35 @@ class TaskRepositoryTest {
     }
 
     @Test
+    fun same_active_task_is_emitted_again_at_its_schedule_boundary() = runTest {
+        val clock = ControlledClock(mondayAt(8, 59, 59).toInstant().toEpochMilli())
+        val repository = TaskRepository(
+            FakeFocusTaskDao(
+                taskEntities(
+                    task(
+                        id = 1,
+                        manual = true,
+                        start = 9 * 60,
+                        end = 10 * 60,
+                        days = MONDAY_MASK
+                    )
+                )
+            ),
+            clock
+        )
+        val activeIds = mutableListOf<Long?>()
+        val job = launch { repository.observeActive().collect { activeIds += it?.id } }
+
+        runCurrent()
+        clock.advanceBy(1_000L)
+        advanceTimeBy(1_000L)
+        runCurrent()
+
+        assertEquals(listOf(1L, 1L), activeIds)
+        job.cancel()
+    }
+
+    @Test
     fun set_manual_active_keeps_the_current_manual_task_when_selected_task_is_completed() = runTest {
         val repository = TaskRepository(
             FakeFocusTaskDao(

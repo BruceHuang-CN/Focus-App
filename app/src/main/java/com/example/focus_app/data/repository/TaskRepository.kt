@@ -10,7 +10,6 @@ import com.example.focus_app.domain.time.SystemClock
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.awaitCancellation
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
@@ -53,7 +52,7 @@ class TaskRepository(
                 delay(waitMillis)
             }
         }
-    }.distinctUntilChanged()
+    }
 
     suspend fun create(task: FocusTask): ScheduleValidation {
         val validation = validateSchedule(task, observeAll().first())

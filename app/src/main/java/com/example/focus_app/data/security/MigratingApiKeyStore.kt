@@ -29,30 +29,34 @@ class MigratingApiKeyStore(
 
     override suspend fun read(): String = mutex.withLock {
         val encrypted = encryptedStore.read()
-        if (encrypted.isNotBlank()) {
-            migrationChecked = true
-            return@withLock encrypted
-        }
-        if (migrationChecked) return@withLock ""
+        if (migrationChecked) return@withLock encrypted
 
         val legacy = legacySource.read()
         if (legacy.isNotBlank()) {
-            encryptedStore.write(legacy)
+            if (encrypted.isBlank()) encryptedStore.write(legacy)
             legacySource.clear()
         }
         migrationChecked = true
-        legacy
+        encrypted.ifBlank { legacy }
     }
 
     override suspend fun write(value: String) = mutex.withLock {
+        if (value.isBlank()) {
+            clearLocked()
+            return@withLock
+        }
         encryptedStore.write(value)
         legacySource.clear()
         migrationChecked = true
     }
 
     override suspend fun clear() = mutex.withLock {
-        encryptedStore.clear()
+        clearLocked()
+    }
+
+    private suspend fun clearLocked() {
         legacySource.clear()
+        encryptedStore.clear()
         migrationChecked = true
     }
 }

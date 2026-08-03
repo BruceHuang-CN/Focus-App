@@ -7,7 +7,6 @@ import com.example.focus_app.data.security.ApiKeyStore
 import com.example.focus_app.domain.model.AiProvider
 import com.example.focus_app.domain.model.ReminderContext
 import kotlinx.coroutines.CancellationException
-import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -16,14 +15,18 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 
 @Singleton
-class AiRepository @Inject constructor(
-    private val apiKeyStore: ApiKeyStore
+class AiRepository internal constructor(
+    private val apiKeyStore: ApiKeyStore,
+    private val apiFactory: (String) -> OpenAiApi
 ) {
-    private val apiCache = ConcurrentHashMap<String, OpenAiApi>()
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .build()
+    @Inject
+    constructor(apiKeyStore: ApiKeyStore) : this(apiKeyStore, RetrofitOpenAiApiFactory())
+
+    @Volatile
+    private var cachedEndpoint: String? = null
+
+    @Volatile
+    private var cachedApi: OpenAiApi? = null
 
     suspend fun generateBatch(
         context: ReminderContext,
@@ -49,12 +52,36 @@ class AiRepository @Inject constructor(
         }
     }
 
-    private fun getOrCreateApi(endpoint: String): OpenAiApi = apiCache.getOrPut(endpoint) {
+    private fun getOrCreateApi(endpoint: String): OpenAiApi {
+        val normalizedEndpoint = endpoint.trimEnd('/')
+        val currentApi = cachedApi
+        if (cachedEndpoint == normalizedEndpoint && currentApi != null) return currentApi
+
+        return synchronized(this) {
+            val synchronizedApi = cachedApi
+            if (cachedEndpoint == normalizedEndpoint && synchronizedApi != null) {
+                synchronizedApi
+            } else {
+                apiFactory(normalizedEndpoint).also {
+                    cachedEndpoint = normalizedEndpoint
+                    cachedApi = it
+                }
+            }
+        }
+    }
+}
+
+private class RetrofitOpenAiApiFactory : (String) -> OpenAiApi {
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(30, TimeUnit.SECONDS)
+        .build()
+
+    override fun invoke(endpoint: String): OpenAiApi =
         Retrofit.Builder()
-            .baseUrl(endpoint.trimEnd('/') + "/")
+            .baseUrl("$endpoint/")
             .client(client)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
             .create(OpenAiApi::class.java)
-    }
 }

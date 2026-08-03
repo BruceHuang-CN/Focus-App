@@ -24,6 +24,12 @@ fun SettingsScreen(onBack: () -> Unit, navigateToTargetApps: () -> Unit, viewMod
     val scope = rememberCoroutineScope()
     var lastChange by remember { mutableStateOf("") }
     var apiKeyInput by remember { mutableStateOf("") }
+    var endpointDraft by remember(s.aiProvider, s.apiEndpoint, s.aiModel) {
+        mutableStateOf(s.apiEndpoint)
+    }
+    var modelDraft by remember(s.aiProvider, s.apiEndpoint, s.aiModel) {
+        mutableStateOf(s.aiModel)
+    }
 
     fun onSettingChanged(label: String) {
         lastChange = label
@@ -95,7 +101,25 @@ fun SettingsScreen(onBack: () -> Unit, navigateToTargetApps: () -> Unit, viewMod
                     Text(p.displayName)
                 }
             }
-            OutlinedTextField(value = s.apiEndpoint, onValueChange = { viewModel.updateApiEndpoint(it) }, label = { Text("API 端点") }, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(
+                value = endpointDraft,
+                onValueChange = { endpointDraft = it },
+                label = { Text("API 端点") },
+                modifier = Modifier.fillMaxWidth()
+            )
+            OutlinedTextField(
+                value = modelDraft,
+                onValueChange = { modelDraft = it },
+                label = { Text("模型名") },
+                modifier = Modifier.fillMaxWidth()
+            )
+            Button(
+                onClick = {
+                    viewModel.updateAiConnection(endpointDraft, modelDraft)
+                    onSettingChanged("AI 连接设置")
+                },
+                enabled = endpointDraft.isNotBlank() && modelDraft.isNotBlank()
+            ) { Text("保存连接设置") }
             OutlinedTextField(
                 value = apiKeyInput,
                 onValueChange = { apiKeyInput = it },
@@ -119,7 +143,6 @@ fun SettingsScreen(onBack: () -> Unit, navigateToTargetApps: () -> Unit, viewMod
                     }
                 ) { Text("清除") }
             }
-            OutlinedTextField(value = s.aiModel, onValueChange = { viewModel.updateAiModel(it) }, label = { Text("模型名") }, modifier = Modifier.fillMaxWidth())
             Divider()
             Text("AI 提醒风格", style = MaterialTheme.typography.titleMedium)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

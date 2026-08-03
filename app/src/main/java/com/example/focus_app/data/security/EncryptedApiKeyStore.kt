@@ -52,11 +52,13 @@ class EncryptedApiKeyStore @Inject constructor(
             .putString(IV_KEY, Base64.encodeToString(cipher.iv, Base64.NO_WRAP))
             .putString(CIPHERTEXT_KEY, Base64.encodeToString(encrypted, Base64.NO_WRAP))
             .commit()
-        check(saved) { "Unable to save encrypted API key" }
+        requireSuccessfulPreferencesCommit(saved)
     }
 
     override suspend fun clear() {
-        preferences.edit().remove(IV_KEY).remove(CIPHERTEXT_KEY).commit()
+        requireSuccessfulPreferencesCommit(
+            preferences.edit().remove(IV_KEY).remove(CIPHERTEXT_KEY).commit()
+        )
     }
 
     private fun getOrCreateKey(): SecretKey {
@@ -83,4 +85,8 @@ class EncryptedApiKeyStore @Inject constructor(
         const val IV_KEY = "iv"
         const val CIPHERTEXT_KEY = "ciphertext"
     }
+}
+
+internal fun requireSuccessfulPreferencesCommit(saved: Boolean) {
+    check(saved) { "Unable to persist encrypted API key state" }
 }

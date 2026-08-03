@@ -31,7 +31,8 @@ class ReminderBatchCoordinator(
     private val moodRevisions: Flow<Long?> = flowOf(null),
     private val buildContext: suspend (FocusTask, AppInfo, AppSettings) -> ReminderContext,
     private val generate: suspend (ReminderContext, AppSettings) -> Result<List<String>>,
-    private val cache: suspend (Long, String, String, List<String>) -> Unit
+    private val cache: suspend (Long, String, String, List<String>) -> Unit,
+    private val cacheReady: suspend (Long, String, String) -> Boolean = { _, _, _ -> false }
 ) {
     @Inject
     constructor(
@@ -50,20 +51,31 @@ class ReminderBatchCoordinator(
         generate = { context, currentSettings ->
             aiRepository.generateBatch(context, currentSettings, BATCH_SIZE)
         },
-        cache = cacheRepository::replace
+        cache = cacheRepository::replace,
+        cacheReady = cacheRepository::isReady
     )
 
     fun start(scope: CoroutineScope): Job = scope.launch {
-        combine(activeTasks, settings, apiKeyRevisions, moodRevisions) {
-                task, currentSettings, apiKeyRevision, moodRevision ->
+        var activeRevision = 0L
+        var startupHandled = false
+        val versionedTasks = activeTasks.map { task ->
+            ActiveEmission(task, activeRevision++)
+        }
+        combine(versionedTasks, settings, apiKeyRevisions, moodRevisions) {
+                active, currentSettings, apiKeyRevision, moodRevision ->
+            val task = active.task
             if (task == null || currentSettings.targetApps.isEmpty()) {
                 null
             } else {
+                val targetApps = currentSettings.targetApps.sortedWith(
+                    compareBy<AppInfo> { it.packageName }.thenBy { it.appName }
+                )
                 BatchActivation(
                     key = ActivationKey(
                         taskId = task.id,
                         taskUpdatedAt = task.updatedAt,
-                        targetPackages = currentSettings.targetApps.map { it.packageName },
+                        activeRevision = active.revision,
+                        targets = targetApps.map { it.packageName to it.appName },
                         toneKey = currentSettings.toneKey.key,
                         customToneInstruction = currentSettings.customToneInstruction,
                         provider = currentSettings.aiProvider.name,
@@ -74,14 +86,25 @@ class ReminderBatchCoordinator(
                         moodRevision = moodRevision
                     ),
                     task = task,
-                    settings = currentSettings
+                    settings = currentSettings,
+                    targetApps = targetApps
                 )
             }
         }
             .distinctUntilChanged { old, new -> old?.key == new?.key }
             .collectLatest { activation ->
+                val isStartupEmission = !startupHandled
+                startupHandled = true
                 if (activation == null) return@collectLatest
-                activation.settings.targetApps.forEach { app ->
+                if (isStartupEmission && activation.targetApps.all { app ->
+                        cacheReady(
+                            activation.task.id,
+                            app.packageName,
+                            activation.settings.toneKey.key
+                        )
+                    }
+                ) return@collectLatest
+                activation.targetApps.forEach { app ->
                     generateAndCache(activation, app)
                 }
             }
@@ -109,13 +132,17 @@ class ReminderBatchCoordinator(
     private data class BatchActivation(
         val key: ActivationKey,
         val task: FocusTask,
-        val settings: AppSettings
+        val settings: AppSettings,
+        val targetApps: List<AppInfo>
     )
+
+    private data class ActiveEmission(val task: FocusTask?, val revision: Long)
 
     private data class ActivationKey(
         val taskId: Long,
         val taskUpdatedAt: Long,
-        val targetPackages: List<String>,
+        val activeRevision: Long,
+        val targets: List<Pair<String, String>>,
         val toneKey: String,
         val customToneInstruction: String,
         val provider: String,

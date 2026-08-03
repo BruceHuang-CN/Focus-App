@@ -43,4 +43,7 @@ class ReminderCacheRepository(
 
     suspend fun next(taskId: Long, packageName: String, toneKey: String): String? =
         dao.takeNext(taskId, packageName, toneKey, clock.nowMillis())?.text
+
+    suspend fun isReady(taskId: Long, packageName: String, toneKey: String): Boolean =
+        dao.count(taskId, packageName, toneKey) == 3
 }

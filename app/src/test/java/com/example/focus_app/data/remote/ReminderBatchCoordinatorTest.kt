@@ -6,6 +6,7 @@ import com.example.focus_app.domain.model.FocusTask
 import com.example.focus_app.domain.model.ReminderContext
 import com.example.focus_app.domain.model.ReminderTone
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -44,9 +45,92 @@ class ReminderBatchCoordinatorTest {
         runCurrent()
         settings.value = settings.value.copy(enableBreathingPause = false)
         runCurrent()
+        settings.value = settings.value.copy(targetApps = settings.value.targetApps.reversed())
+        runCurrent()
 
-        assertEquals(listOf("抖音", "哔哩哔哩"), generated)
-        assertEquals(listOf("douyin", "bilibili"), cached)
+        assertEquals(listOf("哔哩哔哩", "抖音"), generated)
+        assertEquals(listOf("bilibili", "douyin"), cached)
+    }
+
+    @Test
+    fun cold_start_with_complete_cache_skips_generation_once() = runTest {
+        val tasks = MutableStateFlow<FocusTask?>(
+            FocusTask(id = 7L, title = "写方案", isManualActive = true)
+        )
+        val settings = MutableStateFlow(
+            AppSettings(
+                targetApps = listOf(
+                    AppInfo("douyin", "抖音"),
+                    AppInfo("bilibili", "哔哩哔哩")
+                )
+            )
+        )
+        val checkedPackages = mutableListOf<String>()
+        var generated = 0
+        val coordinator = ReminderBatchCoordinator(
+            activeTasks = tasks,
+            settings = settings,
+            buildContext = { task, app, current -> context(task, app, current.toneKey) },
+            generate = { _, _ -> generated++; Result.success(listOf("一", "二", "三")) },
+            cache = { _, _, _, _ -> },
+            cacheReady = { _, packageName, _ -> checkedPackages += packageName; true }
+        )
+
+        coordinator.start(backgroundScope)
+        runCurrent()
+
+        assertEquals(0, generated)
+        assertEquals(listOf("bilibili", "douyin"), checkedPackages)
+    }
+
+    @Test
+    fun cold_start_without_active_task_does_not_skip_later_activation() = runTest {
+        val tasks = MutableStateFlow<FocusTask?>(null)
+        val settings = MutableStateFlow(
+            AppSettings(targetApps = listOf(AppInfo("douyin", "抖音")))
+        )
+        var generated = 0
+        val coordinator = ReminderBatchCoordinator(
+            activeTasks = tasks,
+            settings = settings,
+            buildContext = { task, app, current -> context(task, app, current.toneKey) },
+            generate = { _, _ -> generated++; Result.success(listOf("一", "二", "三")) },
+            cache = { _, _, _, _ -> },
+            cacheReady = { _, _, _ -> true }
+        )
+        coordinator.start(backgroundScope)
+        runCurrent()
+
+        tasks.value = FocusTask(id = 7L, title = "写方案", isManualActive = true)
+        runCurrent()
+
+        assertEquals(1, generated)
+    }
+
+    @Test
+    fun same_task_second_boundary_emission_generates_a_second_batch() = runTest {
+        val task = FocusTask(id = 7L, title = "写方案", isManualActive = true)
+        val tasks = MutableSharedFlow<FocusTask?>(replay = 1)
+        tasks.emit(task)
+        val settings = MutableStateFlow(
+            AppSettings(targetApps = listOf(AppInfo("douyin", "抖音")))
+        )
+        var generated = 0
+        val coordinator = ReminderBatchCoordinator(
+            activeTasks = tasks,
+            settings = settings,
+            buildContext = { currentTask, app, current -> context(currentTask, app, current.toneKey) },
+            generate = { _, _ -> generated++; Result.success(listOf("一", "二", "三")) },
+            cache = { _, _, _, _ -> },
+            cacheReady = { _, _, _ -> false }
+        )
+        coordinator.start(backgroundScope)
+        runCurrent()
+
+        tasks.emit(task)
+        runCurrent()
+
+        assertEquals(2, generated)
     }
 
     @Test

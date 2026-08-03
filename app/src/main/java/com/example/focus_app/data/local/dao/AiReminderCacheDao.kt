@@ -37,6 +37,12 @@ interface AiReminderCacheDao {
     )
     suspend fun maxLastUsedAt(taskId: Long, packageName: String, toneKey: String): Long?
 
+    @Query(
+        "SELECT COUNT(*) FROM ai_reminder_cache WHERE taskId = :taskId " +
+            "AND appPackageName = :packageName AND toneKey = :toneKey"
+    )
+    suspend fun count(taskId: Long, packageName: String, toneKey: String): Int
+
     @Query("UPDATE ai_reminder_cache SET lastUsedAt = :usedAt WHERE id = :id")
     suspend fun updateLastUsedAt(id: Long, usedAt: Long)
 
