@@ -1,5 +1,6 @@
 package com.example.focus_app.service
 
+import android.app.ActivityManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -12,6 +13,23 @@ class ReminderActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val eventId = intent.getLongExtra("event_id", 0)
         val appName = intent.getStringExtra("app_name") ?: "目标App"
-        setContent { ReminderOverlay(eventId = eventId, appName = appName, onDismiss = { finish() }) }
+        val packageName = intent.getStringExtra("package_name") ?: ""
+
+        setContent {
+            ReminderOverlay(
+                eventId = eventId,
+                appName = appName,
+                onExited = {
+                    if (packageName.isNotEmpty()) {
+                        val am = getSystemService(ACTIVITY_SERVICE) as ActivityManager
+                        am.killBackgroundProcesses(packageName)
+                    }
+                    finish()
+                },
+                onContinued = {
+                    finish()
+                }
+            )
+        }
     }
 }

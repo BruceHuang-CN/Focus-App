@@ -60,13 +60,14 @@ class AppDetectionService : Service() {
             Log.d("Focus", "Detected target app: ${app.appName} ($pkg)")
             val result = trackAppOpenUseCase(pkg, app.appName, settings.maxRemindsPerHour)
             Log.d("Focus", "Track result: eventId=${result.eventId}, shouldRemind=${result.shouldRemind}, reminded=${result.remindedCountThisHour}/${result.maxReminds}")
-            if (result.shouldRemind) scheduleReminder(result.eventId, app.appName, settings.remindDelayMinutes)
+            if (result.shouldRemind) scheduleReminder(result.eventId, app.appName, pkg, settings.remindDelayMinutes)
         } catch (_: Exception) {}
     }
 
-    private fun scheduleReminder(eventId: Long, appName: String, delayMinutes: Int) {
+    private fun scheduleReminder(eventId: Long, appName: String, packageName: String, delayMinutes: Int) {
         val intent = Intent(this, ReminderActivity::class.java).apply {
             putExtra("event_id", eventId); putExtra("app_name", appName)
+            putExtra("package_name", packageName)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
         }
         val pi = PendingIntent.getActivity(this, (eventId % Int.MAX_VALUE).toInt(), intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)

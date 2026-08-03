@@ -13,7 +13,7 @@ import com.example.focus_app.ui.theme.InkBlue
 import kotlinx.coroutines.delay
 
 @Composable
-fun ReminderOverlay(eventId: Long, appName: String, onDismiss: () -> Unit, viewModel: ReminderViewModel = hiltViewModel()) {
+fun ReminderOverlay(eventId: Long, appName: String, onExited: () -> Unit, onContinued: () -> Unit, viewModel: ReminderViewModel = hiltViewModel()) {
     val uiState by viewModel.uiState.collectAsState()
     var breathingStep by remember { mutableIntStateOf(5) }
 
@@ -32,8 +32,8 @@ fun ReminderOverlay(eventId: Long, appName: String, onDismiss: () -> Unit, viewM
                     Text("⏰ 提醒", style = MaterialTheme.typography.headlineMedium, color = InkBlue)
                     if (uiState.isLoading) { CircularProgressIndicator(color = InkBlue); Text("AI 正在分析...") } else { Text(uiState.aiMessage, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center) }
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Button(onClick = { viewModel.onExited(eventId); onDismiss() }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = InkBlue)) { Text("退出，去干正事") }
-                        OutlinedButton(onClick = { viewModel.onContinued(eventId); onDismiss() }, modifier = Modifier.weight(1f)) { Text("再刷一会...") }
+                        Button(onClick = { viewModel.onExited(eventId); onExited() }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = InkBlue)) { Text("退出，去干正事") }
+                        OutlinedButton(onClick = { viewModel.onContinued(eventId); onContinued() }, modifier = Modifier.weight(1f)) { Text("再刷一会...") }
                     }
                     val rem = (uiState.maxReminds - uiState.remindedCount).coerceAtLeast(0)
                     Text("本小时剩余提醒额度：${rem} 次", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
