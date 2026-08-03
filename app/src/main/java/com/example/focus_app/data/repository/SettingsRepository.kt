@@ -3,7 +3,9 @@ package com.example.focus_app.data.repository
 import com.example.focus_app.data.local.dao.SettingsDao
 import com.example.focus_app.data.local.entity.SettingsEntity
 import com.example.focus_app.domain.model.AiProvider
-import com.google.gson.Gson
+import com.example.focus_app.domain.model.DetectionMode
+import com.example.focus_app.domain.model.ReminderTone
+import com.example.focus_app.domain.model.ReturnDestination
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
@@ -19,7 +21,15 @@ data class AppSettings(
     val aiModel: String = "deepseek-chat",
     val aiPersonality: String = "gentle",
     val enableAccessibility: Boolean = false,
-    val enableBreathingPause: Boolean = true
+    val enableBreathingPause: Boolean = true,
+    val reminderDelaySeconds: Int = 10,
+    val reminderWindowMinutes: Int = 60,
+    val maxRemindersPerWindow: Int = 3,
+    val returnDestination: ReturnDestination = ReturnDestination.FOCUS,
+    val detectionMode: DetectionMode = DetectionMode.REALTIME,
+    val toneKey: ReminderTone = ReminderTone.GENTLE,
+    val customToneInstruction: String = "",
+    val dailyShortVideoLimitMinutes: Int = 30
 ) {
     val isAiConfigured: Boolean get() = apiKey.isNotBlank()
 }
@@ -28,20 +38,18 @@ data class AppInfo(val packageName: String, val appName: String)
 
 @Singleton
 class SettingsRepository @Inject constructor(private val settingsDao: SettingsDao) {
-    private val gson = Gson()
-
-    fun getSettingsFlow(): Flow<AppSettings> = settingsDao.getSettings().map { it?.toDomain() ?: AppSettings() }
-    suspend fun getSettings(): AppSettings = settingsDao.getSettingsOnce()?.toDomain() ?: AppSettings()
-    suspend fun updateSettings(settings: AppSettings) { settingsDao.insertOrUpdate(settings.toEntity()) }
-
-    private fun SettingsEntity.toDomain(): AppSettings {
-        val apps: List<AppInfo> = try { gson.fromJson(targetApps, Array<AppInfo>::class.java).toList() } catch (_: Exception) { emptyList() }
-        return AppSettings(apps, remindDelayMinutes, maxRemindsPerHour, AiProvider.fromKey(aiProvider), apiEndpoint, apiKey, aiModel, aiPersonality, enableAccessibility, enableBreathingPause)
+    fun getSettingsFlow(): Flow<AppSettings> = settingsDao.getSettings().map {
+        it?.toAppSettings() ?: AppSettings()
     }
 
-    private fun AppSettings.toEntity() = SettingsEntity(
-        targetApps = gson.toJson(targetApps), remindDelayMinutes = remindDelayMinutes, maxRemindsPerHour = maxRemindsPerHour,
-        aiProvider = aiProvider.name.lowercase(), apiEndpoint = apiEndpoint, apiKey = apiKey, aiModel = aiModel,
-        aiPersonality = aiPersonality, enableAccessibility = enableAccessibility, enableBreathingPause = enableBreathingPause
-    )
+    suspend fun getSettings(): AppSettings =
+        settingsDao.getSettingsOnce()?.toAppSettings() ?: AppSettings()
+
+    suspend fun updateSettings(settings: AppSettings) {
+        val existing = settingsDao.getSettingsOnce() ?: SettingsEntity(
+            targetApps = "[]",
+            legacyApiKey = ""
+        )
+        settingsDao.insertOrUpdate(settings.toEntity(existing))
+    }
 }
