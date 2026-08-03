@@ -55,6 +55,13 @@ data class SettingsEntity(
         aiModel = aiModel,
         aiPersonality = aiPersonality,
         enableAccessibility = enableAccessibility,
-        enableBreathingPause = enableBreathingPause
+        enableBreathingPause = enableBreathingPause,
+        reminderDelaySeconds = if (remindDelayMinutes == 0) {
+            3
+        } else {
+            remindDelayMinutes * 60
+        },
+        maxRemindersPerWindow = maxRemindsPerHour,
+        toneKey = aiPersonality
     )
 }
