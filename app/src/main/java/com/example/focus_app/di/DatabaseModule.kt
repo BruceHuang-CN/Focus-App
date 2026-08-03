@@ -10,6 +10,13 @@ import com.example.focus_app.data.local.dao.FocusTaskDao
 import com.example.focus_app.data.local.dao.MoodRecordDao
 import com.example.focus_app.data.local.dao.SettingsDao
 import com.example.focus_app.data.local.migration.MIGRATION_1_2
+import com.example.focus_app.data.repository.AppSessionRepository
+import com.example.focus_app.data.repository.RoomAppSessionRepository
+import com.example.focus_app.data.repository.SettingsRepository
+import com.example.focus_app.data.repository.TaskRepository
+import com.example.focus_app.domain.time.SystemClock
+import com.example.focus_app.service.AppSessionCoordinator
+import com.example.focus_app.service.RepositoryAppSessionContextProvider
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -35,4 +42,21 @@ object DatabaseModule {
     @Provides fun provideFocusTaskDao(db: AppDatabase): FocusTaskDao = db.focusTaskDao()
     @Provides fun provideAppUsageSessionDao(db: AppDatabase): AppUsageSessionDao = db.appUsageSessionDao()
     @Provides fun provideAiReminderCacheDao(db: AppDatabase): AiReminderCacheDao = db.aiReminderCacheDao()
+
+    @Provides
+    @Singleton
+    fun provideAppSessionRepository(dao: AppUsageSessionDao): AppSessionRepository =
+        RoomAppSessionRepository(dao)
+
+    @Provides
+    @Singleton
+    fun provideAppSessionCoordinator(
+        repository: AppSessionRepository,
+        settingsRepository: SettingsRepository,
+        taskRepository: TaskRepository
+    ): AppSessionCoordinator = AppSessionCoordinator(
+        repository = repository,
+        contextProvider = RepositoryAppSessionContextProvider(settingsRepository, taskRepository),
+        clock = SystemClock
+    )
 }
