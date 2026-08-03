@@ -52,6 +52,7 @@ class AppDetectionService : Service() {
                 .distinctUntilChanged()
                 .collectLatest { mode ->
                     if (mode != DetectionMode.COMPATIBILITY) {
+                        appSessionCoordinator.onPackageChanged(null)
                         stopSelf(startId)
                         return@collectLatest
                     }

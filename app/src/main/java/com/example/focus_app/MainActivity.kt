@@ -13,6 +13,7 @@ import androidx.lifecycle.lifecycleScope
 import com.example.focus_app.data.repository.SettingsRepository
 import com.example.focus_app.domain.model.DetectionMode
 import com.example.focus_app.service.AppDetectionService
+import com.example.focus_app.service.AppSessionCoordinator
 import com.example.focus_app.ui.navigation.NavGraph
 import com.example.focus_app.ui.theme.FocusAppTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -24,6 +25,7 @@ import javax.inject.Inject
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     @Inject lateinit var settingsRepository: SettingsRepository
+    @Inject lateinit var appSessionCoordinator: AppSessionCoordinator
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -45,7 +47,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun applyDetectionMode(mode: DetectionMode) {
+    private suspend fun applyDetectionMode(mode: DetectionMode) {
         val intent = Intent(this, AppDetectionService::class.java)
         if (mode == DetectionMode.COMPATIBILITY) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -54,6 +56,7 @@ class MainActivity : ComponentActivity() {
                 startService(intent)
             }
         } else {
+            appSessionCoordinator.onPackageChanged(null)
             stopService(intent)
         }
     }
