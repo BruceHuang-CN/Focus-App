@@ -30,6 +30,8 @@ interface AppSessionRepository {
     suspend fun countShownRemindersSince(since: Long): Int = 0
 
     suspend fun countActiveExitsSince(since: Long): Int = 0
+
+    suspend fun sessionsBetween(from: Long, to: Long): List<AppUsageSession> = emptyList()
 }
 
 class RoomAppSessionRepository @Inject constructor(
@@ -77,4 +79,7 @@ class RoomAppSessionRepository @Inject constructor(
 
     override suspend fun countActiveExitsSince(since: Long): Int =
         dao.countActiveExitsSince(since)
+
+    override suspend fun sessionsBetween(from: Long, to: Long): List<AppUsageSession> =
+        dao.sessionsBetween(from, to).map { it.toDomain() }
 }

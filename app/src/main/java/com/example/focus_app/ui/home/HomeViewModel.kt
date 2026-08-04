@@ -7,6 +7,7 @@ import com.example.focus_app.data.repository.MoodRepository
 import com.example.focus_app.data.repository.TaskRepository
 import com.example.focus_app.domain.model.AppUsageEvent
 import com.example.focus_app.domain.model.FocusTask
+import com.example.focus_app.domain.task.StreakCalculator
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -50,7 +51,10 @@ class HomeViewModel @Inject constructor(
                     latestMood = moodRepository.getLatestMood()?.mood,
                     activeTask = taskRepository.observeActive().first(),
                     completedToday = completedToday,
-                    streakDays = computeStreak(taskRepository, today)
+                    streakDays = StreakCalculator.streakDays(today) { day ->
+                        val start = day.atStartOfDay(zone).toInstant().toEpochMilli()
+                        taskRepository.completedCountBetween(start, start + DAY_MILLIS)
+                    }
                 )
             }
         }
@@ -72,26 +76,7 @@ class HomeViewModel @Inject constructor(
 
     fun refresh() { loadStats() }
 
-    private suspend fun computeStreak(repository: TaskRepository, today: LocalDate): Int {
-        val zone = ZoneId.systemDefault()
-        var streak = 0
-        var daysBack = 0
-        while (daysBack <= MAX_STREAK_DAYS) {
-            val day = today.minusDays(daysBack.toLong())
-            val start = day.atStartOfDay(zone).toInstant().toEpochMilli()
-            val end = start + DAY_MILLIS
-            if (repository.completedCountBetween(start, end) > 0) {
-                streak++
-            } else {
-                break
-            }
-            daysBack++
-        }
-        return streak
-    }
-
     private companion object {
         const val DAY_MILLIS = 86_400_000L
-        const val MAX_STREAK_DAYS = 3_650
     }
 }

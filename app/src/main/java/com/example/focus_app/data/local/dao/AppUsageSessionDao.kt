@@ -54,6 +54,12 @@ interface AppUsageSessionDao {
     suspend fun countShownRemindersSince(since: Long): Int
 
     @Query(
+        "SELECT * FROM app_usage_sessions " +
+            "WHERE startedAt >= :from AND startedAt < :to ORDER BY startedAt ASC"
+    )
+    suspend fun sessionsBetween(from: Long, to: Long): List<AppUsageSessionEntity>
+
+    @Query(
         "SELECT COUNT(*) FROM app_usage_sessions WHERE remindedAt >= :since " +
             "AND userAction IN ('returned_to_focus', 'returned_home')"
     )
