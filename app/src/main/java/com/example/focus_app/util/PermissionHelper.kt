@@ -1,10 +1,16 @@
 package com.example.focus_app.util
 
+import android.Manifest
 import android.app.AppOpsManager
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Process
 import android.provider.Settings
+import androidx.core.content.ContextCompat
+import com.example.focus_app.service.FocusAccessibilityService
 
 object PermissionHelper {
     private const val PREFS_NAME = "focus_prefs"
@@ -17,8 +23,16 @@ object PermissionHelper {
 
     fun isAccessibilityServiceEnabled(context: Context): Boolean {
         val enabledServices = Settings.Secure.getString(context.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES) ?: return false
-        return enabledServices.contains("FocusAccessibilityService")
+        val expected = ComponentName(context, FocusAccessibilityService::class.java).flattenToString()
+        return enabledServices.split(':').any { it.equals(expected, ignoreCase = true) }
     }
+
+    fun needsNotificationPermission(context: Context): Boolean =
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) != PackageManager.PERMISSION_GRANTED
 
     fun openUsageStatsSettings(context: Context) {
         context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
