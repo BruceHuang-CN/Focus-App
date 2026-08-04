@@ -256,6 +256,7 @@ internal fun DailyTrendChart(data: List<DayBucket>, modifier: Modifier = Modifie
 @Composable
 internal fun AppDonutChart(data: List<AppShare>, modifier: Modifier = Modifier) {
     val total = data.sumOf { it.durationMinutes }
+    val surfaceColor = MaterialTheme.colorScheme.surface
     Column(modifier = modifier.fillMaxWidth()) {
         if (data.isEmpty() || total <= 0) {
             Text("暂无数据", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
@@ -279,7 +280,7 @@ internal fun AppDonutChart(data: List<AppShare>, modifier: Modifier = Modifier) 
                 startAngle += sweep
             }
             drawCircle(
-                color = MaterialTheme.colorScheme.surface,
+                color = surfaceColor,
                 radius = size.minDimension * 0.45f
             )
         }

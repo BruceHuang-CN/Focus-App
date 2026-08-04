@@ -89,6 +89,20 @@ class ReminderSchedulerTest {
         assertEquals(0, fixture.repository.remindedCount)
     }
 
+    @Test
+    fun same_session_started_twice_shows_only_one_reminder() = runTest {
+        val fixture = fixture()
+
+        // 同一次会话重复触发（例如无障碍事件去重前），只允许展示一次提醒
+        fixture.scheduler.onSessionStarted(fixture.session, appStillForeground = { true })
+        fixture.scheduler.onSessionStarted(fixture.session, appStillForeground = { true })
+        advanceTimeBy(10_001L)
+        runCurrent()
+
+        assertEquals(1, fixture.launcher.shown.size)
+        assertEquals(1, fixture.repository.remindedCount)
+    }
+
     private fun kotlinx.coroutines.test.TestScope.fixture(
         previousReminderTimes: List<Long> = emptyList()
     ): Fixture {

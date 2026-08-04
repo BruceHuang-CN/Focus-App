@@ -1,6 +1,6 @@
 # Focus v0.1 开发交接
 
-更新时间：2026-08-03
+更新时间：2026-08-04（Task 8–10 已完成，Task 11 已提供代码/测试/验证模板）
 
 ## 下次从这里继续
 
@@ -18,7 +18,7 @@ git switch feature/focus-v0.1-preview
 git pull --ff-only
 ```
 
-然后阅读本文件，从 **Task 8** 开始。不要重新实现 Task 1–7，也不要直接在 `main` 上续写。
+然后阅读本文件，从 **Task 11 的验证部分** 开始。不要重新实现 Task 1–10，也不要直接在 `main` 上续写。
 
 ## 代码来源
 
@@ -88,51 +88,50 @@ git pull --ff-only
 
 ## 未完成任务
 
-### Task 8：设置、首次引导和连接预览（下一个任务）
+### Task 8：设置、首次引导和连接预览
 
-状态：未开始。为本次 GitHub 交接而在写代码前暂停，没有 Task 8 半成品。
+状态：已完成（提交 `16ff5e6`）。
 
-- 添加通用 `PresetSelector`。
-- 设置页按目标应用、提醒时间、提醒次数、AI 服务、口吻、返回行为和检测方式分组。
-- 提供 3/10/30 秒、30/60/120 分钟、1/3/5 次以及各自的自定义选项。
-- 增加 DeepSeek API 真实连接测试：加载、成功并显示模型 ID、简洁错误映射。
-- 增加当前任务的口吻预览；无任务时使用本地示例。
-- 首次引导准确检测 Focus 的无障碍组件；实时模式为推荐项，UsageStats 为可选兼容项。
-- 只在选择兼容前台服务时请求通知权限，并补充相关 ViewModel/UI 测试。
-
-建议提交信息：`feat: add flexible reminder and AI settings`
+- 通用 `PresetSelector`：预设 + 自定义输入（3/10/30 秒、30/60/120 分钟、1/3/5 次）。
+- 设置页按目标应用、提醒时间、提醒次数、AI 服务、口吻、返回行为、检测方式分组。
+- DeepSeek 连接测试：加载态、成功显示模型 ID 列表、简洁错误映射（401/404/429/网络失败）。
+- 当前任务口吻预览；无任务时使用本地示例。
+- 首次引导：实时模式（无障碍，推荐）为默认，UsageStats 为可选兼容项；
+  无障碍检测改为精确匹配组件名；仅在兼容模式时请求通知权限。
+- 测试：`ReminderTonePreviewTest`、`AiRepositoryConnectionTest`、`SettingsViewModelAiConnectionTest` 扩展、`PresetSelectorTest`（androidTest）。
 
 ### Task 9：首页与任务界面
 
-- 首页首先展示当前任务，然后是主要操作、今日短视频摘要和轻量连续达标信息。
-- 增加四项底部导航。
-- 完成任务列表和编辑器：新建、编辑、完成、删除、设为当前任务、可选时间段和星期选择。
-- 时间冲突时就地提示并阻止保存。
-- 保留心情/状态快捷入口，作为 AI 上下文。
-- 增加 Compose Preview、无障碍语义和 ViewModel/UI 测试。
+状态：已完成（提交 `7b83720`）。
 
-建议提交信息：`feat: add focus-first task experience`
+- 首页首先展示当前任务（完成/管理操作），其次是今日摘要与轻量连续达标信息。
+- 四项底部导航：首页 / 任务 / 统计 / 设置。
+- 任务列表 + 编辑器：新建、编辑、完成/恢复、删除、设为当前、时间段选择、星期选择。
+- 时间冲突与结束时间校验就地提示并阻止保存（复用 `TaskRepository.validateSchedule`）。
+- 保留心情快捷入口；任务编辑器与首页内容提供 Compose Preview。
+- 测试：`RepeatWeekdayTest`、`TaskEditorScreenTest`（androidTest）。
 
 ### Task 10：统计图表和轻量养成系统
 
-- 支持今天、最近 7 天和最近 30 天。
-- 展示总时长、打开次数、提醒次数、主动退出次数、继续使用次数和退出率。
-- 提供按小时柱状图、按天趋势图、各应用占比环形/饼图。
-- 查询只读取所选范围；跨午夜会话按本地日期拆分；缺失时段补零。
-- 图表使用 Compose Canvas，处理空数据和单点数据，不使用持续动画。
-- 养成规则包括每日短视频限额、当天至少完成一个任务和连续达标天数；主动退出只做正向反馈。
+状态：已完成（提交 `7457215`）。
 
-建议提交信息：`feat: add focus statistics and streaks`
+- 今天 / 最近 7 天 / 最近 30 天切换。
+- 展示总时长、打开次数、提醒次数、主动退出、继续使用、退出率。
+- 按小时柱状图、按天趋势图、各应用占比环形图（Compose Canvas，无持续动画）。
+- 查询只读取所选范围；跨午夜会话按小时与本地日期拆分；小时与日期补零。
+- 养成规则：每日短视频限额、当天至少完成一个任务、连续达标天数；主动退出只做正向反馈。
+- 测试：`StatsAggregatorTest`、`StreakCalculatorTest`、`GetStatsUseCaseTest`、`StreakStatusUseCaseTest`、`StatsChartsTest`（androidTest）。
 
 ### Task 11：端到端验证、性能证据和预览 APK
 
-- 增加完整提醒链路的 fake-boundary 测试，并验证同一次会话不会重复提醒。
-- 运行完整单元测试、AndroidTest 编译和 Debug APK 构建。
-- 有设备时运行 connected tests；没有设备时必须明确说明，不能声称通过。
-- 真机检查抖音、哔哩哔哩、小红书的提醒、主动退出、任务切换、离线兜底和统计一致性。
-- 使用 `adb dumpsys meminfo` 与 `batterystats` 记录内存、CPU、唤醒锁、任务、闹钟和网络请求证据。
-- 审计仓库，确保没有真实 API Key、第三方强制结束应用 API、旧模型名或 5 秒固定轮询。
-- 输出可安装预览 APK 和可复现的验证报告。
+状态：代码/测试/模板已完成（提交见 feature 分支最新提交）；真机验证与 APK 构建由开发者在 Android Studio 完成。
+
+- 提醒链路 fake-boundary 测试：`ReminderSchedulerTest` 新增「同一会话重复触发只提醒一次」。
+- 可复现验证模板：`docs/FOCUS_V0.1_PREVIEW_VERIFICATION.md`（构建、真机、性能、审计清单）。
+- 仓库审计已执行并通过：无真实 API Key、无强制结束应用 API、`deepseek-chat` 仅存在于迁移逻辑、
+  实时模式零轮询、兼容模式 10 秒轮询、敏感文件未入库。
+- 待开发者完成：`./gradlew testDebugUnitTest assembleDebug`、AndroidTest、真机 connected tests、
+  `adb dumpsys meminfo` / `batterystats` 证据，并回填验证报告。
 
 建议提交信息：`test: verify focus v0.1 preview`
 
