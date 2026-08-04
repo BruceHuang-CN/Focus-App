@@ -43,6 +43,10 @@ class TaskViewModel @Inject constructor(
         viewModelScope.launch { repository.setCompleted(id) }
     }
 
+    fun restore(id: Long) {
+        viewModelScope.launch { repository.setCompleted(id, isCompleted = false) }
+    }
+
     fun setManualActive(id: Long) {
         viewModelScope.launch { repository.setManualActive(id) }
     }
