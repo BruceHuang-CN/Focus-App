@@ -96,7 +96,7 @@ class StreakStatusUseCaseTest {
         completedCount: (Long, Long) -> Int
     ) = StreakStatusUseCase(
         tasks = TaskRepository(FakeTaskDao(completedCount)),
-        sessions = FakeSessionRepository(sessions),
+        sessions = StreakFakeSessionRepository(sessions),
         settings = SettingsRepository(
             FakeSettingsDao(SettingsEntity(targetApps = "[]", dailyShortVideoLimitMinutes = 30))
         ),
@@ -147,7 +147,7 @@ private class FakeSettingsDao(initial: SettingsEntity) : SettingsDao {
     }
 }
 
-private class FakeSessionRepository(
+private class StreakFakeSessionRepository(
     private val sessions: List<AppUsageSession>
 ) : AppSessionRepository {
     override suspend fun sessionsBetween(from: Long, to: Long): List<AppUsageSession> =
