@@ -14,9 +14,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.example.focus_app.domain.model.DetectionMode
+import com.example.focus_app.ui.settings.SettingsViewModel
 import com.example.focus_app.util.PermissionHelper
 
 /**
@@ -24,7 +26,10 @@ import com.example.focus_app.util.PermissionHelper
  * 再按选择引导对应权限，最后配置 AI。
  */
 @Composable
-fun OnboardingScreen(onComplete: () -> Unit) {
+fun OnboardingScreen(
+    onComplete: () -> Unit,
+    viewModel: SettingsViewModel = hiltViewModel()
+) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -57,6 +62,12 @@ fun OnboardingScreen(onComplete: () -> Unit) {
             notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
+    // 进入 AI 配置步骤时（Android 13+）请求通知权限，实时/兼容模式都覆盖
+    LaunchedEffect(step) {
+        if (step == 3 && PermissionHelper.needsNotificationPermission(context)) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
 
     when (step) {
         0 -> Column(
@@ -73,14 +84,22 @@ fun OnboardingScreen(onComplete: () -> Unit) {
             )
             Spacer(modifier = Modifier.height(32.dp))
             OutlinedButton(
-                onClick = { mode = DetectionMode.COMPATIBILITY; step = 2 },
+                onClick = {
+                    viewModel.applyOnboardingDetectionMode(DetectionMode.COMPATIBILITY)
+                    mode = DetectionMode.COMPATIBILITY
+                    step = 2
+                },
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("兼容模式（使用情况访问，更省电）")
             }
             Spacer(modifier = Modifier.height(12.dp))
             Button(
-                onClick = { mode = DetectionMode.REALTIME; step = 1 },
+                onClick = {
+                    viewModel.applyOnboardingDetectionMode(DetectionMode.REALTIME)
+                    mode = DetectionMode.REALTIME
+                    step = 1
+                },
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("实时模式（无障碍服务，推荐）")

@@ -1,6 +1,8 @@
 package com.example.focus_app.ui.settings
 
 import android.Manifest
+import android.content.Intent
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -14,9 +16,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.example.focus_app.domain.model.AiProvider
 import com.example.focus_app.domain.model.DetectionMode
 import com.example.focus_app.domain.model.ReminderTone
@@ -37,6 +42,8 @@ fun SettingsScreen(
     val connectionState by viewModel.aiConnection.collectAsState()
     val tonePreview by viewModel.tonePreview.collectAsState()
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var overlayGranted by remember { mutableStateOf(PermissionHelper.hasOverlayPermission(context)) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     var lastChange by remember { mutableStateOf("") }
@@ -60,6 +67,22 @@ fun SettingsScreen(
                 notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
         }
+    }
+
+    // 从系统设置返回时刷新悬浮窗状态；实时模式下若系统无障碍已开启，自动恢复应用内开关
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                overlayGranted = PermissionHelper.hasOverlayPermission(context)
+                if (viewModel.settings.value.detectionMode == DetectionMode.REALTIME &&
+                    PermissionHelper.isAccessibilityServiceEnabled(context)
+                ) {
+                    viewModel.ensureAccessibilityEnabled()
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     fun onSettingChanged(label: String) {
@@ -309,6 +332,11 @@ fun SettingsScreen(
                         onClick = {
                             viewModel.updateDetectionMode(mode)
                             onSettingChanged("检测方式: ${detectionLabel(mode)}")
+                            if (mode == DetectionMode.REALTIME &&
+                                !PermissionHelper.isAccessibilityServiceEnabled(context)
+                            ) {
+                                context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                            }
                         }
                     )
                     Column {
@@ -319,6 +347,29 @@ fun SettingsScreen(
                             color = MaterialTheme.colorScheme.outline,
                             fontSize = 12.sp
                         )
+                    }
+                }
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("启用无障碍检测", modifier = Modifier.weight(1f))
+                Switch(
+                    checked = s.enableAccessibility,
+                    onCheckedChange = { enabled ->
+                        viewModel.toggleAccessibility()
+                        onSettingChanged(if (enabled) "开启无障碍检测" else "关闭无障碍检测")
+                        if (enabled && !PermissionHelper.isAccessibilityServiceEnabled(context)) {
+                            context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                        }
+                    }
+                )
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("显示在其他应用上层（弹窗提醒）", modifier = Modifier.weight(1f))
+                if (overlayGranted) {
+                    Text("已授予", color = MaterialTheme.colorScheme.primary)
+                } else {
+                    TextButton(onClick = { PermissionHelper.openOverlaySettings(context) }) {
+                        Text("去开启")
                     }
                 }
             }

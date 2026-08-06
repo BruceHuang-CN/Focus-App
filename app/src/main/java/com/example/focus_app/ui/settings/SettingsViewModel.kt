@@ -80,9 +80,26 @@ class SettingsViewModel @Inject constructor(
     fun updateReturnDestination(destination: ReturnDestination) { update { it.copy(returnDestination = destination) } }
     fun updateDetectionMode(mode: DetectionMode) {
         update { it.copy(detectionMode = mode) }
-        if (mode == DetectionMode.COMPATIBILITY) {
-            _notificationPermissionRequests.tryEmit(Unit)
+        _notificationPermissionRequests.tryEmit(Unit)
+    }
+
+    /**
+     * 引导页选择检测方式时调用：持久化模式，并同步无障碍开关状态。
+     */
+    fun applyOnboardingDetectionMode(mode: DetectionMode) {
+        update {
+            it.copy(
+                detectionMode = mode,
+                enableAccessibility = mode == DetectionMode.REALTIME
+            )
         }
+    }
+
+    /**
+     * 系统无障碍已开启时，确保应用内开关同步为开启，恢复实时检测。
+     */
+    fun ensureAccessibilityEnabled() {
+        update { it.copy(enableAccessibility = true) }
     }
     fun updateCustomToneInstruction(instruction: String) { update { it.copy(customToneInstruction = instruction) } }
 

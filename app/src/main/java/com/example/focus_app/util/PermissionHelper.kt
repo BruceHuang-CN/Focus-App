@@ -6,6 +6,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Process
 import android.provider.Settings
@@ -33,6 +34,17 @@ object PermissionHelper {
                 context,
                 Manifest.permission.POST_NOTIFICATIONS
             ) != PackageManager.PERMISSION_GRANTED
+
+    fun hasOverlayPermission(context: Context): Boolean = Settings.canDrawOverlays(context)
+
+    fun openOverlaySettings(context: Context) {
+        context.startActivity(
+            Intent(
+                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                Uri.parse("package:${context.packageName}")
+            )
+        )
+    }
 
     fun openUsageStatsSettings(context: Context) {
         context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
