@@ -60,6 +60,12 @@ interface AppUsageSessionDao {
     suspend fun sessionsBetween(from: Long, to: Long): List<AppUsageSessionEntity>
 
     @Query(
+        "UPDATE app_usage_sessions SET remindedAt = NULL " +
+            "WHERE remindedAt >= :since"
+    )
+    suspend fun clearRemindedSince(since: Long): Int
+
+    @Query(
         "SELECT COUNT(*) FROM app_usage_sessions WHERE remindedAt >= :since " +
             "AND userAction IN ('returned_to_focus', 'returned_home')"
     )

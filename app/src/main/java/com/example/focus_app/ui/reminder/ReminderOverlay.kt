@@ -75,6 +75,14 @@ fun ReminderOverlay(
                         style = MaterialTheme.typography.bodyLarge,
                         textAlign = TextAlign.Center
                     )
+                    if (uiState.windowLimit > 0) {
+                        Text(
+                            "本窗口（${uiState.windowMinutes} 分钟）已提醒 " +
+                                "${uiState.windowReminderCount}/${uiState.windowLimit} 次",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                    }
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)

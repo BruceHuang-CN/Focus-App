@@ -19,7 +19,10 @@ data class ReminderUiState(
     val appName: String = "目标应用",
     val showBreathing: Boolean = false,
     val breathingStep: Int = 5,
-    val returnDestination: ReturnDestination = ReturnDestination.FOCUS
+    val returnDestination: ReturnDestination = ReturnDestination.FOCUS,
+    val windowReminderCount: Int = 0,
+    val windowLimit: Int = 0,
+    val windowMinutes: Int = 0
 )
 
 @HiltViewModel
@@ -38,7 +41,10 @@ class ReminderViewModel @Inject constructor(
             taskTitle = data.taskTitle,
             appName = data.appName,
             showBreathing = data.showBreathing,
-            returnDestination = data.returnDestination
+            returnDestination = data.returnDestination,
+            windowReminderCount = data.windowReminderCount,
+            windowLimit = data.windowLimit,
+            windowMinutes = data.windowMinutes
         )
     }
 

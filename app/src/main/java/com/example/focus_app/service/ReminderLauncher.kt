@@ -69,6 +69,9 @@ class AndroidReminderLauncher @Inject constructor(
             putExtra(ReminderLaunchData.EXTRA_MESSAGE, data.message)
             putExtra(ReminderLaunchData.EXTRA_SHOW_BREATHING, data.showBreathing)
             putExtra(ReminderLaunchData.EXTRA_RETURN_DESTINATION, data.returnDestination.key)
+            putExtra(ReminderLaunchData.EXTRA_WINDOW_REMINDER_COUNT, data.windowReminderCount)
+            putExtra(ReminderLaunchData.EXTRA_WINDOW_LIMIT, data.windowLimit)
+            putExtra(ReminderLaunchData.EXTRA_WINDOW_MINUTES, data.windowMinutes)
         }
 
     private fun postReminderNotification(data: ReminderLaunchData) {

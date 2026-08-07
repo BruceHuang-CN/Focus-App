@@ -64,6 +64,7 @@ class ReminderScheduler(
             val cachedMessage = session.taskId?.let { taskId ->
                 cacheRepository.next(taskId, session.packageName, session.toneKey)
             }
+            val since = clock.nowMillis() - settings.reminderWindowMinutes * 60_000L
             ReminderLaunchData(
                 sessionId = session.id,
                 taskId = session.taskId,
@@ -71,7 +72,10 @@ class ReminderScheduler(
                 appName = session.appName,
                 message = cachedMessage ?: localFallback(session.appName, taskTitle),
                 showBreathing = settings.enableBreathingPause,
-                returnDestination = settings.returnDestination
+                returnDestination = settings.returnDestination,
+                windowReminderCount = repository.countShownRemindersSince(since),
+                windowLimit = settings.maxRemindersPerWindow,
+                windowMinutes = settings.reminderWindowMinutes
             )
         }
     )
@@ -90,8 +94,8 @@ class ReminderScheduler(
                     clock.nowMillis() - settings.reminderWindowMinutes * 60_000L
                 )
                 if (!policy.canShow(reminderTimes, settings)) return@withLock
-                val data = launchDataProvider(session, settings)
                 if (!repository.markRemindedIfNeeded(session.id, clock.nowMillis())) return@withLock
+                val data = launchDataProvider(session, settings)
                 launcher.show(data)
             }
         }

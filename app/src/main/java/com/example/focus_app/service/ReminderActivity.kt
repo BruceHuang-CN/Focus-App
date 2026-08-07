@@ -26,7 +26,12 @@ class ReminderActivity : ComponentActivity() {
             showBreathing = intent.getBooleanExtra(ReminderLaunchData.EXTRA_SHOW_BREATHING, false),
             returnDestination = ReturnDestination.fromKey(
                 intent.getStringExtra(ReminderLaunchData.EXTRA_RETURN_DESTINATION).orEmpty()
-            )
+            ),
+            windowReminderCount = intent.getIntExtra(
+                ReminderLaunchData.EXTRA_WINDOW_REMINDER_COUNT, 0
+            ),
+            windowLimit = intent.getIntExtra(ReminderLaunchData.EXTRA_WINDOW_LIMIT, 0),
+            windowMinutes = intent.getIntExtra(ReminderLaunchData.EXTRA_WINDOW_MINUTES, 0)
         )
 
         setContent {

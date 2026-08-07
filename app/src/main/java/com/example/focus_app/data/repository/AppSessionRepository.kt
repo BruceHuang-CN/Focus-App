@@ -32,6 +32,9 @@ interface AppSessionRepository {
     suspend fun countActiveExitsSince(since: Long): Int = 0
 
     suspend fun sessionsBetween(from: Long, to: Long): List<AppUsageSession> = emptyList()
+
+    /** 清空指定时间以来的已提醒标记，用于重置窗口内提醒额度。 */
+    suspend fun resetReminderQuota(since: Long) = Unit
 }
 
 class RoomAppSessionRepository @Inject constructor(
@@ -82,4 +85,8 @@ class RoomAppSessionRepository @Inject constructor(
 
     override suspend fun sessionsBetween(from: Long, to: Long): List<AppUsageSession> =
         dao.sessionsBetween(from, to).map { it.toDomain() }
+
+    override suspend fun resetReminderQuota(since: Long) {
+        dao.clearRemindedSince(since)
+    }
 }

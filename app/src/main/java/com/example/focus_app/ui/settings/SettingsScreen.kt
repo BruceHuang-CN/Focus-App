@@ -48,7 +48,7 @@ fun SettingsScreen(
     var overlayGranted by remember { mutableStateOf(PermissionHelper.hasOverlayPermission(context)) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-    var lastChange by remember { mutableStateOf("") }
+    var hasUnsavedChanges by remember { mutableStateOf(false) }
     var apiKeyInput by remember { mutableStateOf("") }
     var endpointDraft by remember(s.aiProvider, s.apiEndpoint, s.aiModel) {
         mutableStateOf(s.apiEndpoint)
@@ -89,11 +89,7 @@ fun SettingsScreen(
     }
 
     fun onSettingChanged(label: String) {
-        lastChange = label
-        scope.launch {
-            snackbarHostState.currentSnackbarData?.dismiss()
-            snackbarHostState.showSnackbar("已自动保存：$label", duration = SnackbarDuration.Short)
-        }
+        hasUnsavedChanges = true
     }
 
     fun handlePermissionAction(action: PermissionCheckAction) {
@@ -140,6 +136,32 @@ fun SettingsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // ── 保存状态（半手动保存）──
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    if (hasUnsavedChanges) "有未保存的修改" else "所有设置已保存",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (hasUnsavedChanges) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.outline
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+                Button(
+                    onClick = {
+                        hasUnsavedChanges = false
+                        scope.launch {
+                            snackbarHostState.currentSnackbarData?.dismiss()
+                            snackbarHostState.showSnackbar(
+                                "设置已保存",
+                                duration = SnackbarDuration.Short
+                            )
+                        }
+                    }
+                ) { Text("保存设置") }
+            }
+
             // ── 检测状态（权限检查窗口）──
             PermissionCheckCard(
                 mode = s.detectionMode,
@@ -210,6 +232,21 @@ fun SettingsScreen(
                     onSettingChanged("窗口内 ${it} 次")
                 }
             )
+            OutlinedButton(
+                onClick = {
+                    viewModel.resetReminderWindow()
+                    scope.launch {
+                        snackbarHostState.currentSnackbarData?.dismiss()
+                        snackbarHostState.showSnackbar(
+                            "已重置本窗口额度，AI 提醒已重新生成",
+                            duration = SnackbarDuration.Short
+                        )
+                    }
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("重置当前窗口额度并重新生成提醒")
+            }
             Divider()
 
             // ── AI 服务 ──

@@ -31,6 +31,7 @@ class ReminderBatchCoordinator(
     private val activeTasks: Flow<FocusTask?>,
     private val settings: Flow<AppSettings>,
     private val apiKeyRevisions: Flow<Long> = flowOf(0L),
+    private val cacheRevisions: Flow<Long> = flowOf(0L),
     private val moodRevisions: Flow<Long?> = flowOf(null),
     private val buildContext: suspend (FocusTask, AppInfo, AppSettings) -> ReminderContext,
     private val generate: suspend (ReminderContext, AppSettings) -> Result<List<String>>,
@@ -50,6 +51,7 @@ class ReminderBatchCoordinator(
         activeTasks = taskRepository.observeActiveEvents(),
         settings = settingsRepository.getSettingsFlow(),
         apiKeyRevisions = settingsRepository.apiKeyRevision,
+        cacheRevisions = cacheRepository.revision,
         moodRevisions = moodRepository.observeLatestMood().map { mood -> mood?.id },
         buildContext = contextBuilder::invoke,
         generate = { context, currentSettings ->
@@ -65,8 +67,8 @@ class ReminderBatchCoordinator(
         val versionedTasks = activeTasks.map { task ->
             ActiveEmission(task, task?.let(periodToken))
         }.distinctUntilChanged()
-        combine(versionedTasks, settings, apiKeyRevisions, moodRevisions) {
-                active, currentSettings, apiKeyRevision, moodRevision ->
+        combine(versionedTasks, settings, apiKeyRevisions, cacheRevisions, moodRevisions) {
+                active, currentSettings, apiKeyRevision, cacheRevision, moodRevision ->
             val task = active.task
             if (task == null || currentSettings.targetApps.isEmpty()) {
                 null
@@ -87,6 +89,7 @@ class ReminderBatchCoordinator(
                         model = currentSettings.aiModel,
                         reminderWindowMinutes = currentSettings.reminderWindowMinutes,
                         apiKeyRevision = apiKeyRevision,
+                        cacheRevision = cacheRevision,
                         moodRevision = moodRevision
                     ),
                     task = task,
@@ -157,6 +160,7 @@ class ReminderBatchCoordinator(
         val model: String,
         val reminderWindowMinutes: Int,
         val apiKeyRevision: Long,
+        val cacheRevision: Long,
         val moodRevision: Long?
     )
 
