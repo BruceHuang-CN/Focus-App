@@ -13,6 +13,7 @@ import com.example.focus_app.data.repository.AiRepository
 import com.example.focus_app.data.repository.SettingsRepository
 import com.example.focus_app.data.repository.TaskRepository
 import com.example.focus_app.data.security.ApiKeyStore
+import com.example.focus_app.data.permission.PermissionStatusProvider
 import com.example.focus_app.domain.model.DetectionMode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -100,7 +101,8 @@ class SettingsViewModelDetectionTest {
         SettingsViewModel(
             settingsRepository = SettingsRepository(dao),
             aiRepository = AiRepository(DetectionApiKeyStore("sk-test")) { DetectionOpenAiApi() },
-            taskRepository = TaskRepository(DetectionTaskDao())
+            taskRepository = TaskRepository(DetectionTaskDao()),
+            permissionStatusProvider = DetectionFakePermissionProvider()
         )
 }
 
@@ -144,4 +146,11 @@ private class DetectionTaskDao : FocusTaskDao {
     override suspend fun clearManualActive() = Unit
     override suspend fun markManualActive(id: Long) = Unit
     override suspend fun completedCountBetween(startedAt: Long, endedAt: Long): Int = 0
+}
+
+private class DetectionFakePermissionProvider : PermissionStatusProvider {
+    override fun accessibilityEnabled(): Boolean = true
+    override fun usageStatsGranted(): Boolean = true
+    override fun notificationGranted(): Boolean = true
+    override fun overlayGranted(): Boolean = true
 }

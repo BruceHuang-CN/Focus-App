@@ -8,10 +8,13 @@ import com.example.focus_app.data.repository.AppSettings
 import com.example.focus_app.data.repository.ConnectionTestResult
 import com.example.focus_app.data.repository.SettingsRepository
 import com.example.focus_app.data.repository.TaskRepository
+import com.example.focus_app.data.permission.PermissionStatusProvider
 import com.example.focus_app.domain.model.AiProvider
 import com.example.focus_app.domain.model.DetectionMode
 import com.example.focus_app.domain.model.ReminderTone
 import com.example.focus_app.domain.model.ReturnDestination
+import com.example.focus_app.domain.permission.PermissionCheckEvaluator
+import com.example.focus_app.domain.permission.PermissionCheckItem
 import com.example.focus_app.domain.reminder.ReminderTonePreview
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
@@ -30,12 +33,16 @@ sealed interface AiConnectionUiState {
 class SettingsViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val aiRepository: AiRepository,
-    private val taskRepository: TaskRepository
+    private val taskRepository: TaskRepository,
+    private val permissionStatusProvider: PermissionStatusProvider
 ) : ViewModel() {
     val settings: StateFlow<AppSettings> = settingsRepository.getSettingsFlow().stateIn(viewModelScope, SharingStarted.Eagerly, AppSettings())
 
     private val _aiConnection = MutableStateFlow<AiConnectionUiState>(AiConnectionUiState.Idle)
     val aiConnection: StateFlow<AiConnectionUiState> = _aiConnection.asStateFlow()
+
+    private val _permissionStatus = MutableStateFlow<List<PermissionCheckItem>>(emptyList())
+    val permissionStatus: StateFlow<List<PermissionCheckItem>> = _permissionStatus.asStateFlow()
 
     private val _tonePreview = MutableStateFlow("")
     val tonePreview: StateFlow<String> = _tonePreview.asStateFlow()
@@ -44,6 +51,11 @@ class SettingsViewModel @Inject constructor(
     val notificationPermissionRequests: SharedFlow<Unit> = _notificationPermissionRequests.asSharedFlow()
 
     init {
+        viewModelScope.launch {
+            settingsRepository.getSettingsFlow()
+                .distinctUntilChanged()
+                .collect { currentSettings -> refreshPermissionStatus(currentSettings) }
+        }
         viewModelScope.launch {
             combine(
                 settingsRepository.getSettingsFlow(),
@@ -58,6 +70,25 @@ class SettingsViewModel @Inject constructor(
                 .distinctUntilChanged()
                 .collect { preview -> _tonePreview.value = preview }
         }
+    }
+
+    /** 从系统设置页返回后手动刷新权限状态。 */
+    fun refreshPermissions() {
+        viewModelScope.launch {
+            refreshPermissionStatus(settingsRepository.getSettings())
+        }
+    }
+
+    private suspend fun refreshPermissionStatus(current: AppSettings) {
+        _permissionStatus.value = PermissionCheckEvaluator.evaluate(
+            mode = current.detectionMode,
+            accessibilityEnabled = permissionStatusProvider.accessibilityEnabled(),
+            usageStatsGranted = permissionStatusProvider.usageStatsGranted(),
+            notificationGranted = permissionStatusProvider.notificationGranted(),
+            overlayGranted = permissionStatusProvider.overlayGranted(),
+            enableAccessibility = current.enableAccessibility,
+            hasTargetApps = current.targetApps.isNotEmpty()
+        )
     }
 
     fun updateReminderDelaySeconds(seconds: Int) {

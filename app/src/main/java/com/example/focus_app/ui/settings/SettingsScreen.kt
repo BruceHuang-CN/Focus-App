@@ -26,6 +26,7 @@ import com.example.focus_app.domain.model.AiProvider
 import com.example.focus_app.domain.model.DetectionMode
 import com.example.focus_app.domain.model.ReminderTone
 import com.example.focus_app.domain.model.ReturnDestination
+import com.example.focus_app.domain.permission.PermissionCheckAction
 import com.example.focus_app.ui.components.PresetSelector
 import com.example.focus_app.util.PermissionHelper
 import kotlinx.coroutines.flow.collect
@@ -41,6 +42,7 @@ fun SettingsScreen(
     val s by viewModel.settings.collectAsState()
     val connectionState by viewModel.aiConnection.collectAsState()
     val tonePreview by viewModel.tonePreview.collectAsState()
+    val permissionItems by viewModel.permissionStatus.collectAsState()
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     var overlayGranted by remember { mutableStateOf(PermissionHelper.hasOverlayPermission(context)) }
@@ -74,6 +76,7 @@ fun SettingsScreen(
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 overlayGranted = PermissionHelper.hasOverlayPermission(context)
+                viewModel.refreshPermissions()
                 if (viewModel.settings.value.detectionMode == DetectionMode.REALTIME &&
                     PermissionHelper.isAccessibilityServiceEnabled(context)
                 ) {
@@ -90,6 +93,30 @@ fun SettingsScreen(
         scope.launch {
             snackbarHostState.currentSnackbarData?.dismiss()
             snackbarHostState.showSnackbar("已自动保存：$label", duration = SnackbarDuration.Short)
+        }
+    }
+
+    fun handlePermissionAction(action: PermissionCheckAction) {
+        when (action) {
+            PermissionCheckAction.OPEN_ACCESSIBILITY ->
+                context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+            PermissionCheckAction.OPEN_USAGE_STATS ->
+                PermissionHelper.openUsageStatsSettings(context)
+            PermissionCheckAction.OPEN_OVERLAY ->
+                PermissionHelper.openOverlaySettings(context)
+            PermissionCheckAction.REQUEST_NOTIFICATION ->
+                if (PermissionHelper.needsNotificationPermission(context)) {
+                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
+            PermissionCheckAction.OPEN_TARGET_APPS -> navigateToTargetApps()
+            PermissionCheckAction.ENABLE_ACCESSIBILITY -> {
+                if (!s.enableAccessibility) {
+                    viewModel.toggleAccessibility()
+                    onSettingChanged("开启无障碍检测")
+                }
+                context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+            }
+            PermissionCheckAction.NONE -> Unit
         }
     }
 
@@ -113,6 +140,13 @@ fun SettingsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // ── 检测状态（权限检查窗口）──
+            PermissionCheckCard(
+                mode = s.detectionMode,
+                items = permissionItems,
+                onAction = ::handlePermissionAction
+            )
+
             // ── 目标应用 ──
             SectionTitle("目标应用")
             Row(
