@@ -64,7 +64,7 @@ class ReminderScheduler(
             val cachedMessage = session.taskId?.let { taskId ->
                 cacheRepository.next(taskId, session.packageName, session.toneKey)
             }
-            val since = clock.nowMillis() - settings.reminderWindowMinutes * 60_000L
+            val since = SystemClock.nowMillis() - settings.reminderWindowMinutes * 60_000L
             ReminderLaunchData(
                 sessionId = session.id,
                 taskId = session.taskId,
