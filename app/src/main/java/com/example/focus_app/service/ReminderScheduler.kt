@@ -30,6 +30,8 @@ interface SessionReminderScheduler {
     )
 
     fun cancel(sessionId: Long)
+
+    fun scheduleFollowUp(sessionId: Long, delayMillis: Long) = Unit
 }
 
 @Singleton
@@ -108,6 +110,28 @@ class ReminderScheduler(
 
     override fun cancel(sessionId: Long) {
         jobs.remove(sessionId)?.cancel()
+    }
+
+    /**
+     * 用户点击「仍要使用」后，在同一会话内按间隔再次提醒（受窗口额度限制）。
+     */
+    override fun scheduleFollowUp(sessionId: Long, delayMillis: Long) {
+        val job = scope.launch {
+            delay(delayMillis)
+            val settings = settingsProvider()
+            quotaMutex.withLock {
+                val since = clock.nowMillis() - settings.reminderWindowMinutes * 60_000L
+                if (!policy.canShow(repository.reminderTimesSince(since), settings)) {
+                    return@withLock
+                }
+                val session = repository.sessionById(sessionId) ?: return@withLock
+                repository.updateRemindedAt(sessionId, clock.nowMillis())
+                val data = launchDataProvider(session, settings)
+                launcher.show(data)
+            }
+        }
+        jobs.put(sessionId, job)?.cancel()
+        job.invokeOnCompletion { jobs.remove(sessionId, job) }
     }
 
     private companion object {

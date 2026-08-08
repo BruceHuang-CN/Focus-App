@@ -6,6 +6,8 @@ import com.example.focus_app.domain.model.ReminderTone
 import com.example.focus_app.domain.model.ReturnDestination
 import com.example.focus_app.service.ReminderLaunchData
 import com.example.focus_app.service.ReminderLauncher
+import com.example.focus_app.service.SessionReminderScheduler
+import com.example.focus_app.ui.settings.TestFollowUpReminderStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -80,6 +82,8 @@ class ReminderViewModelTest {
         advanceUntilIdle()
 
         assertEquals("continued", fixture.repository.action)
+        assertEquals(LAUNCH_DATA.sessionId, fixture.scheduler.followUpSessionId)
+        assertEquals(600_000L, fixture.scheduler.followUpDelay)
         assertEquals(null, fixture.launcher.focusTaskId)
         assertEquals(0, fixture.launcher.homeRequests)
     }
@@ -106,13 +110,22 @@ class ReminderViewModelTest {
         val events = mutableListOf<String>()
         val repository = ActionRecordingSessionRepository(events)
         val launcher = ActionRecordingLauncher(events)
-        return Fixture(ReminderViewModel(repository, launcher), repository, launcher, events)
+        val scheduler = ActionRecordingScheduler()
+        val store = TestFollowUpReminderStore().apply { minutes = 10 }
+        return Fixture(
+            ReminderViewModel(repository, launcher, scheduler, store),
+            repository,
+            launcher,
+            scheduler,
+            events
+        )
     }
 
     private data class Fixture(
         val viewModel: ReminderViewModel,
         val repository: ActionRecordingSessionRepository,
         val launcher: ActionRecordingLauncher,
+        val scheduler: ActionRecordingScheduler,
         val events: List<String>
     )
 
@@ -126,6 +139,23 @@ class ReminderViewModelTest {
             showBreathing = false,
             returnDestination = ReturnDestination.FOCUS
         )
+    }
+}
+
+private class ActionRecordingScheduler : SessionReminderScheduler {
+    var followUpSessionId: Long? = null
+    var followUpDelay: Long = -1L
+
+    override fun onSessionStarted(
+        session: AppUsageSession,
+        appStillForeground: suspend () -> Boolean
+    ) = Unit
+
+    override fun cancel(sessionId: Long) = Unit
+
+    override fun scheduleFollowUp(sessionId: Long, delayMillis: Long) {
+        followUpSessionId = sessionId
+        followUpDelay = delayMillis
     }
 }
 

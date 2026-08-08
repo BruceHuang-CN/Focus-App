@@ -12,7 +12,13 @@ enum class StatsRange(val key: String, val label: String) {
 data class HourBucket(
     val hour: Int,
     val durationMinutes: Int,
-    val openCount: Int
+    val openCount: Int,
+    val apps: List<HourAppUsage> = emptyList()
+)
+
+data class HourAppUsage(
+    val appName: String,
+    val durationMinutes: Int
 )
 
 data class DayBucket(

@@ -46,6 +46,7 @@ fun SettingsScreen(
     val tonePreview by viewModel.tonePreview.collectAsState()
     val permissionItems by viewModel.permissionStatus.collectAsState()
     val customReturnPackage by viewModel.customReturnPackage.collectAsState()
+    val followUpInterval by viewModel.followUpInterval.collectAsState()
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     var overlayGranted by remember { mutableStateOf(PermissionHelper.hasOverlayPermission(context)) }
@@ -236,6 +237,17 @@ fun SettingsScreen(
                     }
                 )
             }
+            Text("再次提醒间隔（点“仍要使用”后）", style = MaterialTheme.typography.titleMedium)
+            PresetSelector(
+                presets = listOf(1, 5, 10, 15, 30),
+                customRange = 1..120,
+                value = followUpInterval,
+                formatPreset = { "${it} 分钟" },
+                onValueChange = {
+                    viewModel.updateFollowUpInterval(it)
+                    onSettingChanged("再次提醒间隔 ${it} 分钟")
+                }
+            )
             Divider()
 
             // ── 提醒次数 ──

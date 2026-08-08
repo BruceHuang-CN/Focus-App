@@ -101,6 +101,34 @@ class StatsAggregatorTest {
         assertEquals(10, stats.byApp[1].durationMinutes)
     }
 
+    @Test
+    fun hourly_buckets_break_down_apps_and_durations() {
+        val today = epoch(2026, 8, 4, 0, 0)
+        val tomorrow = today + DAY_MILLIS
+        val douyin = session(
+            id = 6,
+            packageName = "com.a",
+            appName = "抖音",
+            startedAt = epoch(2026, 8, 4, 10, 0),
+            endedAt = epoch(2026, 8, 4, 10, 20)
+        )
+        val bilibili = session(
+            id = 7,
+            packageName = "com.b",
+            appName = "B站",
+            startedAt = epoch(2026, 8, 4, 10, 10),
+            endedAt = epoch(2026, 8, 4, 10, 15)
+        )
+
+        val stats = StatsAggregator.aggregate(listOf(douyin, bilibili), today, tomorrow, zone)
+        val hour10 = stats.hourly[10]
+
+        assertEquals(25, hour10.durationMinutes)
+        assertEquals(2, hour10.openCount)
+        assertEquals(listOf("抖音", "B站"), hour10.apps.map { it.appName })
+        assertEquals(20, hour10.apps.first().durationMinutes)
+    }
+
     private fun session(
         id: Long,
         packageName: String = "com.example.app",

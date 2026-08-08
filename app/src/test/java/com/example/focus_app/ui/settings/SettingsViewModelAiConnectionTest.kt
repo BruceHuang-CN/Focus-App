@@ -150,7 +150,8 @@ class SettingsViewModelAiConnectionTest {
             permissionStatusProvider = AiConnectionFakePermissionProvider(),
             appSessionRepository = TestSessionRepository(),
             reminderCacheRepository = ReminderCacheRepository(TestCacheDao(), FakeClock(0L)),
-            customReturnAppStore = TestCustomReturnAppStore()
+            customReturnAppStore = TestCustomReturnAppStore(),
+            followUpReminderStore = TestFollowUpReminderStore()
         )
     }
 }

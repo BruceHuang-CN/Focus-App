@@ -100,11 +100,12 @@ class SettingsViewModelDetectionTest {
     }
 
     private fun newViewModel(dao: DetectionSettingsDao): SettingsViewModel =
-        newViewModel(dao, TestCustomReturnAppStore())
+        newViewModel(dao, TestCustomReturnAppStore(), TestFollowUpReminderStore())
 
     private fun newViewModel(
         dao: DetectionSettingsDao,
-        store: TestCustomReturnAppStore
+        store: TestCustomReturnAppStore,
+        followUp: TestFollowUpReminderStore
     ): SettingsViewModel =
         SettingsViewModel(
             settingsRepository = SettingsRepository(dao),
@@ -113,14 +114,15 @@ class SettingsViewModelDetectionTest {
             permissionStatusProvider = DetectionFakePermissionProvider(),
             appSessionRepository = TestSessionRepository(),
             reminderCacheRepository = ReminderCacheRepository(TestCacheDao(), FakeClock(0L)),
-            customReturnAppStore = store
+            customReturnAppStore = store,
+            followUpReminderStore = followUp
         )
 
     @Test
     fun updating_custom_return_package_persists_to_store() = runTest(dispatcher) {
         val dao = DetectionSettingsDao(SettingsEntity(targetApps = "[]"))
         val store = TestCustomReturnAppStore()
-        val viewModel = newViewModel(dao, store)
+        val viewModel = newViewModel(dao, store, TestFollowUpReminderStore())
         runCurrent()
 
         viewModel.updateCustomReturnPackage(" com.tencent.mm ")
@@ -128,6 +130,20 @@ class SettingsViewModelDetectionTest {
 
         assertEquals("com.tencent.mm", store.value)
         assertEquals("com.tencent.mm", viewModel.customReturnPackage.value)
+    }
+
+    @Test
+    fun updating_follow_up_interval_persists_to_store() = runTest(dispatcher) {
+        val dao = DetectionSettingsDao(SettingsEntity(targetApps = "[]"))
+        val followUp = TestFollowUpReminderStore()
+        val viewModel = newViewModel(dao, TestCustomReturnAppStore(), followUp)
+        runCurrent()
+
+        viewModel.updateFollowUpInterval(15)
+        runCurrent()
+
+        assertEquals(15, followUp.minutes)
+        assertEquals(15, viewModel.followUpInterval.value)
     }
 }
 

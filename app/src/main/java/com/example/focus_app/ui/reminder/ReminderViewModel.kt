@@ -3,9 +3,11 @@ package com.example.focus_app.ui.reminder
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.focus_app.data.repository.AppSessionRepository
+import com.example.focus_app.data.followup.FollowUpReminderStore
 import com.example.focus_app.domain.model.ReturnDestination
 import com.example.focus_app.service.ReminderLaunchData
 import com.example.focus_app.service.ReminderLauncher
+import com.example.focus_app.service.SessionReminderScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,7 +31,9 @@ data class ReminderUiState(
 @HiltViewModel
 class ReminderViewModel @Inject constructor(
     private val sessionRepository: AppSessionRepository,
-    private val launcher: ReminderLauncher
+    private val launcher: ReminderLauncher,
+    private val scheduler: SessionReminderScheduler,
+    private val followUpReminderStore: FollowUpReminderStore
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ReminderUiState())
     val uiState: StateFlow<ReminderUiState> = _uiState.asStateFlow()
@@ -89,6 +93,8 @@ class ReminderViewModel @Inject constructor(
         if (launchData?.sessionId != sessionId) return
         viewModelScope.launch {
             sessionRepository.markUserAction(sessionId, "continued")
+            val minutes = followUpReminderStore.readMinutes().coerceIn(1, 120)
+            scheduler.scheduleFollowUp(sessionId, minutes * 60_000L)
             onComplete()
         }
     }

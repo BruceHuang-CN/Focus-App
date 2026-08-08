@@ -103,6 +103,18 @@ class ReminderSchedulerTest {
         assertEquals(1, fixture.repository.remindedCount)
     }
 
+    @Test
+    fun follow_up_reminder_fires_after_interval_within_quota() = runTest {
+        val fixture = fixture()
+
+        fixture.scheduler.scheduleFollowUp(fixture.session.id, 60_000L)
+        advanceTimeBy(60_001L)
+        runCurrent()
+
+        assertEquals(1, fixture.launcher.shown.size)
+        assertNotNull(fixture.repository.session(fixture.session.id)?.remindedAt)
+    }
+
     private fun kotlinx.coroutines.test.TestScope.fixture(
         previousReminderTimes: List<Long> = emptyList()
     ): Fixture {
@@ -211,5 +223,12 @@ private class FakeReminderSessionRepository(
     override suspend fun markUserAction(sessionId: Long, action: String) {
         val current = sessions[sessionId] ?: return
         sessions[sessionId] = current.copy(userAction = action)
+    }
+
+    override suspend fun sessionById(id: Long): AppUsageSession? = sessions[id]
+
+    override suspend fun updateRemindedAt(sessionId: Long, remindedAt: Long) {
+        val current = sessions[sessionId] ?: return
+        sessions[sessionId] = current.copy(remindedAt = remindedAt)
     }
 }

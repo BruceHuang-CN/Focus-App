@@ -11,6 +11,7 @@ import com.example.focus_app.data.repository.ReminderCacheRepository
 import com.example.focus_app.data.repository.SettingsRepository
 import com.example.focus_app.data.repository.TaskRepository
 import com.example.focus_app.data.permission.PermissionStatusProvider
+import com.example.focus_app.data.followup.FollowUpReminderStore
 import com.example.focus_app.data.returnapp.CustomReturnAppStore
 import com.example.focus_app.domain.model.AiProvider
 import com.example.focus_app.domain.model.DetectionMode
@@ -40,7 +41,8 @@ class SettingsViewModel @Inject constructor(
     private val permissionStatusProvider: PermissionStatusProvider,
     private val appSessionRepository: AppSessionRepository,
     private val reminderCacheRepository: ReminderCacheRepository,
-    private val customReturnAppStore: CustomReturnAppStore
+    private val customReturnAppStore: CustomReturnAppStore,
+    private val followUpReminderStore: FollowUpReminderStore
 ) : ViewModel() {
     val settings: StateFlow<AppSettings> = settingsRepository.getSettingsFlow().stateIn(viewModelScope, SharingStarted.Eagerly, AppSettings())
 
@@ -52,6 +54,9 @@ class SettingsViewModel @Inject constructor(
 
     private val _customReturnPackage = MutableStateFlow(customReturnAppStore.read())
     val customReturnPackage: StateFlow<String> = _customReturnPackage.asStateFlow()
+
+    private val _followUpInterval = MutableStateFlow(followUpReminderStore.readMinutes())
+    val followUpInterval: StateFlow<Int> = _followUpInterval.asStateFlow()
 
     private val _tonePreview = MutableStateFlow("")
     val tonePreview: StateFlow<String> = _tonePreview.asStateFlow()
@@ -133,6 +138,12 @@ class SettingsViewModel @Inject constructor(
         val trimmed = packageName.trim()
         customReturnAppStore.write(trimmed)
         _customReturnPackage.value = trimmed
+    }
+
+    fun updateFollowUpInterval(minutes: Int) {
+        val value = minutes.coerceIn(1, 120)
+        followUpReminderStore.writeMinutes(value)
+        _followUpInterval.value = value
     }
     fun updateDetectionMode(mode: DetectionMode) {
         update { it.copy(detectionMode = mode) }

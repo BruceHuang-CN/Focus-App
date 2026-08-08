@@ -5,6 +5,7 @@ import com.example.focus_app.domain.model.AppUsageSession
 import com.example.focus_app.domain.model.DayBucket
 import com.example.focus_app.domain.model.FocusStats
 import com.example.focus_app.domain.model.HourBucket
+import com.example.focus_app.domain.model.HourAppUsage
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -30,7 +31,9 @@ object StatsAggregator {
         val activeExitCount = inRange.count { it.userAction in ACTIVE_EXIT_ACTIONS }
         val continuedCount = inRange.count { it.userAction == "continued" }
 
-        val hourly = MutableList(24) { HourBucket(it, 0, 0) }
+        val hourDurations = IntArray(24)
+        val hourOpens = IntArray(24)
+        val hourApps = MutableList(24) { linkedMapOf<String, Int>() }
         val daily = LinkedHashMap<LocalDate, DayBucket>()
         val byApp = LinkedHashMap<String, AppShare>()
         var totalMinutes = 0
@@ -44,7 +47,7 @@ object StatsAggregator {
             val startHour = startInstant.hour
             val startDay = startInstant.toLocalDate()
 
-            hourly[startHour] = hourly[startHour].copy(openCount = hourly[startHour].openCount + 1)
+            hourOpens[startHour] += 1
             val dayBucket = daily.getOrPut(startDay) { DayBucket(startDay, 0, 0) }
             daily[startDay] = dayBucket.copy(openCount = dayBucket.openCount + 1)
 
@@ -54,7 +57,9 @@ object StatsAggregator {
                 val segmentEnd = minOf(end, nextHour)
                 val minutes = minutesOf(segmentEnd - cursor)
                 val hour = Instant.ofEpochMilli(cursor).atZone(zone).hour
-                hourly[hour] = hourly[hour].copy(durationMinutes = hourly[hour].durationMinutes + minutes)
+                hourDurations[hour] += minutes
+                hourApps[hour][session.appName] =
+                    hourApps[hour].getOrDefault(session.appName, 0) + minutes
                 val day = Instant.ofEpochMilli(cursor).atZone(zone).toLocalDate()
                 val existing = daily.getOrPut(day) { DayBucket(day, 0, 0) }
                 daily[day] = existing.copy(durationMinutes = existing.durationMinutes + minutes)
@@ -85,7 +90,16 @@ object StatsAggregator {
             activeExitCount = activeExitCount,
             continuedCount = continuedCount,
             exitRate = if (openCount > 0) activeExitCount.toFloat() / openCount else 0f,
-            hourly = hourly,
+            hourly = (0..23).map { hour ->
+                HourBucket(
+                    hour = hour,
+                    durationMinutes = hourDurations[hour],
+                    openCount = hourOpens[hour],
+                    apps = hourApps[hour]
+                        .map { (appName, minutes) -> HourAppUsage(appName, minutes) }
+                        .sortedByDescending { it.durationMinutes }
+                )
+            },
             daily = daily.values.sortedBy { it.date },
             byApp = byApp.values.sortedByDescending { it.durationMinutes }
         )

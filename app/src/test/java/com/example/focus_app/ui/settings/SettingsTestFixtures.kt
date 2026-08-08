@@ -8,6 +8,7 @@ import com.example.focus_app.data.remote.dto.ChatResponse
 import com.example.focus_app.data.remote.dto.ModelInfo
 import com.example.focus_app.data.remote.dto.ModelsResponse
 import com.example.focus_app.data.repository.AppSessionRepository
+import com.example.focus_app.data.followup.FollowUpReminderStore
 import com.example.focus_app.data.returnapp.CustomReturnAppStore
 import com.example.focus_app.data.security.ApiKeyStore
 import com.example.focus_app.data.permission.PermissionStatusProvider
@@ -77,5 +78,13 @@ class TestCustomReturnAppStore : CustomReturnAppStore {
     override fun read(): String = value
     override fun write(packageName: String) {
         value = packageName.trim()
+    }
+}
+
+class TestFollowUpReminderStore : FollowUpReminderStore {
+    var minutes: Int = 10
+    override fun readMinutes(): Int = minutes
+    override fun writeMinutes(minutes: Int) {
+        this.minutes = minutes.coerceIn(1, 120)
     }
 }

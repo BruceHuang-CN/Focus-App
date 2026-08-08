@@ -35,6 +35,10 @@ interface AppSessionRepository {
 
     /** 清空指定时间以来的已提醒标记，用于重置窗口内提醒额度。 */
     suspend fun resetReminderQuota(since: Long) = Unit
+
+    suspend fun sessionById(id: Long): AppUsageSession? = null
+
+    suspend fun updateRemindedAt(sessionId: Long, remindedAt: Long) = Unit
 }
 
 class RoomAppSessionRepository @Inject constructor(
@@ -88,5 +92,12 @@ class RoomAppSessionRepository @Inject constructor(
 
     override suspend fun resetReminderQuota(since: Long) {
         dao.clearRemindedSince(since)
+    }
+
+    override suspend fun sessionById(id: Long): AppUsageSession? =
+        dao.byId(id)?.toDomain()
+
+    override suspend fun updateRemindedAt(sessionId: Long, remindedAt: Long) {
+        dao.updateRemindedAt(sessionId, remindedAt)
     }
 }

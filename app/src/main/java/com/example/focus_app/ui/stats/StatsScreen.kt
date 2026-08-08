@@ -2,6 +2,7 @@ package com.example.focus_app.ui.stats
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -17,6 +18,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -168,6 +170,7 @@ private fun MetricCard(label: String, value: String, modifier: Modifier = Modifi
 
 @Composable
 internal fun HourlyBarChart(data: List<HourBucket>, modifier: Modifier = Modifier) {
+    var selectedHour by remember { mutableStateOf<Int?>(null) }
     Column(modifier = modifier.fillMaxWidth()) {
         if (data.none { it.durationMinutes > 0 || it.openCount > 0 }) {
             Text("暂无数据", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
@@ -178,6 +181,12 @@ internal fun HourlyBarChart(data: List<HourBucket>, modifier: Modifier = Modifie
             modifier = Modifier
                 .fillMaxWidth()
                 .height(140.dp)
+                .pointerInput(data) {
+                    detectTapGestures { offset ->
+                        val barWidth = size.width / data.size.coerceAtLeast(1)
+                        selectedHour = (offset.x / barWidth).toInt().coerceIn(0, data.size - 1)
+                    }
+                }
                 .testTag("hourly_bar_chart")
         ) {
             val barWidth = size.width / data.size
@@ -198,6 +207,40 @@ internal fun HourlyBarChart(data: List<HourBucket>, modifier: Modifier = Modifie
         ) {
             listOf("0时", "6时", "12时", "18时", "24时").forEach { label ->
                 Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+            }
+        }
+        val selected = selectedHour?.let { hour -> data.getOrNull(hour) }
+        if (selected != null) {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        "${selected.hour} 时",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    if (selected.apps.isEmpty()) {
+                        Text(
+                            "该时段没有使用记录",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                    } else {
+                        selected.apps.forEach { app ->
+                            Row(modifier = Modifier.fillMaxWidth()) {
+                                Text(
+                                    app.appName,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Text(
+                                    "${app.durationMinutes} 分钟",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.outline
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
     }
