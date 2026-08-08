@@ -6,7 +6,7 @@ import androidx.compose.runtime.Composable
 
 private val LightColorScheme = lightColorScheme(
     primary = InkBlue, onPrimary = WarmWhite, background = Parchment, onBackground = WarmGray,
-    surface = WarmWhite, onSurface = WarmGray, outline = BorderGray,
+    surface = WarmWhite, onSurface = WarmGray, outline = SoftGray,
 )
 
 @Composable

@@ -16,7 +16,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import com.example.focus_app.domain.model.AppUsageEvent
+import com.example.focus_app.domain.model.AppUsageSession
 import com.example.focus_app.domain.model.FocusTask
 import com.example.focus_app.ui.tasks.scheduleLabel
 import com.example.focus_app.ui.theme.InkBlue
@@ -165,12 +165,12 @@ internal fun HomeContent(
 }
 
 @Composable
-private fun ReminderRecordCard(event: AppUsageEvent) {
+private fun ReminderRecordCard(session: AppUsageSession) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(12.dp)) {
-            Text(event.appName, style = MaterialTheme.typography.labelLarge)
+            Text(session.appName, style = MaterialTheme.typography.labelLarge)
             Text(
-                "${SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(event.openTime))}  ·  已提醒",
+                "${SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(session.startedAt))}  ·  已提醒",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.outline
             )

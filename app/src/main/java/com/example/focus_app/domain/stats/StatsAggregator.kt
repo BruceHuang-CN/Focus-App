@@ -52,7 +52,7 @@ object StatsAggregator {
             while (cursor < end) {
                 val nextHour = cursor - cursor % HOUR_MILLIS + HOUR_MILLIS
                 val segmentEnd = minOf(end, nextHour)
-                val minutes = ((segmentEnd - cursor) / MINUTE_MILLIS).toInt()
+                val minutes = minutesOf(segmentEnd - cursor)
                 val hour = Instant.ofEpochMilli(cursor).atZone(zone).hour
                 hourly[hour] = hourly[hour].copy(durationMinutes = hourly[hour].durationMinutes + minutes)
                 val day = Instant.ofEpochMilli(cursor).atZone(zone).toLocalDate()
@@ -61,12 +61,12 @@ object StatsAggregator {
                 cursor = segmentEnd
             }
 
-            totalMinutes += ((end - start) / MINUTE_MILLIS).toInt()
+            totalMinutes += minutesOf(end - start)
             val app = byApp.getOrPut(session.packageName) {
                 AppShare(session.packageName, session.appName, 0)
             }
             byApp[session.packageName] = app.copy(
-                durationMinutes = app.durationMinutes + ((end - start) / MINUTE_MILLIS).toInt()
+                durationMinutes = app.durationMinutes + minutesOf(end - start)
             )
         }
 
@@ -93,6 +93,9 @@ object StatsAggregator {
 
     private const val HOUR_MILLIS = 3_600_000L
     private const val MINUTE_MILLIS = 60_000L
+
+    private fun minutesOf(millis: Long): Int =
+        ((millis + MINUTE_MILLIS - 1) / MINUTE_MILLIS).toInt()
 
     private val ACTIVE_EXIT_ACTIONS = setOf("returned_to_focus", "returned_home")
 }
