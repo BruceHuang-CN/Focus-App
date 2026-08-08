@@ -25,6 +25,7 @@ import androidx.navigation.compose.rememberNavController
 import com.example.focus_app.ui.home.HomeScreen
 import com.example.focus_app.ui.mood.MoodPickerScreen
 import com.example.focus_app.ui.onboarding.OnboardingScreen
+import com.example.focus_app.ui.settings.CustomReturnAppPickerScreen
 import com.example.focus_app.ui.settings.SettingsScreen
 import com.example.focus_app.ui.settings.TargetAppsScreen
 import com.example.focus_app.ui.stats.StatsScreen
@@ -39,6 +40,7 @@ sealed class Screen(val route: String) {
     object Settings : Screen("settings")
     object Stats : Screen("stats")
     object TargetApps : Screen("target_apps")
+    object CustomReturnPicker : Screen("custom_return_picker")
 }
 
 private data class TabItem(val route: String, val label: String, val icon: ImageVector)
@@ -112,8 +114,14 @@ fun NavGraph() {
             composable(Screen.Settings.route) {
                 SettingsScreen(
                     onBack = { navController.popBackStack() },
-                    navigateToTargetApps = { navController.navigate(Screen.TargetApps.route) }
+                    navigateToTargetApps = { navController.navigate(Screen.TargetApps.route) },
+                    navigateToCustomReturnPicker = {
+                        navController.navigate(Screen.CustomReturnPicker.route)
+                    }
                 )
+            }
+            composable(Screen.CustomReturnPicker.route) {
+                CustomReturnAppPickerScreen(onBack = { navController.popBackStack() })
             }
             composable(Screen.Stats.route) {
                 StatsScreen(onBack = { navController.popBackStack() })

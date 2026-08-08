@@ -15,38 +15,37 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.example.focus_app.data.repository.AppInfo
-import com.example.focus_app.util.InstalledApp
 import com.example.focus_app.util.loadInstalledApps
-import kotlinx.coroutines.launch
 
+/**
+ * 按应用名称选择「返回指定应用」的目标，无需输入包名。
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TargetAppsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewModel()) {
-    val settings by viewModel.settings.collectAsState()
+fun CustomReturnAppPickerScreen(
+    onBack: () -> Unit,
+    viewModel: SettingsViewModel = hiltViewModel()
+) {
     val context = LocalContext.current
     val allApps = remember { loadInstalledApps(context) }
+    val currentPackage by viewModel.customReturnPackage.collectAsState()
     var searchQuery by remember { mutableStateOf("") }
-    val snackbarHostState = remember { SnackbarHostState() }
-    val scope = rememberCoroutineScope()
-
-    val selectedPackages = remember(settings.targetApps) {
-        settings.targetApps.map { it.packageName }.toSet()
-    }
 
     val filtered = remember(allApps, searchQuery) {
-        if (searchQuery.isBlank()) allApps
-        else allApps.filter {
-            it.appName.contains(searchQuery, ignoreCase = true) ||
-                it.packageName.contains(searchQuery, ignoreCase = true)
+        if (searchQuery.isBlank()) {
+            allApps
+        } else {
+            allApps.filter {
+                it.appName.contains(searchQuery, ignoreCase = true) ||
+                    it.packageName.contains(searchQuery, ignoreCase = true)
+            }
         }
     }
 
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = { Text("选择目标 App") },
+                title = { Text("选择返回应用") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
@@ -59,46 +58,24 @@ fun TargetAppsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltView
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
-                placeholder = { Text("搜索 App 名称或包名...") },
+                placeholder = { Text("搜索应用名称...") },
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                 singleLine = true
             )
-
-            Text(
-                "已选 ${selectedPackages.size} 个 App",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.outline,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
-            )
-
             LazyColumn(modifier = Modifier.fillMaxSize()) {
                 items(filtered, key = { it.packageName }) { app ->
-                    val isChecked = app.packageName in selectedPackages
+                    val isSelected = app.packageName == currentPackage
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable {
-                                val updated = settings.targetApps.toMutableList()
-                                if (isChecked) {
-                                    updated.removeAll { it.packageName == app.packageName }
-                                } else {
-                                    updated.add(app.toAppInfo())
-                                }
-                                viewModel.updateTargetApps(updated)
-                                scope.launch {
-                                    snackbarHostState.showSnackbar(
-                                        if (isChecked) "已移除：${app.appName}" else "已添加：${app.appName}",
-                                        duration = SnackbarDuration.Short
-                                    )
-                                }
+                                viewModel.updateCustomReturnPackage(app.packageName)
+                                onBack()
                             }
                             .padding(horizontal = 16.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Checkbox(
-                            checked = isChecked,
-                            onCheckedChange = { _ -> } // handled by Row click
-                        )
+                        RadioButton(selected = isSelected, onClick = null)
                         Spacer(modifier = Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
@@ -122,4 +99,3 @@ fun TargetAppsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltView
         }
     }
 }
-

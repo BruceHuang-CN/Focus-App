@@ -29,6 +29,7 @@ import com.example.focus_app.domain.model.ReturnDestination
 import com.example.focus_app.domain.permission.PermissionCheckAction
 import com.example.focus_app.ui.components.PresetSelector
 import com.example.focus_app.util.PermissionHelper
+import com.example.focus_app.util.loadInstalledApps
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 
@@ -37,6 +38,7 @@ import kotlinx.coroutines.launch
 fun SettingsScreen(
     onBack: () -> Unit,
     navigateToTargetApps: () -> Unit,
+    navigateToCustomReturnPicker: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val s by viewModel.settings.collectAsState()
@@ -60,10 +62,6 @@ fun SettingsScreen(
     var customToneDraft by remember(s.customToneInstruction) {
         mutableStateOf(s.customToneInstruction)
     }
-    var customReturnDraft by remember(customReturnPackage) {
-        mutableStateOf(customReturnPackage)
-    }
-
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { /* 授权结果由系统设置页兜底处理 */ }
@@ -414,19 +412,34 @@ fun SettingsScreen(
                 }
             }
             if (s.returnDestination == ReturnDestination.CUSTOM) {
-                OutlinedTextField(
-                    value = customReturnDraft,
-                    onValueChange = { customReturnDraft = it },
-                    label = { Text("目标应用包名（如 com.tencent.mm）") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Button(
-                    onClick = {
-                        viewModel.updateCustomReturnPackage(customReturnDraft)
-                        onSettingChanged("返回指定应用")
-                    },
-                    enabled = customReturnDraft.isNotBlank()
-                ) { Text("保存返回应用") }
+                val selectedAppName = remember(customReturnPackage) {
+                    loadInstalledApps(context)
+                        .firstOrNull { it.packageName == customReturnPackage }
+                        ?.appName
+                        ?: customReturnPackage.ifBlank { null }
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { navigateToCustomReturnPicker() }
+                        .padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("返回指定应用", style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            selectedAppName ?: "点击选择应用",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (selectedAppName == null) {
+                                MaterialTheme.colorScheme.error
+                            } else {
+                                MaterialTheme.colorScheme.outline
+                            }
+                        )
+                    }
+                    Text("→", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.outline)
+                }
             }
             Divider()
 
