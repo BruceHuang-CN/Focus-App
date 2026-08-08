@@ -28,6 +28,17 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Focusapp">
 
+        <!-- FocusApp 使用按需初始化（Configuration.Provider），移除 WorkManager 默认初始化器避免重复初始化 -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                tools:node="remove" />
+        </provider>
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

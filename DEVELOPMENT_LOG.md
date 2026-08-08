@@ -193,3 +193,18 @@
 - 单元测试全量 120 项通过。
 
 ---
+
+## 2026-08-08（第三轮）
+
+### 问题：release 构建报 lint fatal error（RemoveWorkManagerInitializer）
+
+**现象**：`assembleRelease` 失败，AndroidManifest.xml 报
+`Remove androidx.work.WorkManagerInitializer ... when using on-demand initialization`。
+**原因**：`FocusApp` 实现了 `androidx.work.Configuration.Provider`（按需初始化，配合 HiltWorkerFactory），
+但 WorkManager 通过 androidx.startup 在 Manifest 中自动注册了默认初始化器，两种初始化方式冲突，lint 判定为致命错误。
+**修复**：在 Manifest 中移除 WorkManager 默认初始化器（`tools:node="remove"` 移除
+`androidx.work.WorkManagerInitializer` 的 meta-data），遵循 WorkManager 官方按需初始化文档。
+**验证**：`:app:assembleRelease --offline` 构建成功，lintVitalRelease 通过，输出
+`app/build/outputs/apk/release/app-release-unsigned.apk`（未签名，需在 Android Studio 签名向导中导出正式包）。
+
+---
