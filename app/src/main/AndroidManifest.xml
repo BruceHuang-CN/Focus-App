@@ -55,6 +55,15 @@
         </service>
 
         <service
+            android:name=".service.KeepAliveService"
+            android:foregroundServiceType="specialUse"
+            android:exported="false">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Low-priority keep-alive foreground service for realtime focus detection" />
+        </service>
+
+        <service
             android:name=".service.FocusAccessibilityService"
             android:exported="true"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">

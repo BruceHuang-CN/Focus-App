@@ -12,6 +12,7 @@ import com.example.focus_app.data.repository.SettingsRepository
 import com.example.focus_app.data.repository.TaskRepository
 import com.example.focus_app.data.permission.PermissionStatusProvider
 import com.example.focus_app.data.followup.FollowUpReminderStore
+import com.example.focus_app.data.keepalive.KeepAliveStore
 import com.example.focus_app.data.returnapp.CustomReturnAppStore
 import com.example.focus_app.domain.model.AiProvider
 import com.example.focus_app.domain.model.DetectionMode
@@ -42,7 +43,8 @@ class SettingsViewModel @Inject constructor(
     private val appSessionRepository: AppSessionRepository,
     private val reminderCacheRepository: ReminderCacheRepository,
     private val customReturnAppStore: CustomReturnAppStore,
-    private val followUpReminderStore: FollowUpReminderStore
+    private val followUpReminderStore: FollowUpReminderStore,
+    private val keepAliveStore: KeepAliveStore
 ) : ViewModel() {
     val settings: StateFlow<AppSettings> = settingsRepository.getSettingsFlow().stateIn(viewModelScope, SharingStarted.Eagerly, AppSettings())
 
@@ -57,6 +59,8 @@ class SettingsViewModel @Inject constructor(
 
     private val _followUpInterval = MutableStateFlow(followUpReminderStore.readMinutes())
     val followUpInterval: StateFlow<Int> = _followUpInterval.asStateFlow()
+
+    val keepAliveEnabled: StateFlow<Boolean> = keepAliveStore.enabled
 
     private val _tonePreview = MutableStateFlow("")
     val tonePreview: StateFlow<String> = _tonePreview.asStateFlow()
@@ -144,6 +148,10 @@ class SettingsViewModel @Inject constructor(
         val value = minutes.coerceIn(1, 120)
         followUpReminderStore.writeMinutes(value)
         _followUpInterval.value = value
+    }
+
+    fun setKeepAliveEnabled(enabled: Boolean) {
+        keepAliveStore.setEnabled(enabled)
     }
     fun updateDetectionMode(mode: DetectionMode) {
         update { it.copy(detectionMode = mode) }

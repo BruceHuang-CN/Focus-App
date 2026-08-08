@@ -47,6 +47,7 @@ fun SettingsScreen(
     val permissionItems by viewModel.permissionStatus.collectAsState()
     val customReturnPackage by viewModel.customReturnPackage.collectAsState()
     val followUpInterval by viewModel.followUpInterval.collectAsState()
+    val keepAliveEnabled by viewModel.keepAliveEnabled.collectAsState()
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     var overlayGranted by remember { mutableStateOf(PermissionHelper.hasOverlayPermission(context)) }
@@ -504,6 +505,23 @@ fun SettingsScreen(
                         Text("去开启")
                     }
                 }
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("常驻守护（防止后台被回收）", style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        "实时模式会显示一条低优先级常驻通知",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                }
+                Switch(
+                    checked = keepAliveEnabled,
+                    onCheckedChange = { enabled ->
+                        viewModel.setKeepAliveEnabled(enabled)
+                        onSettingChanged(if (enabled) "开启常驻守护" else "关闭常驻守护")
+                    }
+                )
             }
 
             Spacer(modifier = Modifier.height(32.dp))

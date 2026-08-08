@@ -100,12 +100,13 @@ class SettingsViewModelDetectionTest {
     }
 
     private fun newViewModel(dao: DetectionSettingsDao): SettingsViewModel =
-        newViewModel(dao, TestCustomReturnAppStore(), TestFollowUpReminderStore())
+        newViewModel(dao, TestCustomReturnAppStore(), TestFollowUpReminderStore(), TestKeepAliveStore())
 
     private fun newViewModel(
         dao: DetectionSettingsDao,
         store: TestCustomReturnAppStore,
-        followUp: TestFollowUpReminderStore
+        followUp: TestFollowUpReminderStore,
+        keepAlive: TestKeepAliveStore = TestKeepAliveStore()
     ): SettingsViewModel =
         SettingsViewModel(
             settingsRepository = SettingsRepository(dao),
@@ -115,7 +116,8 @@ class SettingsViewModelDetectionTest {
             appSessionRepository = TestSessionRepository(),
             reminderCacheRepository = ReminderCacheRepository(TestCacheDao(), FakeClock(0L)),
             customReturnAppStore = store,
-            followUpReminderStore = followUp
+            followUpReminderStore = followUp,
+            keepAliveStore = keepAlive
         )
 
     @Test
@@ -144,6 +146,25 @@ class SettingsViewModelDetectionTest {
 
         assertEquals(15, followUp.minutes)
         assertEquals(15, viewModel.followUpInterval.value)
+    }
+
+    @Test
+    fun toggling_keep_alive_updates_the_store() = runTest(dispatcher) {
+        val dao = DetectionSettingsDao(SettingsEntity(targetApps = "[]"))
+        val keepAlive = TestKeepAliveStore()
+        val viewModel = newViewModel(
+            dao,
+            TestCustomReturnAppStore(),
+            TestFollowUpReminderStore(),
+            keepAlive
+        )
+        runCurrent()
+
+        viewModel.setKeepAliveEnabled(false)
+        runCurrent()
+
+        assertEquals(false, keepAlive.enabled.value)
+        assertEquals(false, viewModel.keepAliveEnabled.value)
     }
 }
 

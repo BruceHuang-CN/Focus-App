@@ -9,10 +9,14 @@ import com.example.focus_app.data.remote.dto.ModelInfo
 import com.example.focus_app.data.remote.dto.ModelsResponse
 import com.example.focus_app.data.repository.AppSessionRepository
 import com.example.focus_app.data.followup.FollowUpReminderStore
+import com.example.focus_app.data.keepalive.KeepAliveStore
 import com.example.focus_app.data.returnapp.CustomReturnAppStore
 import com.example.focus_app.data.security.ApiKeyStore
 import com.example.focus_app.data.permission.PermissionStatusProvider
 import com.example.focus_app.domain.model.AppUsageSession
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import retrofit2.Response
 
 class TestSessionRepository : AppSessionRepository {
@@ -86,5 +90,13 @@ class TestFollowUpReminderStore : FollowUpReminderStore {
     override fun readMinutes(): Int = minutes
     override fun writeMinutes(minutes: Int) {
         this.minutes = minutes.coerceIn(1, 120)
+    }
+}
+
+class TestKeepAliveStore : KeepAliveStore {
+    private val _enabled = MutableStateFlow(true)
+    override val enabled: StateFlow<Boolean> = _enabled.asStateFlow()
+    override fun setEnabled(enabled: Boolean) {
+        _enabled.value = enabled
     }
 }
