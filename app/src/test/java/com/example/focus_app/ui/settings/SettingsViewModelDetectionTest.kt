@@ -100,14 +100,35 @@ class SettingsViewModelDetectionTest {
     }
 
     private fun newViewModel(dao: DetectionSettingsDao): SettingsViewModel =
+        newViewModel(dao, TestCustomReturnAppStore())
+
+    private fun newViewModel(
+        dao: DetectionSettingsDao,
+        store: TestCustomReturnAppStore
+    ): SettingsViewModel =
         SettingsViewModel(
             settingsRepository = SettingsRepository(dao),
             aiRepository = AiRepository(DetectionApiKeyStore("sk-test")) { DetectionOpenAiApi() },
             taskRepository = TaskRepository(DetectionTaskDao()),
             permissionStatusProvider = DetectionFakePermissionProvider(),
             appSessionRepository = TestSessionRepository(),
-            reminderCacheRepository = ReminderCacheRepository(TestCacheDao(), FakeClock(0L))
+            reminderCacheRepository = ReminderCacheRepository(TestCacheDao(), FakeClock(0L)),
+            customReturnAppStore = store
         )
+
+    @Test
+    fun updating_custom_return_package_persists_to_store() = runTest(dispatcher) {
+        val dao = DetectionSettingsDao(SettingsEntity(targetApps = "[]"))
+        val store = TestCustomReturnAppStore()
+        val viewModel = newViewModel(dao, store)
+        runCurrent()
+
+        viewModel.updateCustomReturnPackage(" com.tencent.mm ")
+        runCurrent()
+
+        assertEquals("com.tencent.mm", store.value)
+        assertEquals("com.tencent.mm", viewModel.customReturnPackage.value)
+    }
 }
 
 private class DetectionSettingsDao(initial: SettingsEntity) : SettingsDao {

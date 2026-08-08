@@ -18,6 +18,7 @@ interface ReminderLauncher {
     fun show(data: ReminderLaunchData)
     fun returnToFocus(taskId: Long?)
     fun returnHome()
+    fun returnToCustom(packageName: String) = Unit
 }
 
 internal fun presentReminder(
@@ -59,6 +60,15 @@ class AndroidReminderLauncher @Inject constructor(
         )
     }
 
+    override fun returnToCustom(packageName: String) {
+        val intent = context.packageManager.getLaunchIntentForPackage(packageName)
+        if (intent != null) {
+            context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        } else {
+            returnHome()
+        }
+    }
+
     private fun reminderIntent(data: ReminderLaunchData) =
         Intent(context, ReminderActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
@@ -72,6 +82,7 @@ class AndroidReminderLauncher @Inject constructor(
             putExtra(ReminderLaunchData.EXTRA_WINDOW_REMINDER_COUNT, data.windowReminderCount)
             putExtra(ReminderLaunchData.EXTRA_WINDOW_LIMIT, data.windowLimit)
             putExtra(ReminderLaunchData.EXTRA_WINDOW_MINUTES, data.windowMinutes)
+            putExtra(ReminderLaunchData.EXTRA_RETURN_PACKAGE_NAME, data.returnPackageName)
         }
 
     private fun postReminderNotification(data: ReminderLaunchData) {

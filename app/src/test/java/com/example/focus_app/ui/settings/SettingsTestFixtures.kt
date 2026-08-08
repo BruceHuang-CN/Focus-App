@@ -8,6 +8,7 @@ import com.example.focus_app.data.remote.dto.ChatResponse
 import com.example.focus_app.data.remote.dto.ModelInfo
 import com.example.focus_app.data.remote.dto.ModelsResponse
 import com.example.focus_app.data.repository.AppSessionRepository
+import com.example.focus_app.data.returnapp.CustomReturnAppStore
 import com.example.focus_app.data.security.ApiKeyStore
 import com.example.focus_app.data.permission.PermissionStatusProvider
 import com.example.focus_app.domain.model.AppUsageSession
@@ -69,4 +70,12 @@ class TestPermissionProvider : PermissionStatusProvider {
     override fun usageStatsGranted(): Boolean = true
     override fun notificationGranted(): Boolean = true
     override fun overlayGranted(): Boolean = true
+}
+
+class TestCustomReturnAppStore : CustomReturnAppStore {
+    var value: String = ""
+    override fun read(): String = value
+    override fun write(packageName: String) {
+        value = packageName.trim()
+    }
 }

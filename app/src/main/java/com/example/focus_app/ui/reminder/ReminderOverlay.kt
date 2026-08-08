@@ -89,20 +89,23 @@ fun ReminderOverlay(
                     ) {
                         Button(
                             onClick = {
-                                if (uiState.returnDestination == ReturnDestination.FOCUS) {
-                                    viewModel.returnToFocus(data.sessionId, onDismiss)
-                                } else {
-                                    viewModel.returnHome(data.sessionId, onDismiss)
+                                when (uiState.returnDestination) {
+                                    ReturnDestination.FOCUS ->
+                                        viewModel.returnToFocus(data.sessionId, onDismiss)
+                                    ReturnDestination.HOME ->
+                                        viewModel.returnHome(data.sessionId, onDismiss)
+                                    ReturnDestination.CUSTOM ->
+                                        viewModel.returnToCustom(data.sessionId, onDismiss)
                                 }
                             },
                             modifier = Modifier.weight(1f),
                             colors = ButtonDefaults.buttonColors(containerColor = InkBlue)
                         ) {
                             Text(
-                                if (uiState.returnDestination == ReturnDestination.FOCUS) {
-                                    "不刷了，回到 Focus"
-                                } else {
-                                    "不刷了，回到桌面"
+                                when (uiState.returnDestination) {
+                                    ReturnDestination.FOCUS -> "不刷了，回到 Focus"
+                                    ReturnDestination.HOME -> "不刷了，回到桌面"
+                                    ReturnDestination.CUSTOM -> "不刷了，去指定应用"
                                 }
                             )
                         }

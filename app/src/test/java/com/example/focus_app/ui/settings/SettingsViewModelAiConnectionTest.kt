@@ -149,7 +149,8 @@ class SettingsViewModelAiConnectionTest {
             taskRepository = TaskRepository(EmptyTaskDao()),
             permissionStatusProvider = AiConnectionFakePermissionProvider(),
             appSessionRepository = TestSessionRepository(),
-            reminderCacheRepository = ReminderCacheRepository(TestCacheDao(), FakeClock(0L))
+            reminderCacheRepository = ReminderCacheRepository(TestCacheDao(), FakeClock(0L)),
+            customReturnAppStore = TestCustomReturnAppStore()
         )
     }
 }

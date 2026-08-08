@@ -9,6 +9,14 @@
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- Android 11+ 包可见性：允许列出带启动器入口的已安装应用（目标 App 选择） -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+    </queries>
+
     <application
         android:name=".FocusApp"
         android:allowBackup="true"

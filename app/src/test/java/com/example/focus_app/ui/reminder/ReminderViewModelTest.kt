@@ -84,6 +84,24 @@ class ReminderViewModelTest {
         assertEquals(0, fixture.launcher.homeRequests)
     }
 
+    @Test
+    fun return_to_custom_records_action_and_opens_package() = runTest(dispatcher) {
+        val fixture = fixture()
+        fixture.viewModel.init(
+            LAUNCH_DATA.copy(
+                returnDestination = ReturnDestination.CUSTOM,
+                returnPackageName = "com.tencent.mm"
+            )
+        )
+
+        fixture.viewModel.returnToCustom(LAUNCH_DATA.sessionId)
+        advanceUntilIdle()
+
+        assertEquals("returned_to_custom", fixture.repository.action)
+        assertEquals("com.tencent.mm", fixture.launcher.customPackage)
+        assertEquals(listOf("saved", "custom"), fixture.events)
+    }
+
     private fun fixture(): Fixture {
         val events = mutableListOf<String>()
         val repository = ActionRecordingSessionRepository(events)
@@ -116,6 +134,7 @@ private class ActionRecordingLauncher(
 ) : ReminderLauncher {
     var focusTaskId: Long? = null
     var homeRequests = 0
+    var customPackage: String? = null
 
     override fun show(data: ReminderLaunchData) = Unit
 
@@ -127,6 +146,11 @@ private class ActionRecordingLauncher(
     override fun returnHome() {
         homeRequests++
         events += "home"
+    }
+
+    override fun returnToCustom(packageName: String) {
+        customPackage = packageName
+        events += "custom"
     }
 }
 

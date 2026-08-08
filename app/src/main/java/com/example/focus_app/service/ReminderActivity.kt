@@ -31,7 +31,8 @@ class ReminderActivity : ComponentActivity() {
                 ReminderLaunchData.EXTRA_WINDOW_REMINDER_COUNT, 0
             ),
             windowLimit = intent.getIntExtra(ReminderLaunchData.EXTRA_WINDOW_LIMIT, 0),
-            windowMinutes = intent.getIntExtra(ReminderLaunchData.EXTRA_WINDOW_MINUTES, 0)
+            windowMinutes = intent.getIntExtra(ReminderLaunchData.EXTRA_WINDOW_MINUTES, 0),
+            returnPackageName = intent.getStringExtra(ReminderLaunchData.EXTRA_RETURN_PACKAGE_NAME).orEmpty()
         )
 
         setContent {

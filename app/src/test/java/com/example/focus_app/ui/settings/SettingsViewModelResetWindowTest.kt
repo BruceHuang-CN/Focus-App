@@ -53,7 +53,8 @@ class SettingsViewModelResetWindowTest {
                 taskRepository = TaskRepository(WindowResetTaskDao()),
                 permissionStatusProvider = TestPermissionProvider(),
                 appSessionRepository = sessionRepository,
-                reminderCacheRepository = cacheRepository
+                reminderCacheRepository = cacheRepository,
+                customReturnAppStore = TestCustomReturnAppStore()
             )
             runCurrent()
             val revisionBefore = cacheRepository.revision.value

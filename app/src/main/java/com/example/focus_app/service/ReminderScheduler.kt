@@ -5,6 +5,7 @@ import com.example.focus_app.data.repository.AppSettings
 import com.example.focus_app.data.repository.ReminderCacheRepository
 import com.example.focus_app.data.repository.SettingsRepository
 import com.example.focus_app.data.repository.TaskRepository
+import com.example.focus_app.data.returnapp.CustomReturnAppStore
 import com.example.focus_app.domain.model.AppUsageSession
 import com.example.focus_app.domain.reminder.ReminderPolicy
 import com.example.focus_app.domain.time.Clock
@@ -50,7 +51,8 @@ class ReminderScheduler(
         settingsRepository: SettingsRepository,
         taskRepository: TaskRepository,
         cacheRepository: ReminderCacheRepository,
-        launcher: ReminderLauncher
+        launcher: ReminderLauncher,
+        customReturnAppStore: CustomReturnAppStore
     ) : this(
         repository = repository,
         launcher = launcher,
@@ -75,7 +77,8 @@ class ReminderScheduler(
                 returnDestination = settings.returnDestination,
                 windowReminderCount = repository.countShownRemindersSince(since),
                 windowLimit = settings.maxRemindersPerWindow,
-                windowMinutes = settings.reminderWindowMinutes
+                windowMinutes = settings.reminderWindowMinutes,
+                returnPackageName = customReturnAppStore.read()
             )
         }
     )

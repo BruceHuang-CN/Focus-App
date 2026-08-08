@@ -43,6 +43,7 @@ fun SettingsScreen(
     val connectionState by viewModel.aiConnection.collectAsState()
     val tonePreview by viewModel.tonePreview.collectAsState()
     val permissionItems by viewModel.permissionStatus.collectAsState()
+    val customReturnPackage by viewModel.customReturnPackage.collectAsState()
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     var overlayGranted by remember { mutableStateOf(PermissionHelper.hasOverlayPermission(context)) }
@@ -58,6 +59,9 @@ fun SettingsScreen(
     }
     var customToneDraft by remember(s.customToneInstruction) {
         mutableStateOf(s.customToneInstruction)
+    }
+    var customReturnDraft by remember(customReturnPackage) {
+        mutableStateOf(customReturnPackage)
     }
 
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
@@ -217,6 +221,23 @@ fun SettingsScreen(
                     onSettingChanged("统计窗口 ${it} 分钟")
                 }
             )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("提醒前呼吸停顿", style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        "弹窗先引导深呼吸，再显示操作按钮",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                }
+                Switch(
+                    checked = s.enableBreathingPause,
+                    onCheckedChange = { enabled ->
+                        viewModel.toggleBreathingPause()
+                        onSettingChanged(if (enabled) "开启呼吸停顿" else "关闭呼吸停顿")
+                    }
+                )
+            }
             Divider()
 
             // ── 提醒次数 ──
@@ -392,6 +413,21 @@ fun SettingsScreen(
                     Text(returnLabel(destination))
                 }
             }
+            if (s.returnDestination == ReturnDestination.CUSTOM) {
+                OutlinedTextField(
+                    value = customReturnDraft,
+                    onValueChange = { customReturnDraft = it },
+                    label = { Text("目标应用包名（如 com.tencent.mm）") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Button(
+                    onClick = {
+                        viewModel.updateCustomReturnPackage(customReturnDraft)
+                        onSettingChanged("返回指定应用")
+                    },
+                    enabled = customReturnDraft.isNotBlank()
+                ) { Text("保存返回应用") }
+            }
             Divider()
 
             // ── 检测方式 ──
@@ -470,6 +506,7 @@ private fun toneLabel(tone: ReminderTone): String = when (tone) {
 private fun returnLabel(destination: ReturnDestination): String = when (destination) {
     ReturnDestination.FOCUS -> "不刷了，返回 Focus"
     ReturnDestination.HOME -> "不刷了，返回桌面"
+    ReturnDestination.CUSTOM -> "不刷了，返回指定应用"
 }
 
 private fun detectionLabel(mode: DetectionMode): String = when (mode) {

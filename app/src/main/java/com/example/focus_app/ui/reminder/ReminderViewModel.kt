@@ -22,7 +22,8 @@ data class ReminderUiState(
     val returnDestination: ReturnDestination = ReturnDestination.FOCUS,
     val windowReminderCount: Int = 0,
     val windowLimit: Int = 0,
-    val windowMinutes: Int = 0
+    val windowMinutes: Int = 0,
+    val returnPackageName: String = ""
 )
 
 @HiltViewModel
@@ -44,7 +45,8 @@ class ReminderViewModel @Inject constructor(
             returnDestination = data.returnDestination,
             windowReminderCount = data.windowReminderCount,
             windowLimit = data.windowLimit,
-            windowMinutes = data.windowMinutes
+            windowMinutes = data.windowMinutes,
+            returnPackageName = data.returnPackageName
         )
     }
 
@@ -70,6 +72,15 @@ class ReminderViewModel @Inject constructor(
         viewModelScope.launch {
             sessionRepository.markUserAction(sessionId, "returned_home")
             launcher.returnHome()
+            onComplete()
+        }
+    }
+
+    fun returnToCustom(sessionId: Long, onComplete: () -> Unit = {}) {
+        val data = launchData?.takeIf { it.sessionId == sessionId } ?: return
+        viewModelScope.launch {
+            sessionRepository.markUserAction(sessionId, "returned_to_custom")
+            launcher.returnToCustom(data.returnPackageName)
             onComplete()
         }
     }

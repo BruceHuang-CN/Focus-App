@@ -11,6 +11,7 @@ import com.example.focus_app.data.repository.ReminderCacheRepository
 import com.example.focus_app.data.repository.SettingsRepository
 import com.example.focus_app.data.repository.TaskRepository
 import com.example.focus_app.data.permission.PermissionStatusProvider
+import com.example.focus_app.data.returnapp.CustomReturnAppStore
 import com.example.focus_app.domain.model.AiProvider
 import com.example.focus_app.domain.model.DetectionMode
 import com.example.focus_app.domain.model.ReminderTone
@@ -38,7 +39,8 @@ class SettingsViewModel @Inject constructor(
     private val taskRepository: TaskRepository,
     private val permissionStatusProvider: PermissionStatusProvider,
     private val appSessionRepository: AppSessionRepository,
-    private val reminderCacheRepository: ReminderCacheRepository
+    private val reminderCacheRepository: ReminderCacheRepository,
+    private val customReturnAppStore: CustomReturnAppStore
 ) : ViewModel() {
     val settings: StateFlow<AppSettings> = settingsRepository.getSettingsFlow().stateIn(viewModelScope, SharingStarted.Eagerly, AppSettings())
 
@@ -47,6 +49,9 @@ class SettingsViewModel @Inject constructor(
 
     private val _permissionStatus = MutableStateFlow<List<PermissionCheckItem>>(emptyList())
     val permissionStatus: StateFlow<List<PermissionCheckItem>> = _permissionStatus.asStateFlow()
+
+    private val _customReturnPackage = MutableStateFlow(customReturnAppStore.read())
+    val customReturnPackage: StateFlow<String> = _customReturnPackage.asStateFlow()
 
     private val _tonePreview = MutableStateFlow("")
     val tonePreview: StateFlow<String> = _tonePreview.asStateFlow()
@@ -123,6 +128,12 @@ class SettingsViewModel @Inject constructor(
 
     fun updateReminderTone(tone: ReminderTone) { update { it.copy(toneKey = tone) } }
     fun updateReturnDestination(destination: ReturnDestination) { update { it.copy(returnDestination = destination) } }
+
+    fun updateCustomReturnPackage(packageName: String) {
+        val trimmed = packageName.trim()
+        customReturnAppStore.write(trimmed)
+        _customReturnPackage.value = trimmed
+    }
     fun updateDetectionMode(mode: DetectionMode) {
         update { it.copy(detectionMode = mode) }
         _notificationPermissionRequests.tryEmit(Unit)
