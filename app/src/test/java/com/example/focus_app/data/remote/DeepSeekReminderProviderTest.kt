@@ -4,6 +4,7 @@ import com.example.focus_app.data.remote.dto.ChatRequest
 import com.example.focus_app.data.remote.dto.ChatResponse
 import com.example.focus_app.data.remote.dto.Choice
 import com.example.focus_app.data.remote.dto.MessageContent
+import com.example.focus_app.data.remote.dto.ModelsResponse
 import com.example.focus_app.data.security.ApiKeyStore
 import com.example.focus_app.domain.model.ReminderContext
 import com.example.focus_app.domain.model.ReminderTone
@@ -94,6 +95,9 @@ private class CancellingOpenAiApi : OpenAiApi {
         authorization: String,
         request: ChatRequest
     ): Response<ChatResponse> = throw CancellationException("activation changed")
+
+    override suspend fun listModels(authorization: String): Response<ModelsResponse> =
+        throw CancellationException("activation changed")
 }
 
 private class FakeOpenAiApi(
@@ -120,6 +124,9 @@ private class FakeOpenAiApi(
             )
         }
     }
+
+    override suspend fun listModels(authorization: String): Response<ModelsResponse> =
+        Response.success(ModelsResponse())
 }
 
 private class FakeApiKeyStore(initial: String = "") : ApiKeyStore {

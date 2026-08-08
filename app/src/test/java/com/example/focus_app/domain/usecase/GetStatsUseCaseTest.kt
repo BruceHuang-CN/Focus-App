@@ -72,6 +72,24 @@ private class FakeSessionRepository(
     var lastFrom: Long = -1
     var lastTo: Long = -1
 
+    override suspend fun openSession(
+        packageName: String,
+        appName: String,
+        startedAt: Long,
+        taskId: Long?,
+        toneKey: String
+    ): AppUsageSession = error("Not used")
+
+    override suspend fun closeSession(sessionId: Long, endedAt: Long) = Unit
+
+    override suspend fun currentOpenSession(): AppUsageSession? = null
+
+    override suspend fun reminderTimesSince(since: Long): List<Long> = emptyList()
+
+    override suspend fun markRemindedIfNeeded(sessionId: Long, remindedAt: Long): Boolean = false
+
+    override suspend fun markUserAction(sessionId: Long, action: String) = Unit
+
     override suspend fun sessionsBetween(from: Long, to: Long): List<AppUsageSession> {
         lastFrom = from
         lastTo = to

@@ -152,7 +152,8 @@ class SettingsViewModelAiConnectionTest {
             reminderCacheRepository = ReminderCacheRepository(TestCacheDao(), FakeClock(0L)),
             customReturnAppStore = TestCustomReturnAppStore(),
             followUpReminderStore = TestFollowUpReminderStore(),
-            keepAliveStore = TestKeepAliveStore()
+            keepAliveStore = TestKeepAliveStore(),
+            themeStore = TestThemeStore()
         )
     }
 }

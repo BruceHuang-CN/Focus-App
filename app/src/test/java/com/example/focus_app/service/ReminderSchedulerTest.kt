@@ -115,6 +115,32 @@ class ReminderSchedulerTest {
         assertNotNull(fixture.repository.session(fixture.session.id)?.remindedAt)
     }
 
+    @Test
+    fun follow_up_reminder_does_not_fire_when_session_closed() = runTest {
+        val fixture = fixture()
+
+        fixture.scheduler.scheduleFollowUp(fixture.session.id, 60_000L)
+        fixture.repository.closeSession(fixture.session.id, NOW + 5_000L)
+        advanceTimeBy(60_001L)
+        runCurrent()
+
+        assertEquals(0, fixture.launcher.shown.size)
+        assertEquals(0, fixture.repository.remindedCount)
+    }
+
+    @Test
+    fun initial_reminder_does_not_fire_when_session_closed_before_delay() = runTest {
+        val fixture = fixture()
+
+        fixture.scheduler.onSessionStarted(fixture.session, appStillForeground = { true })
+        fixture.repository.closeSession(fixture.session.id, NOW + 3_000L)
+        advanceTimeBy(10_001L)
+        runCurrent()
+
+        assertEquals(0, fixture.launcher.shown.size)
+        assertEquals(0, fixture.repository.remindedCount)
+    }
+
     private fun kotlinx.coroutines.test.TestScope.fixture(
         previousReminderTimes: List<Long> = emptyList()
     ): Fixture {
@@ -207,8 +233,13 @@ private class FakeReminderSessionRepository(
         toneKey: String
     ): AppUsageSession = error("Not used")
 
-    override suspend fun closeSession(sessionId: Long, endedAt: Long) = Unit
-    override suspend fun currentOpenSession(): AppUsageSession? = null
+    override suspend fun closeSession(sessionId: Long, endedAt: Long) {
+        val current = sessions[sessionId] ?: return
+        sessions[sessionId] = current.copy(endedAt = endedAt)
+    }
+
+    override suspend fun currentOpenSession(): AppUsageSession? =
+        sessions.values.firstOrNull { it.endedAt == null }
 
     override suspend fun reminderTimesSince(since: Long): List<Long> =
         previous.filter { it >= since } + sessions.values.mapNotNull { it.remindedAt }.filter { it >= since }

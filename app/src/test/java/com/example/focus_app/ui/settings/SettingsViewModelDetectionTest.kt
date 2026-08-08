@@ -117,7 +117,8 @@ class SettingsViewModelDetectionTest {
             reminderCacheRepository = ReminderCacheRepository(TestCacheDao(), FakeClock(0L)),
             customReturnAppStore = store,
             followUpReminderStore = followUp,
-            keepAliveStore = keepAlive
+            keepAliveStore = keepAlive,
+            themeStore = TestThemeStore()
         )
 
     @Test

@@ -56,7 +56,8 @@ class SettingsViewModelResetWindowTest {
                 reminderCacheRepository = cacheRepository,
                 customReturnAppStore = TestCustomReturnAppStore(),
                 followUpReminderStore = TestFollowUpReminderStore(),
-                keepAliveStore = TestKeepAliveStore()
+                keepAliveStore = TestKeepAliveStore(),
+                themeStore = TestThemeStore()
             )
             runCurrent()
             val revisionBefore = cacheRepository.revision.value

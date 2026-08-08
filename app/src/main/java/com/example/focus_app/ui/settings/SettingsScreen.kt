@@ -5,9 +5,12 @@ import android.content.Intent
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -15,6 +18,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
@@ -22,6 +28,8 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.example.focus_app.domain.model.AppThemeColor
+import com.example.focus_app.domain.model.AppThemeMode
 import com.example.focus_app.domain.model.AiProvider
 import com.example.focus_app.domain.model.DetectionMode
 import com.example.focus_app.domain.model.ReminderTone
@@ -48,6 +56,7 @@ fun SettingsScreen(
     val customReturnPackage by viewModel.customReturnPackage.collectAsState()
     val followUpInterval by viewModel.followUpInterval.collectAsState()
     val keepAliveEnabled by viewModel.keepAliveEnabled.collectAsState()
+    val themeSettings by viewModel.themeSettings.collectAsState()
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     var overlayGranted by remember { mutableStateOf(PermissionHelper.hasOverlayPermission(context)) }
@@ -172,6 +181,40 @@ fun SettingsScreen(
                 items = permissionItems,
                 onAction = ::handlePermissionAction
             )
+
+            // ── 外观主题 ──
+            SectionTitle("外观主题")
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Text("界面模式", style = MaterialTheme.typography.titleMedium)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        AppThemeMode.entries.forEach { mode ->
+                            FilterChip(
+                                selected = themeSettings.mode == mode,
+                                onClick = { viewModel.setThemeMode(mode) },
+                                label = { Text(themeModeLabel(mode)) }
+                            )
+                        }
+                    }
+                    Text("主题配色", style = MaterialTheme.typography.titleMedium)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        AppThemeColor.entries.forEach { color ->
+                            ThemeColorSwatch(
+                                color = color,
+                                selected = themeSettings.color == color,
+                                onClick = { viewModel.setThemeColor(color) },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                }
+            }
 
             // ── 目标应用 ──
             SectionTitle("目标应用")
@@ -526,6 +569,58 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
         }
+    }
+}
+
+private fun themeModeLabel(mode: AppThemeMode): String = when (mode) {
+    AppThemeMode.SYSTEM -> "跟随系统"
+    AppThemeMode.DAY -> "日间"
+    AppThemeMode.NIGHT -> "夜间"
+}
+
+private fun themeColorLabel(color: AppThemeColor): String = when (color) {
+    AppThemeColor.MINT -> "薄荷青"
+    AppThemeColor.BLUE -> "宁静蓝"
+    AppThemeColor.ORANGE -> "暖阳橙"
+    AppThemeColor.GRAPHITE -> "石墨"
+}
+
+private val themeGradient: Map<AppThemeColor, List<Color>> = mapOf(
+    AppThemeColor.MINT to listOf(Color(0xFF0B6B57), Color(0xFF2BB673)),
+    AppThemeColor.BLUE to listOf(Color(0xFF16304F), Color(0xFF2E5EAA)),
+    AppThemeColor.ORANGE to listOf(Color(0xFFC85A12), Color(0xFFF5A623)),
+    AppThemeColor.GRAPHITE to listOf(Color(0xFF1F242B), Color(0xFF2F80ED))
+)
+
+@Composable
+private fun ThemeColorSwatch(
+    color: AppThemeColor,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier
+    ) {
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .clip(CircleShape)
+                .background(Brush.linearGradient(themeGradient[color] ?: emptyList()))
+                .border(
+                    width = if (selected) 3.dp else 1.dp,
+                    color = if (selected) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.outline
+                    },
+                    shape = CircleShape
+                )
+                .clickable(onClick = onClick)
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(themeColorLabel(color), style = MaterialTheme.typography.labelSmall)
     }
 }
 

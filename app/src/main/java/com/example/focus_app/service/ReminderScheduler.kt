@@ -93,6 +93,7 @@ class ReminderScheduler(
             val settings = settingsProvider()
             delay(settings.reminderDelaySeconds * 1_000L)
             if (!appStillForeground()) return@launch
+            if (repository.currentOpenSession()?.id != session.id) return@launch
 
             quotaMutex.withLock {
                 val reminderTimes = repository.reminderTimesSince(
@@ -125,6 +126,8 @@ class ReminderScheduler(
                     return@withLock
                 }
                 val session = repository.sessionById(sessionId) ?: return@withLock
+                if (session.endedAt != null) return@withLock
+                if (repository.currentOpenSession()?.id != sessionId) return@withLock
                 repository.updateRemindedAt(sessionId, clock.nowMillis())
                 val data = launchDataProvider(session, settings)
                 launcher.show(data)

@@ -13,6 +13,10 @@ import com.example.focus_app.data.keepalive.KeepAliveStore
 import com.example.focus_app.data.returnapp.CustomReturnAppStore
 import com.example.focus_app.data.security.ApiKeyStore
 import com.example.focus_app.data.permission.PermissionStatusProvider
+import com.example.focus_app.data.theme.ThemeSettings
+import com.example.focus_app.data.theme.ThemeStore
+import com.example.focus_app.domain.model.AppThemeColor
+import com.example.focus_app.domain.model.AppThemeMode
 import com.example.focus_app.domain.model.AppUsageSession
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -98,5 +102,16 @@ class TestKeepAliveStore : KeepAliveStore {
     override val enabled: StateFlow<Boolean> = _enabled.asStateFlow()
     override fun setEnabled(enabled: Boolean) {
         _enabled.value = enabled
+    }
+}
+
+class TestThemeStore : ThemeStore {
+    private val _settings = MutableStateFlow(ThemeSettings())
+    override val settings: StateFlow<ThemeSettings> = _settings.asStateFlow()
+    override fun setMode(mode: AppThemeMode) {
+        _settings.value = _settings.value.copy(mode = mode)
+    }
+    override fun setColor(color: AppThemeColor) {
+        _settings.value = _settings.value.copy(color = color)
     }
 }

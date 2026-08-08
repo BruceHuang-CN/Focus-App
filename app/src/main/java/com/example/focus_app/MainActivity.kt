@@ -8,10 +8,13 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.lifecycleScope
 import com.example.focus_app.data.repository.SettingsRepository
 import com.example.focus_app.data.keepalive.KeepAliveStore
+import com.example.focus_app.data.theme.ThemeStore
 import com.example.focus_app.domain.model.DetectionMode
 import com.example.focus_app.service.AppDetectionService
 import com.example.focus_app.service.KeepAliveService
@@ -27,6 +30,7 @@ import javax.inject.Inject
 class MainActivity : ComponentActivity() {
     @Inject lateinit var settingsRepository: SettingsRepository
     @Inject lateinit var keepAliveStore: KeepAliveStore
+    @Inject lateinit var themeStore: ThemeStore
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -62,7 +66,8 @@ class MainActivity : ComponentActivity() {
                 }
         }
         setContent {
-            FocusAppTheme {
+            val theme by themeStore.settings.collectAsState()
+            FocusAppTheme(mode = theme.mode, color = theme.color) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background

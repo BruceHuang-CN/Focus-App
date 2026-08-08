@@ -6,6 +6,7 @@ import com.example.focus_app.data.remote.dto.ChatRequest
 import com.example.focus_app.data.remote.dto.ChatResponse
 import com.example.focus_app.data.remote.dto.Choice
 import com.example.focus_app.data.remote.dto.MessageContent
+import com.example.focus_app.data.remote.dto.ModelsResponse
 import com.example.focus_app.domain.model.AiProvider
 import com.example.focus_app.domain.model.ReminderContext
 import com.example.focus_app.domain.model.ReminderTone
@@ -79,6 +80,9 @@ private class SuccessfulOpenAiApi : OpenAiApi {
             )
         )
     )
+
+    override suspend fun listModels(authorization: String): Response<ModelsResponse> =
+        Response.success(ModelsResponse())
 }
 
 private class StaticApiKeyStore(private val value: String) : ApiKeyStore {

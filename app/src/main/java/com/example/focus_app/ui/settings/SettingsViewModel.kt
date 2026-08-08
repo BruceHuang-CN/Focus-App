@@ -14,6 +14,10 @@ import com.example.focus_app.data.permission.PermissionStatusProvider
 import com.example.focus_app.data.followup.FollowUpReminderStore
 import com.example.focus_app.data.keepalive.KeepAliveStore
 import com.example.focus_app.data.returnapp.CustomReturnAppStore
+import com.example.focus_app.data.theme.ThemeSettings
+import com.example.focus_app.data.theme.ThemeStore
+import com.example.focus_app.domain.model.AppThemeColor
+import com.example.focus_app.domain.model.AppThemeMode
 import com.example.focus_app.domain.model.AiProvider
 import com.example.focus_app.domain.model.DetectionMode
 import com.example.focus_app.domain.model.ReminderTone
@@ -44,7 +48,8 @@ class SettingsViewModel @Inject constructor(
     private val reminderCacheRepository: ReminderCacheRepository,
     private val customReturnAppStore: CustomReturnAppStore,
     private val followUpReminderStore: FollowUpReminderStore,
-    private val keepAliveStore: KeepAliveStore
+    private val keepAliveStore: KeepAliveStore,
+    private val themeStore: ThemeStore
 ) : ViewModel() {
     val settings: StateFlow<AppSettings> = settingsRepository.getSettingsFlow().stateIn(viewModelScope, SharingStarted.Eagerly, AppSettings())
 
@@ -61,6 +66,7 @@ class SettingsViewModel @Inject constructor(
     val followUpInterval: StateFlow<Int> = _followUpInterval.asStateFlow()
 
     val keepAliveEnabled: StateFlow<Boolean> = keepAliveStore.enabled
+    val themeSettings: StateFlow<ThemeSettings> = themeStore.settings
 
     private val _tonePreview = MutableStateFlow("")
     val tonePreview: StateFlow<String> = _tonePreview.asStateFlow()
@@ -148,6 +154,14 @@ class SettingsViewModel @Inject constructor(
         val value = minutes.coerceIn(1, 120)
         followUpReminderStore.writeMinutes(value)
         _followUpInterval.value = value
+    }
+
+    fun setThemeMode(mode: AppThemeMode) {
+        themeStore.setMode(mode)
+    }
+
+    fun setThemeColor(color: AppThemeColor) {
+        themeStore.setColor(color)
     }
 
     fun setKeepAliveEnabled(enabled: Boolean) {

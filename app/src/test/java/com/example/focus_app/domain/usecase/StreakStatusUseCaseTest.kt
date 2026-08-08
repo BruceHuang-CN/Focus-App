@@ -82,7 +82,7 @@ class StreakStatusUseCaseTest {
         val useCase = newUseCase(
             clock = FakeClock(epoch(2026, 8, 4, 15, 0)),
             sessions = emptyList(),
-            completedCount = { _, _ -> if (day++ < 3) 1 else 0 }
+            completedCount = { _, _ -> if (day++ < 4) 1 else 0 }
         )
 
         val status = useCase()
@@ -150,6 +150,24 @@ private class FakeSettingsDao(initial: SettingsEntity) : SettingsDao {
 private class StreakFakeSessionRepository(
     private val sessions: List<AppUsageSession>
 ) : AppSessionRepository {
+    override suspend fun openSession(
+        packageName: String,
+        appName: String,
+        startedAt: Long,
+        taskId: Long?,
+        toneKey: String
+    ): AppUsageSession = error("Not used")
+
+    override suspend fun closeSession(sessionId: Long, endedAt: Long) = Unit
+
+    override suspend fun currentOpenSession(): AppUsageSession? = null
+
+    override suspend fun reminderTimesSince(since: Long): List<Long> = emptyList()
+
+    override suspend fun markRemindedIfNeeded(sessionId: Long, remindedAt: Long): Boolean = false
+
+    override suspend fun markUserAction(sessionId: Long, action: String) = Unit
+
     override suspend fun sessionsBetween(from: Long, to: Long): List<AppUsageSession> =
         sessions.filter { it.startedAt in from until to }
 }
