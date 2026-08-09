@@ -84,6 +84,26 @@ class AppSessionCoordinatorTest {
     }
 
     @Test
+    fun reminder_presentation_does_not_close_the_target_session() = runTest {
+        val fixture = fixture()
+
+        fixture.coordinator.onPackageChanged(TARGET_A)
+        val sessionId = fixture.repository.sessions.single().id
+        fixture.coordinator.onPackageChanged(
+            packageName = FOCUS_PACKAGE,
+            isReminderPresentation = true
+        )
+
+        assertNull(fixture.repository.sessions.single().endedAt)
+        assertEquals(emptyList<Long>(), fixture.reminderScheduler.cancelledSessionIds)
+
+        fixture.coordinator.onPackageChanged(FOCUS_PACKAGE)
+
+        assertEquals(sessionId, fixture.reminderScheduler.cancelledSessionIds.single())
+        assertEquals(STARTED_AT, fixture.repository.sessions.single().endedAt)
+    }
+
+    @Test
     fun compatibility_verifier_is_forwarded_to_the_delayed_reminder_check() = runTest {
         val fixture = fixture()
         val verifiedPackages = mutableListOf<String>()
@@ -182,6 +202,7 @@ class AppSessionCoordinatorTest {
         const val TARGET_A = "com.ss.android.ugc.aweme"
         const val TARGET_B = "com.xingin.xhs"
         const val LAUNCHER = "com.android.launcher"
+        const val FOCUS_PACKAGE = "com.example.focus_app"
         const val STARTED_AT = 1_000_000L
         const val HOUR_MS = 60 * 60 * 1_000L
     }

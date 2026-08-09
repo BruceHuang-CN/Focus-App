@@ -46,11 +46,13 @@ class AppSessionCoordinator(
 
     suspend fun onPackageChanged(
         packageName: String?,
-        foregroundVerifier: (suspend (String) -> Boolean)? = null
+        foregroundVerifier: (suspend (String) -> Boolean)? = null,
+        isReminderPresentation: Boolean = false
     ) = eventMutex.withLock {
         val now = clock.nowMillis()
         recoverStaleSession(now)
 
+        if (isReminderPresentation && openSession != null) return@withLock
         if (packageName == foregroundPackage) return@withLock
 
         openSession?.let { session ->

@@ -17,13 +17,18 @@ import javax.inject.Inject
 internal fun shouldProcessAccessibilityEvents(settings: AppSettings): Boolean =
     settings.detectionMode == DetectionMode.REALTIME && settings.enableAccessibility
 
+private data class PackageChange(
+    val packageName: String,
+    val isReminderPresentation: Boolean
+)
+
 @AndroidEntryPoint
 class FocusAccessibilityService : AccessibilityService() {
     @Inject lateinit var settingsRepository: SettingsRepository
     @Inject lateinit var appSessionCoordinator: AppSessionCoordinator
 
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
-    private val packageChanges = Channel<String>(Channel.UNLIMITED)
+    private val packageChanges = Channel<PackageChange>(Channel.UNLIMITED)
     @Volatile private var isRealtimeMode = false
     private var monitoringStarted = false
 
@@ -39,8 +44,11 @@ class FocusAccessibilityService : AccessibilityService() {
             }
         }
         scope.launch {
-            for (packageName in packageChanges) {
-                appSessionCoordinator.onPackageChanged(packageName)
+            for (change in packageChanges) {
+                appSessionCoordinator.onPackageChanged(
+                    packageName = change.packageName,
+                    isReminderPresentation = change.isReminderPresentation
+                )
             }
         }
     }
@@ -48,7 +56,12 @@ class FocusAccessibilityService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (!isRealtimeMode || event?.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
         val pkg = event.packageName?.toString() ?: return
-        packageChanges.trySend(pkg)
+        packageChanges.trySend(
+            PackageChange(
+                packageName = pkg,
+                isReminderPresentation = event.className?.toString() == ReminderActivity::class.java.name
+            )
+        )
     }
 
     override fun onInterrupt() {}

@@ -21,6 +21,9 @@ class ReminderActivity : ComponentActivity() {
     @Inject
     lateinit var sessionRepository: AppSessionRepository
 
+    @Inject
+    lateinit var reminderPresentationRegistry: ReminderPresentationRegistry
+
     private var launchData: ReminderLaunchData? = null
     private var overlayAttached = false
     private var dismissReceiverRegistered = false
@@ -66,6 +69,7 @@ class ReminderActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
+        launchData?.let { reminderPresentationRegistry.show(it.sessionId) }
         ContextCompat.registerReceiver(
             this,
             dismissReceiver,
@@ -77,6 +81,7 @@ class ReminderActivity : ComponentActivity() {
     }
 
     override fun onStop() {
+        launchData?.let { reminderPresentationRegistry.hide(it.sessionId) }
         if (dismissReceiverRegistered) {
             unregisterReceiver(dismissReceiver)
             dismissReceiverRegistered = false

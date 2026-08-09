@@ -40,6 +40,7 @@ private data class ForegroundObservation(
 class AppDetectionService : Service() {
     @Inject lateinit var settingsRepository: SettingsRepository
     @Inject lateinit var appSessionCoordinator: AppSessionCoordinator
+    @Inject lateinit var reminderPresentationRegistry: ReminderPresentationRegistry
 
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private var pollingJob: Job? = null
@@ -85,7 +86,9 @@ class AppDetectionService : Service() {
                         from = (foreground.timestamp - 1L).coerceAtLeast(0L),
                         to = System.currentTimeMillis()
                     )?.packageName == expectedPackage
-                }
+                },
+                isReminderPresentation =
+                    foreground.packageName == packageName && reminderPresentationRegistry.isShowing()
             )
         }
         return now

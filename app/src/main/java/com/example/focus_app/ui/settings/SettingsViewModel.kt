@@ -38,6 +38,14 @@ sealed interface AiConnectionUiState {
     data class Error(val message: String) : AiConnectionUiState
 }
 
+data class SettingsExitSnapshot(
+    val settings: AppSettings,
+    val customReturnPackage: String,
+    val followUpInterval: Int,
+    val keepAliveEnabled: Boolean,
+    val themeSettings: ThemeSettings
+)
+
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
@@ -167,6 +175,21 @@ class SettingsViewModel @Inject constructor(
     fun setKeepAliveEnabled(enabled: Boolean) {
         keepAliveStore.setEnabled(enabled)
     }
+
+    fun restoreExitSnapshot(snapshot: SettingsExitSnapshot, onComplete: () -> Unit = {}) {
+        viewModelScope.launch {
+            settingsRepository.updateSettings(snapshot.settings)
+            customReturnAppStore.write(snapshot.customReturnPackage)
+            _customReturnPackage.value = snapshot.customReturnPackage
+            followUpReminderStore.writeMinutes(snapshot.followUpInterval)
+            _followUpInterval.value = snapshot.followUpInterval
+            keepAliveStore.setEnabled(snapshot.keepAliveEnabled)
+            themeStore.setMode(snapshot.themeSettings.mode)
+            themeStore.setColor(snapshot.themeSettings.color)
+            onComplete()
+        }
+    }
+
     fun updateDetectionMode(mode: DetectionMode) {
         update { it.copy(detectionMode = mode) }
         _notificationPermissionRequests.tryEmit(Unit)

@@ -3,6 +3,7 @@ package com.example.focus_app.ui.settings
 import android.Manifest
 import android.content.Intent
 import android.provider.Settings
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -62,7 +63,19 @@ fun SettingsScreen(
     var overlayGranted by remember { mutableStateOf(PermissionHelper.hasOverlayPermission(context)) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-    var hasUnsavedChanges by remember { mutableStateOf(false) }
+    var settingsEdited by remember { mutableStateOf(false) }
+    var savedSnapshot by remember {
+        mutableStateOf(
+            SettingsExitSnapshot(
+                settings = s,
+                customReturnPackage = customReturnPackage,
+                followUpInterval = followUpInterval,
+                keepAliveEnabled = keepAliveEnabled,
+                themeSettings = themeSettings
+            )
+        )
+    }
+    var showExitConfirmation by remember { mutableStateOf(false) }
     var apiKeyInput by remember { mutableStateOf("") }
     var endpointDraft by remember(s.aiProvider, s.apiEndpoint, s.aiModel) {
         mutableStateOf(s.apiEndpoint)
@@ -101,9 +114,28 @@ fun SettingsScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    fun onSettingChanged(label: String) {
-        hasUnsavedChanges = true
+    val currentSnapshot = SettingsExitSnapshot(
+        settings = s,
+        customReturnPackage = customReturnPackage,
+        followUpInterval = followUpInterval,
+        keepAliveEnabled = keepAliveEnabled,
+        themeSettings = themeSettings
+    )
+    val hasUnsavedChanges = settingsEdited
+
+    LaunchedEffect(currentSnapshot, settingsEdited) {
+        if (!settingsEdited) savedSnapshot = currentSnapshot
     }
+
+    fun onSettingChanged(label: String) {
+        settingsEdited = true
+    }
+
+    fun requestExit() {
+        if (hasUnsavedChanges) showExitConfirmation = true else onBack()
+    }
+
+    BackHandler(onBack = ::requestExit)
 
     fun handlePermissionAction(action: PermissionCheckAction) {
         when (action) {
@@ -135,7 +167,7 @@ fun SettingsScreen(
             TopAppBar(
                 title = { Text("设置") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = ::requestExit) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
                     }
                 }
@@ -163,7 +195,7 @@ fun SettingsScreen(
                 )
                 Button(
                     onClick = {
-                        hasUnsavedChanges = false
+                        settingsEdited = false
                         scope.launch {
                             snackbarHostState.currentSnackbarData?.dismiss()
                             snackbarHostState.showSnackbar(
@@ -194,7 +226,10 @@ fun SettingsScreen(
                         AppThemeMode.entries.forEach { mode ->
                             FilterChip(
                                 selected = themeSettings.mode == mode,
-                                onClick = { viewModel.setThemeMode(mode) },
+                                onClick = {
+                                    viewModel.setThemeMode(mode)
+                                    onSettingChanged("界面模式")
+                                },
                                 label = { Text(themeModeLabel(mode)) }
                             )
                         }
@@ -208,7 +243,10 @@ fun SettingsScreen(
                             ThemeColorSwatch(
                                 color = color,
                                 selected = themeSettings.color == color,
-                                onClick = { viewModel.setThemeColor(color) },
+                                onClick = {
+                                    viewModel.setThemeColor(color)
+                                    onSettingChanged("主题配色")
+                                },
                                 modifier = Modifier.weight(1f)
                             )
                         }
@@ -569,6 +607,39 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
         }
+    }
+
+    if (showExitConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showExitConfirmation = false },
+            title = { Text("保存设置？") },
+            text = { Text("你有未保存的修改。退出前可以保存，也可以放弃本次修改。") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        settingsEdited = false
+                        showExitConfirmation = false
+                        onBack()
+                    }
+                ) { Text("保存并退出") }
+            },
+            dismissButton = {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(
+                        onClick = {
+                            viewModel.restoreExitSnapshot(savedSnapshot) {
+                                settingsEdited = false
+                                showExitConfirmation = false
+                                onBack()
+                            }
+                        }
+                    ) { Text("放弃修改") }
+                    TextButton(onClick = { showExitConfirmation = false }) {
+                        Text("继续编辑")
+                    }
+                }
+            }
+        )
     }
 }
 
