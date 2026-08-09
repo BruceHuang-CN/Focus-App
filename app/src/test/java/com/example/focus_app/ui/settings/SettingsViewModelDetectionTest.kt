@@ -17,8 +17,6 @@ import com.example.focus_app.data.security.ApiKeyStore
 import com.example.focus_app.data.permission.PermissionStatusProvider
 import com.example.focus_app.domain.time.FakeClock
 import com.example.focus_app.domain.model.DetectionMode
-import com.example.focus_app.data.repository.AppSettings
-import com.example.focus_app.data.theme.ThemeSettings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -170,47 +168,6 @@ class SettingsViewModelDetectionTest {
         assertEquals(false, viewModel.keepAliveEnabled.value)
     }
 
-    @Test
-    fun discarding_settings_restores_the_snapshot_taken_on_entry() = runTest(dispatcher) {
-        val dao = DetectionSettingsDao(SettingsEntity(targetApps = "[]"))
-        val customReturn = TestCustomReturnAppStore().apply { value = "com.tencent.mm" }
-        val followUp = TestFollowUpReminderStore().apply { minutes = 10 }
-        val keepAlive = TestKeepAliveStore()
-        val theme = TestThemeStore()
-        val viewModel = SettingsViewModel(
-            settingsRepository = SettingsRepository(dao),
-            aiRepository = AiRepository(DetectionApiKeyStore("sk-test")) { DetectionOpenAiApi() },
-            taskRepository = TaskRepository(DetectionTaskDao()),
-            permissionStatusProvider = DetectionFakePermissionProvider(),
-            appSessionRepository = TestSessionRepository(),
-            reminderCacheRepository = ReminderCacheRepository(TestCacheDao(), FakeClock(0L)),
-            customReturnAppStore = customReturn,
-            followUpReminderStore = followUp,
-            keepAliveStore = keepAlive,
-            themeStore = theme
-        )
-        runCurrent()
-        val snapshot = SettingsExitSnapshot(
-            settings = AppSettings(targetApps = emptyList()),
-            customReturnPackage = "com.tencent.mm",
-            followUpInterval = 10,
-            keepAliveEnabled = true,
-            themeSettings = ThemeSettings()
-        )
-
-        viewModel.updateReminderDelaySeconds(30)
-        viewModel.updateCustomReturnPackage("com.example.reader")
-        viewModel.updateFollowUpInterval(25)
-        viewModel.setKeepAliveEnabled(false)
-        runCurrent()
-        viewModel.restoreExitSnapshot(snapshot)
-        runCurrent()
-
-        assertEquals(10, dao.current.reminderDelaySeconds)
-        assertEquals("com.tencent.mm", customReturn.value)
-        assertEquals(10, followUp.minutes)
-        assertTrue(keepAlive.enabled.value)
-    }
 }
 
 private class DetectionSettingsDao(initial: SettingsEntity) : SettingsDao {

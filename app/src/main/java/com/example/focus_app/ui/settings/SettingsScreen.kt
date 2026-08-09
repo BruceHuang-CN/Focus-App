@@ -3,7 +3,6 @@ package com.example.focus_app.ui.settings
 import android.Manifest
 import android.content.Intent
 import android.provider.Settings
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -46,6 +45,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
+    onSystemBackRequest: ((() -> Unit)?) -> Unit = {},
     navigateToTargetApps: () -> Unit,
     navigateToCustomReturnPicker: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel()
@@ -64,17 +64,6 @@ fun SettingsScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     var settingsEdited by remember { mutableStateOf(false) }
-    var savedSnapshot by remember {
-        mutableStateOf(
-            SettingsExitSnapshot(
-                settings = s,
-                customReturnPackage = customReturnPackage,
-                followUpInterval = followUpInterval,
-                keepAliveEnabled = keepAliveEnabled,
-                themeSettings = themeSettings
-            )
-        )
-    }
     var showExitConfirmation by remember { mutableStateOf(false) }
     var apiKeyInput by remember { mutableStateOf("") }
     var endpointDraft by remember(s.aiProvider, s.apiEndpoint, s.aiModel) {
@@ -114,18 +103,7 @@ fun SettingsScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    val currentSnapshot = SettingsExitSnapshot(
-        settings = s,
-        customReturnPackage = customReturnPackage,
-        followUpInterval = followUpInterval,
-        keepAliveEnabled = keepAliveEnabled,
-        themeSettings = themeSettings
-    )
     val hasUnsavedChanges = settingsEdited
-
-    LaunchedEffect(currentSnapshot, settingsEdited) {
-        if (!settingsEdited) savedSnapshot = currentSnapshot
-    }
 
     fun onSettingChanged(label: String) {
         settingsEdited = true
@@ -135,7 +113,11 @@ fun SettingsScreen(
         if (hasUnsavedChanges) showExitConfirmation = true else onBack()
     }
 
-    BackHandler(onBack = ::requestExit)
+    val latestRequestExit by rememberUpdatedState(::requestExit)
+    DisposableEffect(Unit) {
+        onSystemBackRequest { latestRequestExit() }
+        onDispose { onSystemBackRequest(null) }
+    }
 
     fun handlePermissionAction(action: PermissionCheckAction) {
         when (action) {
@@ -613,7 +595,7 @@ fun SettingsScreen(
         AlertDialog(
             onDismissRequest = { showExitConfirmation = false },
             title = { Text("保存设置？") },
-            text = { Text("你有未保存的修改。退出前可以保存，也可以放弃本次修改。") },
+            text = { Text("你有未保存的修改。请先保存，或继续修改。") },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -624,19 +606,8 @@ fun SettingsScreen(
                 ) { Text("保存并退出") }
             },
             dismissButton = {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(
-                        onClick = {
-                            viewModel.restoreExitSnapshot(savedSnapshot) {
-                                settingsEdited = false
-                                showExitConfirmation = false
-                                onBack()
-                            }
-                        }
-                    ) { Text("放弃修改") }
-                    TextButton(onClick = { showExitConfirmation = false }) {
-                        Text("继续编辑")
-                    }
+                TextButton(onClick = { showExitConfirmation = false }) {
+                    Text("继续修改")
                 }
             }
         )

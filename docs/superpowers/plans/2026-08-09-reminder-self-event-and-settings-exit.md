@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Keep a reminder visible when Focus launches its own reminder activity, and ask before leaving genuinely unsaved settings.
+**Goal:** Keep a reminder visible when Focus launches its own reminder activity, and require saving before leaving changed settings.
 
-**Architecture:** Treat a Focus-owned reminder activity as a presentation event, not a user exit from the target app. The realtime detector recognizes `ReminderActivity` directly, while compatibility mode uses a small injected registry during its 10-second foreground observation. Keep existing immediate settings writes, but capture an entry snapshot so an explicit discard action can restore every ordinary settings value changed on the page.
+**Architecture:** Treat a Focus-owned reminder activity as a presentation event, not a user exit from the target app. The realtime detector recognizes `ReminderActivity` directly, while compatibility mode uses a small injected registry during its 10-second foreground observation. Register system back after `NavHost` so it can ask the settings screen to save before navigating away.
 
 **Tech Stack:** Kotlin, Android AccessibilityService, UsageStats foreground service, Jetpack Compose, StateFlow, JUnit.
 
@@ -41,10 +41,10 @@
 - Modify: `app/src/main/java/com/example/focus_app/ui/settings/SettingsViewModel.kt`
 - Test: `app/src/test/java/com/example/focus_app/ui/settings/SettingsViewModelTest.kt`
 
-- [x] Write a failing ViewModel test proving a discard operation restores the entry snapshot after immediate updates.
-- [x] Run the focused test and verify it fails because no restore operation exists.
-- [x] Add an entry snapshot and `restoreExitSnapshot()` operation without changing API key persistence.
-- [x] Add a Compose confirmation dialog on back navigation with Save and exit, Discard changes, and Continue editing actions.
+- [x] Write a failing navigation test proving system back is forwarded to the active settings screen.
+- [x] Run the focused test and verify it fails because no navigation-level dispatcher exists.
+- [x] Add a navigation-level dispatcher registered after `NavHost`, without changing API key persistence.
+- [x] Add a Compose confirmation dialog on back navigation with Save and exit and Continue editing actions.
 - [x] Run settings ViewModel tests and compile Android tests.
 
 ### Task 3: Verify and document
