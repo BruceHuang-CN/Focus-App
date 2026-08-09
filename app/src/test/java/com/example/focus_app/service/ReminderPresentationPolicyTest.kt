@@ -33,4 +33,12 @@ class ReminderPresentationPolicyTest {
         assertEquals(1, activityStarts)
         assertEquals(0, notifications)
     }
+
+    @Test
+    fun reminder_is_only_valid_for_its_current_open_session() {
+        assertEquals(true, isReminderSessionCurrent(7L, 7L))
+        assertEquals(false, isReminderSessionCurrent(7L, null))
+        assertEquals(false, isReminderSessionCurrent(7L, 8L))
+        assertEquals(false, isReminderSessionCurrent(0L, 0L))
+    }
 }

@@ -8,6 +8,7 @@ import com.example.focus_app.domain.model.ReturnDestination
 import com.example.focus_app.service.ReminderLaunchData
 import com.example.focus_app.service.ReminderLauncher
 import com.example.focus_app.service.SessionReminderScheduler
+import com.example.focus_app.service.CustomReturnResult
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,7 +26,8 @@ data class ReminderUiState(
     val windowReminderCount: Int = 0,
     val windowLimit: Int = 0,
     val windowMinutes: Int = 0,
-    val returnPackageName: String = ""
+    val returnPackageName: String = "",
+    val customReturnError: String? = null
 )
 
 @HiltViewModel
@@ -83,10 +85,20 @@ class ReminderViewModel @Inject constructor(
     fun returnToCustom(sessionId: Long, onComplete: () -> Unit = {}) {
         val data = launchData?.takeIf { it.sessionId == sessionId } ?: return
         viewModelScope.launch {
-            sessionRepository.markUserAction(sessionId, "returned_to_custom")
-            launcher.returnToCustom(data.returnPackageName)
-            onComplete()
+            when (launcher.returnToCustom(data.returnPackageName)) {
+                CustomReturnResult.SUCCESS -> {
+                    sessionRepository.markUserAction(sessionId, "returned_to_custom")
+                    onComplete()
+                }
+                CustomReturnResult.NO_APP_CONFIGURED -> showCustomReturnError("还没有选择要跳转的应用")
+                CustomReturnResult.APP_UNAVAILABLE -> showCustomReturnError("指定应用不可用，请重新选择")
+                CustomReturnResult.LAUNCH_FAILED -> showCustomReturnError("无法打开指定应用，请稍后重试")
+            }
         }
+    }
+
+    private fun showCustomReturnError(message: String) {
+        _uiState.value = _uiState.value.copy(customReturnError = message)
     }
 
     fun continueTargetApp(sessionId: Long, onComplete: () -> Unit = {}) {

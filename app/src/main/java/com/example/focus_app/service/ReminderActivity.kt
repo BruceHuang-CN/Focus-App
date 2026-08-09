@@ -1,14 +1,40 @@
 package com.example.focus_app.service
 
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
+import com.example.focus_app.data.repository.AppSessionRepository
 import com.example.focus_app.domain.model.ReturnDestination
 import com.example.focus_app.ui.reminder.ReminderOverlay
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
+import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
 class ReminderActivity : ComponentActivity() {
+    @Inject
+    lateinit var sessionRepository: AppSessionRepository
+
+    private var launchData: ReminderLaunchData? = null
+    private var overlayAttached = false
+    private var dismissReceiverRegistered = false
+
+    private val dismissReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            val sessionId = intent.getLongExtra(
+                AndroidReminderLauncher.EXTRA_DISMISS_SESSION_ID,
+                0L
+            )
+            if (sessionId == launchData?.sessionId) finishAndRemoveTask()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val taskId = if (intent.hasExtra(ReminderLaunchData.EXTRA_TASK_ID)) {
@@ -16,7 +42,7 @@ class ReminderActivity : ComponentActivity() {
         } else {
             null
         }
-        val data = ReminderLaunchData(
+        launchData = ReminderLaunchData(
             sessionId = intent.getLongExtra(ReminderLaunchData.EXTRA_SESSION_ID, 0L),
             taskId = taskId,
             taskTitle = intent.getStringExtra(ReminderLaunchData.EXTRA_TASK_TITLE),
@@ -35,11 +61,44 @@ class ReminderActivity : ComponentActivity() {
             returnPackageName = intent.getStringExtra(ReminderLaunchData.EXTRA_RETURN_PACKAGE_NAME).orEmpty()
         )
 
-        setContent {
-            ReminderOverlay(
-                data = data,
-                onDismiss = { finishAndRemoveTask() }
-            )
+        renderIfSessionCurrent()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        ContextCompat.registerReceiver(
+            this,
+            dismissReceiver,
+            IntentFilter(AndroidReminderLauncher.ACTION_DISMISS_REMINDER),
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
+        dismissReceiverRegistered = true
+        renderIfSessionCurrent()
+    }
+
+    override fun onStop() {
+        if (dismissReceiverRegistered) {
+            unregisterReceiver(dismissReceiver)
+            dismissReceiverRegistered = false
+        }
+        super.onStop()
+    }
+
+    private fun renderIfSessionCurrent() {
+        val data = launchData ?: return
+        lifecycleScope.launch {
+            if (!isReminderSessionCurrent(data.sessionId, sessionRepository.currentOpenSession()?.id)) {
+                finishAndRemoveTask()
+                return@launch
+            }
+            if (overlayAttached) return@launch
+            overlayAttached = true
+            setContent {
+                ReminderOverlay(
+                    data = data,
+                    onDismiss = { finishAndRemoveTask() }
+                )
+            }
         }
     }
 }

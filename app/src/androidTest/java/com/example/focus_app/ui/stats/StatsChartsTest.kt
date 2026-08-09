@@ -1,7 +1,7 @@
 package com.example.focus_app.ui.stats
 
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.ui.test.assertExists
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -31,9 +31,9 @@ class StatsChartsTest {
             }
         }
 
-        composeRule.onNodeWithTag("hourly_bar_chart").assertExists()
-        composeRule.onNodeWithTag("daily_trend_chart").assertExists()
-        composeRule.onNodeWithTag("app_donut_chart").assertExists()
+        composeRule.onNodeWithTag("hourly_bar_chart").assertIsDisplayed()
+        composeRule.onNodeWithTag("daily_trend_chart").assertIsDisplayed()
+        composeRule.onNodeWithTag("app_donut_chart").assertIsDisplayed()
     }
 
     @Test
@@ -43,7 +43,7 @@ class StatsChartsTest {
                 HourlyBarChart(emptyList())
             }
         }
-        composeRule.onNodeWithText("暂无数据").assertExists()
+        composeRule.onNodeWithText("暂无数据").assertIsDisplayed()
     }
 
     private val sampleStats = FocusStats(

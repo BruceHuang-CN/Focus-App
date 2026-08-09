@@ -1,9 +1,9 @@
 package com.example.focus_app.ui.settings
 
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -51,7 +51,7 @@ class PermissionCheckCardTest {
         }
 
         composeRule.onNodeWithText("实时模式 · 1 项未就绪").assertIsDisplayed()
-        composeRule.onNodeWithText("系统无障碍服务").assertDoesNotExist()
+        assertEquals(0, composeRule.onAllNodesWithText("系统无障碍服务").fetchSemanticsNodes().size)
 
         composeRule.onNodeWithText("实时模式 · 1 项未就绪").performClick()
         composeRule.onNodeWithText("系统无障碍服务").assertIsDisplayed()

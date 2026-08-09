@@ -37,7 +37,7 @@ interface AppUsageSessionDao {
 
     @Query(
         "UPDATE app_usage_sessions SET remindedAt = :remindedAt " +
-            "WHERE id = :sessionId AND remindedAt IS NULL"
+            "WHERE id = :sessionId AND remindedAt IS NULL AND endedAt IS NULL"
     )
     suspend fun markRemindedIfNeeded(sessionId: Long, remindedAt: Long): Int
 
@@ -70,7 +70,7 @@ interface AppUsageSessionDao {
 
     @Query(
         "UPDATE app_usage_sessions SET remindedAt = :remindedAt " +
-            "WHERE id = :sessionId"
+            "WHERE id = :sessionId AND endedAt IS NULL"
     )
     suspend fun updateRemindedAt(sessionId: Long, remindedAt: Long): Int
 

@@ -90,6 +90,18 @@ class ReminderSchedulerTest {
     }
 
     @Test
+    fun cancelling_session_dismisses_a_presented_reminder() = runTest {
+        val fixture = fixture()
+
+        fixture.scheduler.onSessionStarted(fixture.session, appStillForeground = { true })
+        advanceTimeBy(10_001L)
+        runCurrent()
+        fixture.scheduler.cancel(fixture.session.id)
+
+        assertEquals(listOf(fixture.session.id), fixture.launcher.dismissedSessionIds)
+    }
+
+    @Test
     fun same_session_started_twice_shows_only_one_reminder() = runTest {
         val fixture = fixture()
 
@@ -141,8 +153,21 @@ class ReminderSchedulerTest {
         assertEquals(0, fixture.repository.remindedCount)
     }
 
+    @Test
+    fun closed_session_cannot_reserve_a_reminder_quota() = runTest {
+        val fixture = fixture(closeImmediatelyBeforeReminderMark = true)
+
+        fixture.scheduler.onSessionStarted(fixture.session, appStillForeground = { true })
+        advanceTimeBy(10_001L)
+        runCurrent()
+
+        assertEquals(0, fixture.launcher.shown.size)
+        assertEquals(0, fixture.repository.remindedCount)
+    }
+
     private fun kotlinx.coroutines.test.TestScope.fixture(
-        previousReminderTimes: List<Long> = emptyList()
+        previousReminderTimes: List<Long> = emptyList(),
+        closeImmediatelyBeforeReminderMark: Boolean = false
     ): Fixture {
         val session = AppUsageSession(
             id = 12L,
@@ -152,7 +177,11 @@ class ReminderSchedulerTest {
             taskId = 7L,
             toneKey = ReminderTone.DIRECT.key
         )
-        val repository = FakeReminderSessionRepository(session, previousReminderTimes)
+        val repository = FakeReminderSessionRepository(
+            session = session,
+            previousReminderTimes = previousReminderTimes,
+            closeImmediatelyBeforeReminderMark = closeImmediatelyBeforeReminderMark
+        )
         val launcher = RecordingReminderLauncher(repository)
         val settings = AppSettings(
             targetApps = listOf(AppInfo(session.packageName, session.appName)),
@@ -202,6 +231,7 @@ private class RecordingReminderLauncher(
     private val repository: FakeReminderSessionRepository
 ) : ReminderLauncher {
     val shown = mutableListOf<ReminderLaunchData>()
+    val dismissedSessionIds = mutableListOf<Long>()
     var remindedAtWhenShown: Long? = null
 
     override fun show(data: ReminderLaunchData) {
@@ -211,11 +241,18 @@ private class RecordingReminderLauncher(
 
     override fun returnToFocus(taskId: Long?) = Unit
     override fun returnHome() = Unit
+    override fun returnToCustom(packageName: String): CustomReturnResult =
+        CustomReturnResult.SUCCESS
+
+    override fun dismiss(sessionId: Long) {
+        dismissedSessionIds += sessionId
+    }
 }
 
 private class FakeReminderSessionRepository(
     session: AppUsageSession,
-    previousReminderTimes: List<Long>
+    previousReminderTimes: List<Long>,
+    private val closeImmediatelyBeforeReminderMark: Boolean = false
 ) : AppSessionRepository {
     private val sessions = mutableMapOf(session.id to session)
     private val previous = previousReminderTimes.toMutableList()
@@ -245,8 +282,11 @@ private class FakeReminderSessionRepository(
         previous.filter { it >= since } + sessions.values.mapNotNull { it.remindedAt }.filter { it >= since }
 
     override suspend fun markRemindedIfNeeded(sessionId: Long, remindedAt: Long): Boolean {
+        if (closeImmediatelyBeforeReminderMark) {
+            closeSession(sessionId, remindedAt)
+        }
         val current = sessions[sessionId] ?: return false
-        if (current.remindedAt != null) return false
+        if (current.remindedAt != null || current.endedAt != null) return false
         sessions[sessionId] = current.copy(remindedAt = remindedAt)
         return true
     }
@@ -260,6 +300,7 @@ private class FakeReminderSessionRepository(
 
     override suspend fun updateRemindedAt(sessionId: Long, remindedAt: Long) {
         val current = sessions[sessionId] ?: return
+        if (current.endedAt != null) return
         sessions[sessionId] = current.copy(remindedAt = remindedAt)
     }
 }

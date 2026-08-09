@@ -7,6 +7,7 @@ import com.example.focus_app.domain.model.ReturnDestination
 import com.example.focus_app.service.ReminderLaunchData
 import com.example.focus_app.service.ReminderLauncher
 import com.example.focus_app.service.SessionReminderScheduler
+import com.example.focus_app.service.CustomReturnResult
 import com.example.focus_app.ui.settings.TestFollowUpReminderStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -103,7 +104,27 @@ class ReminderViewModelTest {
 
         assertEquals("returned_to_custom", fixture.repository.action)
         assertEquals("com.tencent.mm", fixture.launcher.customPackage)
-        assertEquals(listOf("saved", "custom"), fixture.events)
+        assertEquals(listOf("custom", "saved"), fixture.events)
+    }
+
+    @Test
+    fun failed_custom_return_keeps_the_reminder_open_and_does_not_record_an_exit() = runTest(dispatcher) {
+        val fixture = fixture()
+        fixture.launcher.customLaunchSucceeds = false
+        fixture.viewModel.init(
+            LAUNCH_DATA.copy(
+                returnDestination = ReturnDestination.CUSTOM,
+                returnPackageName = "com.tencent.mm"
+            )
+        )
+
+        var completed = false
+        fixture.viewModel.returnToCustom(LAUNCH_DATA.sessionId) { completed = true }
+        advanceUntilIdle()
+
+        assertEquals(null, fixture.repository.action)
+        assertEquals(false, completed)
+        assertEquals("指定应用不可用，请重新选择", fixture.viewModel.uiState.value.customReturnError)
     }
 
     private fun fixture(): Fixture {
@@ -165,8 +186,11 @@ private class ActionRecordingLauncher(
     var focusTaskId: Long? = null
     var homeRequests = 0
     var customPackage: String? = null
+    var customLaunchSucceeds = true
 
     override fun show(data: ReminderLaunchData) = Unit
+
+    override fun dismiss(sessionId: Long) = Unit
 
     override fun returnToFocus(taskId: Long?) {
         focusTaskId = taskId
@@ -178,9 +202,14 @@ private class ActionRecordingLauncher(
         events += "home"
     }
 
-    override fun returnToCustom(packageName: String) {
+    override fun returnToCustom(packageName: String): CustomReturnResult {
         customPackage = packageName
-        events += "custom"
+        return if (customLaunchSucceeds) {
+            events += "custom"
+            CustomReturnResult.SUCCESS
+        } else {
+            CustomReturnResult.APP_UNAVAILABLE
+        }
     }
 }
 

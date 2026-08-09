@@ -111,6 +111,7 @@ class ReminderScheduler(
 
     override fun cancel(sessionId: Long) {
         jobs.remove(sessionId)?.cancel()
+        launcher.dismiss(sessionId)
     }
 
     /**

@@ -83,6 +83,14 @@ fun ReminderOverlay(
                             color = MaterialTheme.colorScheme.outline
                         )
                     }
+                    uiState.customReturnError?.let { error ->
+                        Text(
+                            error,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.error,
+                            textAlign = TextAlign.Center
+                        )
+                    }
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)

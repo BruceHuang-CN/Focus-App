@@ -3,6 +3,7 @@ package com.example.focus_app.service
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.os.Build
@@ -16,17 +17,17 @@ import javax.inject.Singleton
 
 interface ReminderLauncher {
     fun show(data: ReminderLaunchData)
+    fun dismiss(sessionId: Long)
     fun returnToFocus(taskId: Long?)
     fun returnHome()
-    fun returnToCustom(packageName: String) = Unit
+    fun returnToCustom(packageName: String): CustomReturnResult
 }
 
-internal fun presentReminder(
-    canDrawOverlays: Boolean,
-    startActivity: () -> Unit,
-    postNotification: () -> Unit
-) {
-    if (canDrawOverlays) startActivity() else postNotification()
+enum class CustomReturnResult {
+    SUCCESS,
+    NO_APP_CONFIGURED,
+    APP_UNAVAILABLE,
+    LAUNCH_FAILED
 }
 
 @Singleton
@@ -38,6 +39,15 @@ class AndroidReminderLauncher @Inject constructor(
             canDrawOverlays = Settings.canDrawOverlays(context),
             startActivity = { context.startActivity(reminderIntent(data)) },
             postNotification = { postReminderNotification(data) }
+        )
+    }
+
+    override fun dismiss(sessionId: Long) {
+        NotificationManagerCompat.from(context).cancel(notificationId(sessionId))
+        context.sendBroadcast(
+            Intent(ACTION_DISMISS_REMINDER)
+                .setPackage(context.packageName)
+                .putExtra(EXTRA_DISMISS_SESSION_ID, sessionId)
         )
     }
 
@@ -60,12 +70,17 @@ class AndroidReminderLauncher @Inject constructor(
         )
     }
 
-    override fun returnToCustom(packageName: String) {
+    override fun returnToCustom(packageName: String): CustomReturnResult {
+        if (packageName.isBlank()) return CustomReturnResult.NO_APP_CONFIGURED
         val intent = context.packageManager.getLaunchIntentForPackage(packageName)
-        if (intent != null) {
+            ?: return CustomReturnResult.APP_UNAVAILABLE
+        return try {
             context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-        } else {
-            returnHome()
+            CustomReturnResult.SUCCESS
+        } catch (_: ActivityNotFoundException) {
+            CustomReturnResult.LAUNCH_FAILED
+        } catch (_: SecurityException) {
+            CustomReturnResult.LAUNCH_FAILED
         }
     }
 
@@ -87,7 +102,7 @@ class AndroidReminderLauncher @Inject constructor(
 
     private fun postReminderNotification(data: ReminderLaunchData) {
         ensureReminderChannel()
-        val notificationId = data.sessionId.hashCode() and Int.MAX_VALUE
+        val notificationId = notificationId(data.sessionId)
         val contentIntent = PendingIntent.getActivity(
             context,
             notificationId,
@@ -121,8 +136,12 @@ class AndroidReminderLauncher @Inject constructor(
         )
     }
 
+    private fun notificationId(sessionId: Long): Int = sessionId.hashCode() and Int.MAX_VALUE
+
     companion object {
         const val ACTIVE_TASK_ID = "active_task_id"
+        const val ACTION_DISMISS_REMINDER = "com.example.focus_app.action.DISMISS_REMINDER"
+        const val EXTRA_DISMISS_SESSION_ID = "dismiss_session_id"
         private const val REMINDER_CHANNEL_ID = "focus_task_reminders"
     }
 }
