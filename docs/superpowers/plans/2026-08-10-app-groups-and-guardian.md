@@ -34,7 +34,7 @@
 - Produces `AppSettings.guardianEnabled: Boolean`，默认 `true`。
 - Produces `SettingsRepository.setGuardianEnabled(enabled: Boolean): suspend Unit`。
 
-- [ ] **Step 1: 写失败的映射与迁移测试**
+- [x] **Step 1: 写失败的映射与迁移测试**
 
 ```kotlin
 @Test fun version_2_database_migrates_guardian_enabled_to_true() {
@@ -47,11 +47,11 @@
 }
 ```
 
-- [ ] **Step 2: 运行测试确认失败**
+- [x] **Step 2: 运行测试确认失败**
 
 Run: `./gradlew.bat testDebugUnitTest --tests *Migration2To3Test --tests *SettingsMappingTest`
 
-- [ ] **Step 3: 最小实现持久化**
+- [x] **Step 3: 最小实现持久化**
 
 ```kotlin
 // SettingsEntity
@@ -63,7 +63,7 @@ database.execSQL("ALTER TABLE settings ADD COLUMN guardianEnabled INTEGER NOT NU
 
 将 Room 版本改为 3，注册 `MIGRATION_2_3`，并在 `toAppSettings` / `toEntity` 传递该字段；仓库方法只更新此字段。
 
-- [ ] **Step 4: 运行测试确认通过并提交**
+- [x] **Step 4: 运行测试确认通过并提交**
 
 Run: `./gradlew.bat testDebugUnitTest --tests *Migration2To3Test --tests *SettingsMappingTest`
 

@@ -27,6 +27,7 @@ data class AppSettings(
     val aiModel: String = "deepseek-v4-flash",
     val aiPersonality: String = "gentle",
     val enableAccessibility: Boolean = false,
+    val guardianEnabled: Boolean = true,
     val enableBreathingPause: Boolean = true,
     val reminderDelaySeconds: Int = 10,
     val reminderWindowMinutes: Int = 60,
@@ -59,6 +60,10 @@ class SettingsRepository @Inject constructor(
 
     suspend fun updateSettings(settings: AppSettings) {
         update { settings }
+    }
+
+    suspend fun setGuardianEnabled(enabled: Boolean) {
+        update { it.copy(guardianEnabled = enabled) }
     }
 
     suspend fun saveApiKey(value: String) {
