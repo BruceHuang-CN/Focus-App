@@ -10,9 +10,32 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Test
 
 class SettingsRepositoryConcurrencyTest {
+    @Test
+    fun set_guardian_enabled_updates_only_guardian_state_in_existing_row() = runTest {
+        val existing = SettingsEntity(
+            id = 7,
+            targetApps = "[{\"packageName\":\"video.app\",\"appName\":\"Video\"}]",
+            aiModel = "custom-model",
+            reminderDelaySeconds = 45,
+            guardianEnabled = true
+        )
+        val dao = FakeSettingsDao(existing)
+        val repository = SettingsRepository(dao)
+
+        repository.setGuardianEnabled(false)
+
+        val persisted = dao.getSettingsOnce()!!
+        assertFalse(persisted.guardianEnabled)
+        assertEquals(existing.id, persisted.id)
+        assertEquals(existing.targetApps, persisted.targetApps)
+        assertEquals(existing.aiModel, persisted.aiModel)
+        assertEquals(existing.reminderDelaySeconds, persisted.reminderDelaySeconds)
+    }
+
     @Test
     fun concurrent_transforms_preserve_both_settings_updates() = runTest {
         val dao = FakeSettingsDao(
