@@ -17,11 +17,10 @@ class AppGroupRepository @Inject constructor(
 ) {
     private val initialState = store.read() ?: runBlocking {
         val apps = normalizeApps(settingsRepository.getSettings().targetApps)
-        (apps.takeIf { it.isNotEmpty() }
+        apps.takeIf { it.isNotEmpty() }
             ?.let { AppGroup(UUID.randomUUID().toString(), CURRENT_GROUP_NAME, it) }
-            ?.let { StoredAppGroups(listOf(it), it.id) }
+            ?.let { StoredAppGroups(listOf(it), it.id).also(store::write) }
             ?: StoredAppGroups(emptyList(), "")
-        ).also(store::write)
     }
     private val mutableGroups = MutableStateFlow(initialState.groups)
     private val mutableActiveGroupId = MutableStateFlow(initialState.activeGroupId)
@@ -60,8 +59,10 @@ class AppGroupRepository @Inject constructor(
     }
 
     private fun persist(groups: List<AppGroup>, activeGroupId: String) {
-        store.write(StoredAppGroups(groups, activeGroupId))
-        mutableGroups.value = groups
+        val normalizedGroups = groups.map { it.copy(apps = normalizeApps(it.apps)) }
+        require(normalizedGroups.all { it.apps.isNotEmpty() }) { "An app group must contain at least one app." }
+        store.write(StoredAppGroups(normalizedGroups, activeGroupId))
+        mutableGroups.value = normalizedGroups
         mutableActiveGroupId.value = activeGroupId
     }
 

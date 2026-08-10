@@ -57,18 +57,64 @@ class AppGroupRepositoryTest {
         assertEquals(listOf(AppInfo("video.app", "首个名称")), repository.groups.value.single().apps)
     }
 
+    @Test
+    fun empty_legacy_target_apps_do_not_mark_migration_complete() = runTest {
+        val store = AppGroupStore(InMemorySharedPreferences())
+        val dao = FakeSettingsDao(emptyList())
+
+        AppGroupRepository(store, SettingsRepository(dao))
+
+        assertEquals(null, store.read())
+        dao.setTargetApps(listOf(AppInfo("video.app", "Video")))
+        val migrated = AppGroupRepository(store, SettingsRepository(dao))
+
+        assertEquals(listOf(AppInfo("video.app", "Video")), migrated.groups.value.single().apps)
+        assertEquals(migrated.groups.value.single().id, migrated.activeGroupId.value)
+    }
+
+    @Test
+    fun activate_normalizes_apps_in_every_persisted_group() = runTest {
+        val store = AppGroupStore(InMemorySharedPreferences())
+        store.write(groupsWithDuplicateApps())
+        val repository = AppGroupRepository(store, SettingsRepository(FakeSettingsDao(emptyList())))
+
+        repository.activate("second")
+
+        assertEquals(listOf(AppInfo("video.app", "First")), repository.groups.value.first().apps)
+        assertEquals(listOf(AppInfo("social.app", "Social")), repository.groups.value.last().apps)
+    }
+
+    @Test
+    fun delete_normalizes_apps_in_remaining_groups() = runTest {
+        val store = AppGroupStore(InMemorySharedPreferences())
+        store.write(groupsWithDuplicateApps())
+        val repository = AppGroupRepository(store, SettingsRepository(FakeSettingsDao(emptyList())))
+
+        repository.delete("first")
+
+        assertEquals(listOf(AppInfo("social.app", "Social")), repository.groups.value.single().apps)
+    }
+
     private fun repositoryWith(targetApps: List<AppInfo>): AppGroupRepository = AppGroupRepository(
         AppGroupStore(InMemorySharedPreferences()),
         SettingsRepository(FakeSettingsDao(targetApps))
     )
+
+    private fun groupsWithDuplicateApps() = StoredAppGroups(
+        groups = listOf(
+            AppGroup("first", "First", listOf(AppInfo("video.app", "First"), AppInfo("video.app", "Duplicate"))),
+            AppGroup("second", "Second", listOf(AppInfo("social.app", "Social"), AppInfo("social.app", "Duplicate")))
+        ),
+        activeGroupId = "first"
+    )
 }
 
 private class FakeSettingsDao(targetApps: List<AppInfo>) : SettingsDao {
-    private val settings = MutableStateFlow<SettingsEntity?>(
-        SettingsEntity(targetApps = targetApps.joinToString(prefix = "[", postfix = "]") {
-            Gson().toJson(it)
-        })
-    )
+    private val settings = MutableStateFlow<SettingsEntity?>(SettingsEntity(targetApps = Gson().toJson(targetApps)))
+
+    fun setTargetApps(targetApps: List<AppInfo>) {
+        settings.value = SettingsEntity(targetApps = Gson().toJson(targetApps))
+    }
 
     override suspend fun insertOrUpdate(settings: SettingsEntity) { this.settings.value = settings }
     override fun getSettings(): Flow<SettingsEntity?> = settings
