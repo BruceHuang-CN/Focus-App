@@ -86,6 +86,17 @@ class AppSessionCoordinator(
         }
     }
 
+    suspend fun stopCurrentSession() = eventMutex.withLock {
+        val session = openSession ?: repository.currentOpenSession()
+        session?.let {
+            reminderScheduler.cancel(it.id)
+            repository.closeSession(it.id, clock.nowMillis())
+        }
+        openSession = null
+        foregroundPackage = null
+        initialized = true
+    }
+
     private suspend fun recoverStaleSession(now: Long) {
         if (initialized) return
 

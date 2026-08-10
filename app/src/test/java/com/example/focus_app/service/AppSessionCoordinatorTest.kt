@@ -139,6 +139,20 @@ class AppSessionCoordinatorTest {
         )
     }
 
+    @Test
+    fun stop_current_session_cancels_pending_reminder_closes_session_and_clears_foreground_package() = runTest {
+        val fixture = fixture()
+        fixture.coordinator.onPackageChanged(TARGET_A)
+        val sessionId = fixture.repository.sessions.single().id
+
+        fixture.coordinator.stopCurrentSession()
+        fixture.coordinator.onPackageChanged(TARGET_A)
+
+        assertEquals(2, fixture.repository.sessions.size)
+        assertEquals(STARTED_AT, fixture.repository.sessions.first().endedAt)
+        assertEquals(listOf(sessionId), fixture.reminderScheduler.cancelledSessionIds)
+    }
+
     private fun fixture(
         activeTaskId: Long? = 7L,
         toneKey: String = ReminderTone.GENTLE.key,
