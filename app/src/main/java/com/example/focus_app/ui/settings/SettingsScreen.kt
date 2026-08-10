@@ -3,6 +3,7 @@ package com.example.focus_app.ui.settings
 import android.Manifest
 import android.content.Intent
 import android.provider.Settings
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -45,7 +46,6 @@ import kotlinx.coroutines.launch
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
-    onSystemBackRequest: ((() -> Unit)?) -> Unit = {},
     navigateToTargetApps: () -> Unit,
     navigateToCustomReturnPicker: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel()
@@ -113,11 +113,7 @@ fun SettingsScreen(
         if (hasUnsavedChanges) showExitConfirmation = true else onBack()
     }
 
-    val latestRequestExit by rememberUpdatedState(::requestExit)
-    DisposableEffect(Unit) {
-        onSystemBackRequest { latestRequestExit() }
-        onDispose { onSystemBackRequest(null) }
-    }
+    BackHandler(enabled = !showExitConfirmation) { requestExit() }
 
     fun handlePermissionAction(action: PermissionCheckAction) {
         when (action) {

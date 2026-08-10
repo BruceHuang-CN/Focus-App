@@ -11,7 +11,6 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -46,18 +45,6 @@ sealed class Screen(val route: String) {
 
 private data class TabItem(val route: String, val label: String, val icon: ImageVector)
 
-internal class SettingsBackRequestDispatcher {
-    private var request: (() -> Unit)? = null
-
-    fun register(request: (() -> Unit)?) {
-        this.request = request
-    }
-
-    fun request() {
-        request?.invoke()
-    }
-}
-
 private val mainTabs = listOf(
     TabItem(Screen.Home.route, "首页", Icons.Filled.Home),
     TabItem(Screen.Tasks.route, "任务", Icons.AutoMirrored.Filled.List),
@@ -75,7 +62,6 @@ fun NavGraph() {
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
     val tabRoutes = mainTabs.map { it.route }
-    val settingsBackDispatcher = remember { SettingsBackRequestDispatcher() }
 
     Scaffold(
         bottomBar = {
@@ -128,7 +114,6 @@ fun NavGraph() {
             composable(Screen.Settings.route) {
                 SettingsScreen(
                     onBack = { navController.popBackStack() },
-                    onSystemBackRequest = settingsBackDispatcher::register,
                     navigateToTargetApps = { navController.navigate(Screen.TargetApps.route) },
                     navigateToCustomReturnPicker = {
                         navController.navigate(Screen.CustomReturnPicker.route)
@@ -147,7 +132,4 @@ fun NavGraph() {
         }
     }
 
-    BackHandler(enabled = currentRoute == Screen.Settings.route) {
-        settingsBackDispatcher.request()
-    }
 }

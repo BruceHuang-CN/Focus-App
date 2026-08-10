@@ -1,5 +1,6 @@
 package com.example.focus_app.ui.settings
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -27,11 +28,24 @@ fun TargetAppsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltView
     val context = LocalContext.current
     val allApps = remember { loadInstalledApps(context) }
     var searchQuery by remember { mutableStateOf("") }
+    var selectedApps by remember(settings.targetApps) { mutableStateOf(settings.targetApps) }
+    var showExitConfirmation by remember { mutableStateOf(false) }
+    var saveRequested by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
-    val selectedPackages = remember(settings.targetApps) {
-        settings.targetApps.map { it.packageName }.toSet()
+    val selectedPackages = remember(selectedApps) { selectedApps.map { it.packageName }.toSet() }
+    val savedPackages = remember(settings.targetApps) { settings.targetApps.map { it.packageName }.toSet() }
+    val hasUnsavedChanges = TargetAppsExitPolicy.requiresConfirmation(savedPackages, selectedPackages)
+
+    fun requestExit() {
+        if (hasUnsavedChanges) showExitConfirmation = true else onBack()
+    }
+
+    BackHandler(enabled = !showExitConfirmation) { requestExit() }
+
+    LaunchedEffect(saveRequested, hasUnsavedChanges) {
+        if (saveRequested && !hasUnsavedChanges) onBack()
     }
 
     val filtered = remember(allApps, searchQuery) {
@@ -48,7 +62,7 @@ fun TargetAppsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltView
             TopAppBar(
                 title = { Text("选择目标 App") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = ::requestExit) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
                     }
                 }
@@ -78,13 +92,13 @@ fun TargetAppsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltView
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable {
-                                val updated = settings.targetApps.toMutableList()
+                                val updated = selectedApps.toMutableList()
                                 if (isChecked) {
                                     updated.removeAll { it.packageName == app.packageName }
                                 } else {
                                     updated.add(app.toAppInfo())
                                 }
-                                viewModel.updateTargetApps(updated)
+                                selectedApps = updated
                                 scope.launch {
                                     snackbarHostState.showSnackbar(
                                         if (isChecked) "已移除：${app.appName}" else "已添加：${app.appName}",
@@ -120,6 +134,28 @@ fun TargetAppsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltView
                 }
             }
         }
+    }
+
+    if (showExitConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showExitConfirmation = false },
+            title = { Text("保存目标应用？") },
+            text = { Text("你修改了目标应用列表。保存后才会用于检测和提醒。") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.updateTargetApps(selectedApps)
+                        showExitConfirmation = false
+                        saveRequested = true
+                    }
+                ) { Text("保存并返回") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showExitConfirmation = false }) {
+                    Text("继续修改")
+                }
+            }
+        )
     }
 }
 
