@@ -2,6 +2,7 @@ package com.example.focus_app.di
 
 import android.content.Context
 import androidx.room.Room
+import com.example.focus_app.data.appgroup.AppGroupStore
 import com.example.focus_app.data.local.AppDatabase
 import com.example.focus_app.data.local.dao.AiReminderCacheDao
 import com.example.focus_app.data.local.dao.AppUsageEventDao
@@ -35,6 +36,11 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object DatabaseModule {
+
+    @Provides
+    @Singleton
+    fun provideAppGroupStore(@ApplicationContext context: Context): AppGroupStore =
+        AppGroupStore(context.getSharedPreferences(AppGroupStore.PREFERENCES_NAME, Context.MODE_PRIVATE))
 
     @Provides
     @Singleton
