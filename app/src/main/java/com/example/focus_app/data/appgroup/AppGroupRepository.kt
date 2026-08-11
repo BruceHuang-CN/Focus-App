@@ -31,7 +31,7 @@ class AppGroupRepository @Inject constructor(
     fun create(name: String, apps: List<AppInfo>) {
         val group = AppGroup(UUID.randomUUID().toString(), normalizeName(name), normalizeApps(apps))
         require(group.apps.isNotEmpty()) { "An app group must contain at least one app." }
-        persist(mutableGroups.value + group, group.id)
+        persist(mutableGroups.value + group, mutableActiveGroupId.value)
     }
 
     fun update(id: String, name: String, apps: List<AppInfo>) {
@@ -48,9 +48,9 @@ class AppGroupRepository @Inject constructor(
         val existing = mutableGroups.value
         require(existing.any { it.id == id }) { "App group does not exist." }
         check(existing.size > 1) { "The final app group cannot be deleted." }
+        check(mutableActiveGroupId.value != id) { "Activate another app group before deleting this group." }
         val remaining = existing.filterNot { it.id == id }
-        val activeId = if (mutableActiveGroupId.value == id) remaining.first().id else mutableActiveGroupId.value
-        persist(remaining, activeId)
+        persist(remaining, mutableActiveGroupId.value)
     }
 
     fun activate(id: String) {

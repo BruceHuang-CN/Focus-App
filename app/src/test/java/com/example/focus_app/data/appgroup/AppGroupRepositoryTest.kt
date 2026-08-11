@@ -44,6 +44,28 @@ class AppGroupRepositoryTest {
     }
 
     @Test
+    fun create_keeps_the_existing_active_group_selected() = runTest {
+        val repository = repositoryWith(targetApps = listOf(AppInfo("video.app", "Video")))
+        val activeId = repository.activeGroupId.value
+
+        repository.create("Social", listOf(AppInfo("social.app", "Social")))
+
+        assertEquals(activeId, repository.activeGroupId.value)
+    }
+
+    @Test
+    fun delete_rejects_the_active_group_before_selecting_a_replacement() = runTest {
+        val repository = repositoryWith(targetApps = listOf(AppInfo("video.app", "Video")))
+        repository.create("Social", listOf(AppInfo("social.app", "Social")))
+        val activeId = repository.activeGroupId.value
+
+        assertThrows(IllegalStateException::class.java) {
+            repository.delete(activeId)
+        }
+        assertEquals(activeId, repository.activeGroupId.value)
+    }
+
+    @Test
     fun update_removes_duplicate_packages_and_preserves_the_first_app_name() = runTest {
         val repository = repositoryWith(targetApps = listOf(AppInfo("video.app", "Video")))
         val id = repository.activeGroupId.value
@@ -90,6 +112,7 @@ class AppGroupRepositoryTest {
         store.write(groupsWithDuplicateApps())
         val repository = AppGroupRepository(store, SettingsRepository(FakeSettingsDao(emptyList())))
 
+        repository.activate("second")
         repository.delete("first")
 
         assertEquals(listOf(AppInfo("social.app", "Social")), repository.groups.value.single().apps)

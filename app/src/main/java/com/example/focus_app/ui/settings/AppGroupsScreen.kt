@@ -26,10 +26,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import kotlinx.coroutines.launch
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
@@ -42,6 +44,7 @@ fun AppGroupsScreen(
     val groups by viewModel.appGroups.collectAsState()
     val activeId by viewModel.activeAppGroupId.collectAsState()
     val snackbar = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
     LaunchedEffect(Unit) { viewModel.appGroupMessages.collect { snackbar.showSnackbar(it) } }
 
     Scaffold(
@@ -70,7 +73,14 @@ fun AppGroupsScreen(
                     Row {
                         TextButton(onClick = { viewModel.activateAppGroup(group.id) }, enabled = group.id != activeId) { Text("启用") }
                         TextButton(onClick = { onEdit(group.id) }) { Text("编辑") }
-                        TextButton(onClick = { viewModel.deleteAppGroup(group.id) }, enabled = groups.size > 1) { Text("删除") }
+                        TextButton(
+                            onClick = {
+                                viewModel.deleteAppGroup(group.id).exceptionOrNull()?.let { error ->
+                                    scope.launch { snackbar.showSnackbar("删除应用组失败：${error.message}") }
+                                }
+                            },
+                            enabled = groups.size > 1 && group.id != activeId
+                        ) { Text("删除") }
                     }
                 }
             }
