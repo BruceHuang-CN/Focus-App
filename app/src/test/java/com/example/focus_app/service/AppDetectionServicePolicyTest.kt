@@ -25,4 +25,16 @@ class AppDetectionServicePolicyTest {
             )
         )
     }
+
+    @Test
+    fun realtime_keepalive_stops_when_guardian_is_disabled() {
+        assertFalse(
+            com.example.focus_app.shouldRunRealtimeKeepAlive(
+                mode = DetectionMode.REALTIME,
+                accessibilityEnabled = true,
+                guardianEnabled = false,
+                keepAlive = true
+            )
+        )
+    }
 }

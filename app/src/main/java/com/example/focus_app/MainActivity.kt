@@ -26,6 +26,17 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+internal fun shouldRunRealtimeKeepAlive(
+    mode: DetectionMode,
+    accessibilityEnabled: Boolean,
+    guardianEnabled: Boolean,
+    keepAlive: Boolean
+): Boolean =
+    mode == DetectionMode.REALTIME &&
+        accessibilityEnabled &&
+        guardianEnabled &&
+        keepAlive
+
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     @Inject lateinit var settingsRepository: SettingsRepository
@@ -53,9 +64,12 @@ class MainActivity : ComponentActivity() {
                             stopKeepAliveService()
                             startCompatibilityService()
                         }
-                        state.mode == DetectionMode.REALTIME &&
-                            state.accessibilityEnabled &&
-                            state.keepAlive -> {
+                        shouldRunRealtimeKeepAlive(
+                            mode = state.mode,
+                            accessibilityEnabled = state.accessibilityEnabled,
+                            guardianEnabled = state.guardianEnabled,
+                            keepAlive = state.keepAlive
+                        ) -> {
                             stopCompatibilityService()
                             startKeepAliveService()
                         }

@@ -19,6 +19,9 @@ internal fun shouldProcessAccessibilityEvents(settings: AppSettings): Boolean =
         settings.enableAccessibility &&
         settings.guardianEnabled
 
+internal fun shouldProcessQueuedAccessibilityEvent(settings: AppSettings): Boolean =
+    shouldProcessAccessibilityEvents(settings)
+
 private data class PackageChange(
     val packageName: String,
     val isReminderPresentation: Boolean
@@ -32,6 +35,7 @@ class FocusAccessibilityService : AccessibilityService() {
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private val packageChanges = Channel<PackageChange>(Channel.UNLIMITED)
     @Volatile private var isRealtimeMode = false
+    @Volatile private var currentSettings = AppSettings()
     private var monitoringStarted = false
 
     override fun onServiceConnected() {
@@ -42,11 +46,13 @@ class FocusAccessibilityService : AccessibilityService() {
 
         scope.launch {
             settingsRepository.getSettingsFlow().collect { settings ->
+                currentSettings = settings
                 isRealtimeMode = shouldProcessAccessibilityEvents(settings)
             }
         }
         scope.launch {
             for (change in packageChanges) {
+                if (!shouldProcessQueuedAccessibilityEvent(currentSettings)) continue
                 appSessionCoordinator.onPackageChanged(
                     packageName = change.packageName,
                     isReminderPresentation = change.isReminderPresentation

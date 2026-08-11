@@ -8,6 +8,19 @@ import org.junit.Test
 
 class AccessibilityMonitoringPolicyTest {
     @Test
+    fun queued_accessibility_events_are_ignored_after_guardian_is_disabled() {
+        assertFalse(
+            shouldProcessQueuedAccessibilityEvent(
+                AppSettings(
+                    detectionMode = DetectionMode.REALTIME,
+                    enableAccessibility = true,
+                    guardianEnabled = false
+                )
+            )
+        )
+    }
+
+    @Test
     fun accessibility_events_require_realtime_mode_accessibility_toggle_and_guardian_toggle() {
         assertTrue(
             shouldProcessAccessibilityEvents(
