@@ -256,6 +256,17 @@
 
 ---
 
+## 2026-08-11
+
+### 应用组管理界面
+
+- 设置页提供应用组入口，以及应用组列表和编辑器。
+- 应用组不可为空；支持创建、编辑和启用；仅剩最后一组时受删除保护。
+- 启用继续使用既有的安全切换用例；创建或删除应用组不会使当前应用组与守护目标脱节。
+- 首页提供守护状态和额度重置。本条不表示已完成真机测试、反馈二维码、赞助、强制选择设置或其他路线图工作。
+
+**验证：** `$env:GRADLE_USER_HOME='C:\Users\6\.gradle'; .\gradlew.bat :app:testDebugUnitTest :app:compileDebugAndroidTestKotlin :app:assembleDebug --no-daemon --no-configuration-cache`，结果：`BUILD SUCCESSFUL in 24s`。
+
 ## 2026-08-08（第三轮）
 
 ### 问题：release 构建报 lint fatal error（RemoveWorkManagerInitializer）
