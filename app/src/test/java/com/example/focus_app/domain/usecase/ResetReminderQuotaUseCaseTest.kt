@@ -24,7 +24,7 @@ class ResetReminderQuotaUseCaseTest {
 
         fixture.useCase()
 
-        assertEquals(listOf("cancel", "close", "quota"), fixture.events)
+        assertEquals(listOf("cancel", "close", "settings", "quota"), fixture.events)
         assertEquals(listOf(4_400_000L), fixture.sessions.resetSince)
     }
 
@@ -59,7 +59,7 @@ class ResetReminderQuotaUseCaseTest {
         )
         return Fixture(
             useCase = ResetReminderQuotaUseCase(
-                SettingsRepository(ResetSettingsDao(reminderWindowMinutes)),
+                SettingsRepository(ResetSettingsDao(reminderWindowMinutes, events)),
                 sessions,
                 coordinator,
                 FakeClock(8_000_000L)
@@ -76,7 +76,10 @@ class ResetReminderQuotaUseCaseTest {
     )
 }
 
-private class ResetSettingsDao(reminderWindowMinutes: Int) : SettingsDao {
+private class ResetSettingsDao(
+    reminderWindowMinutes: Int,
+    private val events: MutableList<String>
+) : SettingsDao {
     private val state = MutableStateFlow<SettingsEntity?>(
         SettingsEntity(targetApps = "[]", reminderWindowMinutes = reminderWindowMinutes)
     )
@@ -86,7 +89,7 @@ private class ResetSettingsDao(reminderWindowMinutes: Int) : SettingsDao {
     }
 
     override fun getSettings(): Flow<SettingsEntity?> = state
-    override suspend fun getSettingsOnce(): SettingsEntity? = state.value
+    override suspend fun getSettingsOnce(): SettingsEntity? = state.value.also { events += "settings" }
     override suspend fun clearLegacyApiKey() = Unit
 }
 
