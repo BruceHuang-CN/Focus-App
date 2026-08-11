@@ -54,7 +54,7 @@ Add a policy test asserting `isReminderPresentationForForegroundChange(true)` is
 - [x] **Step 2: Run the focused tests before service and lifecycle changes**
 
 ```powershell
-$env:GRADLE_USER_HOME='C:\Users\6\.gradle'; .\gradlew.bat :app:testDebugUnitTest --no-daemon --no-configuration-cache --tests "com.example.focus_app.service.AppSessionCoordinatorTest" --tests "com.example.focus_app.service.ReminderPresentationRegistryTest"
+$env:GRADLE_USER_HOME='C:\Users\6\.gradle'; .\gradlew.bat :app:testDebugUnitTest --no-daemon --no-configuration-cache --tests "com.example.focus_app.service.AppSessionCoordinatorTest" --tests "com.example.focus_app.service.ReminderPresentationPolicyTest"
 ```
 
 Expected: compilation failure for the missing `isReminderPresentationForForegroundChange` policy function before the production implementation is added.
@@ -69,7 +69,7 @@ Expected: compilation failure for the missing `isReminderPresentationForForegrou
 - [x] **Step 4: Run focused tests and commit**
 
 ```powershell
-$env:GRADLE_USER_HOME='C:\Users\6\.gradle'; .\gradlew.bat :app:testDebugUnitTest --no-daemon --no-configuration-cache --tests "com.example.focus_app.service.AppSessionCoordinatorTest" --tests "com.example.focus_app.service.ReminderPresentationRegistryTest"
+$env:GRADLE_USER_HOME='C:\Users\6\.gradle'; .\gradlew.bat :app:testDebugUnitTest --no-daemon --no-configuration-cache --tests "com.example.focus_app.service.AppSessionCoordinatorTest" --tests "com.example.focus_app.service.ReminderPresentationPolicyTest"
 git add app/src/main/java/com/example/focus_app/service/FocusAccessibilityService.kt app/src/main/java/com/example/focus_app/service/AppDetectionService.kt app/src/main/java/com/example/focus_app/service/ReminderActivity.kt app/src/main/java/com/example/focus_app/ui/reminder/ReminderViewModel.kt app/src/test/java/com/example/focus_app/service/AppSessionCoordinatorTest.kt app/src/test/java/com/example/focus_app/service/ReminderPresentationRegistryTest.kt
 git commit -m "fix: preserve reminders through transient popups"
 ```
