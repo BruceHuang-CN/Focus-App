@@ -10,12 +10,10 @@ import com.example.focus_app.data.remote.dto.ChatResponse
 import com.example.focus_app.data.remote.dto.ModelInfo
 import com.example.focus_app.data.remote.dto.ModelsResponse
 import com.example.focus_app.data.repository.AiRepository
-import com.example.focus_app.data.repository.ReminderCacheRepository
 import com.example.focus_app.data.repository.SettingsRepository
 import com.example.focus_app.data.repository.TaskRepository
 import com.example.focus_app.data.security.ApiKeyStore
 import com.example.focus_app.data.permission.PermissionStatusProvider
-import com.example.focus_app.domain.time.FakeClock
 import com.example.focus_app.domain.model.AiProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -148,8 +146,6 @@ class SettingsViewModelAiConnectionTest {
             aiRepository = aiRepository,
             taskRepository = TaskRepository(EmptyTaskDao()),
             permissionStatusProvider = AiConnectionFakePermissionProvider(),
-            appSessionRepository = TestSessionRepository(),
-            reminderCacheRepository = ReminderCacheRepository(TestCacheDao(), FakeClock(0L)),
             customReturnAppStore = TestCustomReturnAppStore(),
             followUpReminderStore = TestFollowUpReminderStore(),
             keepAliveStore = TestKeepAliveStore(),

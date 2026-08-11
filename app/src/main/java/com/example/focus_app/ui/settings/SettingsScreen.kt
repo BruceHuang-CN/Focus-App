@@ -323,21 +323,6 @@ fun SettingsScreen(
                     onSettingChanged("窗口内 ${it} 次")
                 }
             )
-            OutlinedButton(
-                onClick = {
-                    viewModel.resetReminderWindow()
-                    scope.launch {
-                        snackbarHostState.currentSnackbarData?.dismiss()
-                        snackbarHostState.showSnackbar(
-                            "已重置本窗口额度，AI 提醒已重新生成",
-                            duration = SnackbarDuration.Short
-                        )
-                    }
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("重置当前窗口额度并重新生成提醒")
-            }
             Divider()
 
             // ── AI 服务 ──

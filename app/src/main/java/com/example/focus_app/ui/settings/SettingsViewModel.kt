@@ -4,10 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.focus_app.data.repository.AiRepository
 import com.example.focus_app.data.repository.AppInfo
-import com.example.focus_app.data.repository.AppSessionRepository
 import com.example.focus_app.data.repository.AppSettings
 import com.example.focus_app.data.repository.ConnectionTestResult
-import com.example.focus_app.data.repository.ReminderCacheRepository
 import com.example.focus_app.data.repository.SettingsRepository
 import com.example.focus_app.data.repository.TaskRepository
 import com.example.focus_app.data.permission.PermissionStatusProvider
@@ -44,8 +42,6 @@ class SettingsViewModel @Inject constructor(
     private val aiRepository: AiRepository,
     private val taskRepository: TaskRepository,
     private val permissionStatusProvider: PermissionStatusProvider,
-    private val appSessionRepository: AppSessionRepository,
-    private val reminderCacheRepository: ReminderCacheRepository,
     private val customReturnAppStore: CustomReturnAppStore,
     private val followUpReminderStore: FollowUpReminderStore,
     private val keepAliveStore: KeepAliveStore,
@@ -129,16 +125,6 @@ class SettingsViewModel @Inject constructor(
 
     fun updateDailyShortVideoLimitMinutes(minutes: Int) {
         update { it.copy(dailyShortVideoLimitMinutes = minutes.coerceIn(1, 1_440)) }
-    }
-
-    /** 重置当前统计窗口的提醒额度，并请求后台重新生成 AI 提醒内容。 */
-    fun resetReminderWindow() {
-        viewModelScope.launch {
-            val current = settingsRepository.getSettings()
-            val since = System.currentTimeMillis() - current.reminderWindowMinutes * 60_000L
-            appSessionRepository.resetReminderQuota(since)
-            reminderCacheRepository.requestRegeneration()
-        }
     }
 
     fun updateReminderTone(tone: ReminderTone) { update { it.copy(toneKey = tone) } }

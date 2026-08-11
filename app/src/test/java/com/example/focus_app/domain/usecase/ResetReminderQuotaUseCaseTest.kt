@@ -13,8 +13,8 @@ import com.example.focus_app.service.SessionReminderScheduler
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Test
 
 class ResetReminderQuotaUseCaseTest {
@@ -38,11 +38,17 @@ class ResetReminderQuotaUseCaseTest {
     }
 
     @Test
-    fun reset_use_case_has_no_reminder_cache_dependency() {
-        assertFalse(
-            ResetReminderQuotaUseCase::class.java.constructors
-                .flatMap { it.parameterTypes.asIterable() }
-                .any { it.simpleName == "ReminderCacheRepository" }
+    fun reset_use_case_requires_only_settings_sessions_and_session_coordinator() {
+        val injectedConstructor = ResetReminderQuotaUseCase::class.java.constructors
+            .single { it.parameterTypes.size == 3 }
+
+        assertArrayEquals(
+            arrayOf(
+                SettingsRepository::class.java,
+                AppSessionRepository::class.java,
+                AppSessionCoordinator::class.java
+            ),
+            injectedConstructor.parameterTypes
         )
     }
 

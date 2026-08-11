@@ -53,7 +53,9 @@ fun HomeScreen(
         uiState = uiState,
         onRecordMood = navigateToMood,
         onManageTasks = navigateToTasks,
-        onCompleteCurrentTask = viewModel::completeCurrentTask
+        onCompleteCurrentTask = viewModel::completeCurrentTask,
+        onGuardianEnabledChange = viewModel::setGuardianEnabled,
+        onResetReminderQuota = viewModel::resetReminderQuota
     )
 }
 
@@ -63,7 +65,9 @@ internal fun HomeContent(
     uiState: HomeUiState,
     onRecordMood: () -> Unit,
     onManageTasks: () -> Unit,
-    onCompleteCurrentTask: () -> Unit
+    onCompleteCurrentTask: () -> Unit,
+    onGuardianEnabledChange: (Boolean) -> Unit,
+    onResetReminderQuota: () -> Unit
 ) {
     Scaffold(
         topBar = {
@@ -139,6 +143,15 @@ internal fun HomeContent(
 
             // 今日短视频摘要
             item {
+                GuardianControlCard(
+                    guardianEnabled = uiState.guardianEnabled,
+                    activeGroupName = uiState.activeGroupName,
+                    onGuardianEnabledChange = onGuardianEnabledChange,
+                    onResetReminderQuota = onResetReminderQuota
+                )
+            }
+
+            item {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     StatCard("打开次数", uiState.openCountToday.toString(), InkBlue, Modifier.weight(1f))
                     StatCard("已提醒", uiState.remindedCountToday.toString(), WarningAmber, Modifier.weight(1f))
@@ -188,6 +201,36 @@ internal fun HomeContent(
 }
 
 @Composable
+private fun GuardianControlCard(
+    guardianEnabled: Boolean,
+    activeGroupName: String,
+    onGuardianEnabledChange: (Boolean) -> Unit,
+    onResetReminderQuota: () -> Unit
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "守护控制",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f)
+                )
+                Switch(checked = guardianEnabled, onCheckedChange = onGuardianEnabledChange)
+            }
+            Text(
+                text = if (guardianEnabled) "守护已开启" else "已暂停检测和提醒",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.outline
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text("当前应用组：$activeGroupName", style = MaterialTheme.typography.bodyMedium)
+            Spacer(modifier = Modifier.height(12.dp))
+            OutlinedButton(onClick = onResetReminderQuota) { Text("重置提醒额度") }
+        }
+    }
+}
+
+@Composable
 private fun ReminderRecordCard(session: AppUsageSession) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(12.dp)) {
@@ -227,7 +270,9 @@ private fun HomeContentPreview() {
             ),
             onRecordMood = {},
             onManageTasks = {},
-            onCompleteCurrentTask = {}
+            onCompleteCurrentTask = {},
+            onGuardianEnabledChange = {},
+            onResetReminderQuota = {}
         )
     }
 }
