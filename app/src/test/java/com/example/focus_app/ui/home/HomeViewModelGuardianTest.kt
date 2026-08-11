@@ -29,7 +29,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.async
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
@@ -74,6 +76,20 @@ class HomeViewModelGuardianTest {
         viewModel.resetReminderQuota()
         runCurrent()
         assertFalse(fixture.settings.getSettings().guardianEnabled)
+        assertEquals(1, fixture.sessions.resetQuotaCalls)
+    }
+
+    @Test
+    fun reset_reminder_quota_emits_confirmation_after_the_reset_completes() = runTest(dispatcher) {
+        val fixture = fixture()
+        val viewModel = fixture.homeViewModel()
+        val event = async { viewModel.events.first() }
+        runCurrent()
+
+        viewModel.resetReminderQuota()
+        runCurrent()
+
+        assertEquals(HomeEvent.ReminderQuotaReset, event.await())
         assertEquals(1, fixture.sessions.resetQuotaCalls)
     }
 

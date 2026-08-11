@@ -29,6 +29,7 @@ import com.example.focus_app.ui.theme.SuccessGreen
 import com.example.focus_app.ui.theme.WarningAmber
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlinx.coroutines.flow.collect
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -39,6 +40,17 @@ fun HomeScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val lifecycleOwner = LocalLifecycleOwner.current
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(viewModel) {
+        viewModel.events.collect { event ->
+            if (event == HomeEvent.ReminderQuotaReset) {
+                snackbarHostState.showSnackbar(
+                    "提醒额度已重置；下次进入目标应用后会按延迟提醒"
+                )
+            }
+        }
+    }
 
     // 返回本页时刷新统计（例如提醒操作或设置变更后）
     DisposableEffect(lifecycleOwner) {
@@ -55,7 +67,8 @@ fun HomeScreen(
         onManageTasks = navigateToTasks,
         onCompleteCurrentTask = viewModel::completeCurrentTask,
         onGuardianEnabledChange = viewModel::setGuardianEnabled,
-        onResetReminderQuota = viewModel::resetReminderQuota
+        onResetReminderQuota = viewModel::resetReminderQuota,
+        snackbarHostState = snackbarHostState
     )
 }
 
@@ -67,9 +80,12 @@ internal fun HomeContent(
     onManageTasks: () -> Unit,
     onCompleteCurrentTask: () -> Unit,
     onGuardianEnabledChange: (Boolean) -> Unit,
-    onResetReminderQuota: () -> Unit
+    onResetReminderQuota: () -> Unit,
+    snackbarHostState: SnackbarHostState? = null
 ) {
+    val effectiveSnackbarHostState = snackbarHostState ?: remember { SnackbarHostState() }
     Scaffold(
+        snackbarHost = { SnackbarHost(effectiveSnackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {

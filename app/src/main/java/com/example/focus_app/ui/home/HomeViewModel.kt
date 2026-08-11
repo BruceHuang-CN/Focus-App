@@ -32,6 +32,10 @@ data class HomeUiState(
     val activeGroupName: String = "\u672a\u8bbe\u7f6e\u5e94\u7528\u7ec4"
 )
 
+sealed interface HomeEvent {
+    data object ReminderQuotaReset : HomeEvent
+}
+
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val appSessionRepository: AppSessionRepository,
@@ -44,6 +48,8 @@ class HomeViewModel @Inject constructor(
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
+    private val _events = MutableSharedFlow<HomeEvent>(extraBufferCapacity = 1)
+    val events: SharedFlow<HomeEvent> = _events.asSharedFlow()
 
     init {
         loadStats()
@@ -113,7 +119,10 @@ class HomeViewModel @Inject constructor(
     }
 
     fun resetReminderQuota() {
-        viewModelScope.launch { resetReminderQuotaUseCase() }
+        viewModelScope.launch {
+            resetReminderQuotaUseCase()
+            _events.emit(HomeEvent.ReminderQuotaReset)
+        }
     }
 
     private companion object {
