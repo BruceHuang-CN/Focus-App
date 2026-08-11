@@ -26,6 +26,8 @@ import com.example.focus_app.ui.home.HomeScreen
 import com.example.focus_app.ui.mood.MoodPickerScreen
 import com.example.focus_app.ui.onboarding.OnboardingScreen
 import com.example.focus_app.ui.settings.CustomReturnAppPickerScreen
+import com.example.focus_app.ui.settings.AppGroupEditorScreen
+import com.example.focus_app.ui.settings.AppGroupsScreen
 import com.example.focus_app.ui.settings.SettingsScreen
 import com.example.focus_app.ui.settings.TargetAppsScreen
 import com.example.focus_app.ui.stats.StatsScreen
@@ -41,6 +43,10 @@ sealed class Screen(val route: String) {
     object Stats : Screen("stats")
     object TargetApps : Screen("target_apps")
     object CustomReturnPicker : Screen("custom_return_picker")
+    object AppGroups : Screen("app_groups")
+    object AppGroupEditor : Screen("app_group_editor/{groupId}") {
+        fun routeFor(groupId: String? = null): String = "app_group_editor/${groupId ?: "new"}"
+    }
 }
 
 private data class TabItem(val route: String, val label: String, val icon: ImageVector)
@@ -117,7 +123,8 @@ fun NavGraph() {
                     navigateToTargetApps = { navController.navigate(Screen.TargetApps.route) },
                     navigateToCustomReturnPicker = {
                         navController.navigate(Screen.CustomReturnPicker.route)
-                    }
+                    },
+                    navigateToAppGroups = { navController.navigate(Screen.AppGroups.route) }
                 )
             }
             composable(Screen.CustomReturnPicker.route) {
@@ -128,6 +135,17 @@ fun NavGraph() {
             }
             composable(Screen.TargetApps.route) {
                 TargetAppsScreen(onBack = { navController.popBackStack() })
+            }
+            composable(Screen.AppGroups.route) {
+                AppGroupsScreen(
+                    onBack = { navController.popBackStack() },
+                    onAdd = { navController.navigate(Screen.AppGroupEditor.routeFor()) },
+                    onEdit = { id -> navController.navigate(Screen.AppGroupEditor.routeFor(id)) }
+                )
+            }
+            composable(Screen.AppGroupEditor.route) { entry ->
+                val groupId = entry.arguments?.getString("groupId")?.takeUnless { it == "new" }
+                AppGroupEditorScreen(groupId = groupId, onBack = { navController.popBackStack() })
             }
         }
     }

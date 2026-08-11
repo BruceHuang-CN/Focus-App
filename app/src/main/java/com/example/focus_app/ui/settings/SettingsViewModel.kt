@@ -8,6 +8,8 @@ import com.example.focus_app.data.repository.AppSettings
 import com.example.focus_app.data.repository.ConnectionTestResult
 import com.example.focus_app.data.repository.SettingsRepository
 import com.example.focus_app.data.repository.TaskRepository
+import com.example.focus_app.data.appgroup.AppGroup
+import com.example.focus_app.data.appgroup.AppGroupRepository
 import com.example.focus_app.data.permission.PermissionStatusProvider
 import com.example.focus_app.data.followup.FollowUpReminderStore
 import com.example.focus_app.data.keepalive.KeepAliveStore
@@ -23,6 +25,7 @@ import com.example.focus_app.domain.model.ReturnDestination
 import com.example.focus_app.domain.permission.PermissionCheckEvaluator
 import com.example.focus_app.domain.permission.PermissionCheckItem
 import com.example.focus_app.domain.reminder.ReminderTonePreview
+import com.example.focus_app.domain.usecase.UpdateGuardianStateUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -45,7 +48,9 @@ class SettingsViewModel @Inject constructor(
     private val customReturnAppStore: CustomReturnAppStore,
     private val followUpReminderStore: FollowUpReminderStore,
     private val keepAliveStore: KeepAliveStore,
-    private val themeStore: ThemeStore
+    private val themeStore: ThemeStore,
+    private val appGroupRepository: AppGroupRepository? = null,
+    private val updateGuardianStateUseCase: UpdateGuardianStateUseCase? = null
 ) : ViewModel() {
     val settings: StateFlow<AppSettings> = settingsRepository.getSettingsFlow().stateIn(viewModelScope, SharingStarted.Eagerly, AppSettings())
 
@@ -63,6 +68,8 @@ class SettingsViewModel @Inject constructor(
 
     val keepAliveEnabled: StateFlow<Boolean> = keepAliveStore.enabled
     val themeSettings: StateFlow<ThemeSettings> = themeStore.settings
+    val appGroups: StateFlow<List<AppGroup>> = appGroupRepository?.groups ?: MutableStateFlow(emptyList())
+    val activeAppGroupId: StateFlow<String> = appGroupRepository?.activeGroupId ?: MutableStateFlow("")
 
     private val _tonePreview = MutableStateFlow("")
     val tonePreview: StateFlow<String> = _tonePreview.asStateFlow()
@@ -236,6 +243,30 @@ class SettingsViewModel @Inject constructor(
     fun toggleBreathingPause() { update { it.copy(enableBreathingPause = !it.enableBreathingPause) } }
     fun toggleAccessibility() { update { it.copy(enableAccessibility = !it.enableAccessibility) } }
     fun updateTargetApps(apps: List<AppInfo>) { update { it.copy(targetApps = apps) } }
+
+    fun saveAppGroup(groupId: String?, name: String, apps: List<AppInfo>): Result<Unit> = runCatching {
+        val validation = AppGroupEditorPolicy.validate(name, apps)
+        require(validation.canSave) { validation.errorMessage.orEmpty() }
+        val groups = requireNotNull(appGroupRepository)
+        if (groupId == null) groups.create(validation.normalizedName, apps)
+        else groups.update(groupId, validation.normalizedName, apps)
+    }
+
+    fun deleteAppGroup(groupId: String): Result<Unit> = runCatching {
+        requireNotNull(appGroupRepository).delete(groupId)
+    }
+
+    fun activateAppGroup(groupId: String) {
+        viewModelScope.launch {
+            requireNotNull(updateGuardianStateUseCase).activateGroup(groupId)
+                .exceptionOrNull()
+                ?.message
+                ?.let { _appGroupMessages.emit("启用应用组失败：$it") }
+        }
+    }
+
+    private val _appGroupMessages = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    val appGroupMessages: SharedFlow<String> = _appGroupMessages.asSharedFlow()
 
     private fun update(transform: (AppSettings) -> AppSettings) {
         viewModelScope.launch { settingsRepository.update(transform) }

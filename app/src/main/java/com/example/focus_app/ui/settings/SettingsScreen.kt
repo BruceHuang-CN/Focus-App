@@ -48,6 +48,7 @@ fun SettingsScreen(
     onBack: () -> Unit,
     navigateToTargetApps: () -> Unit,
     navigateToCustomReturnPicker: () -> Unit,
+    navigateToAppGroups: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val s by viewModel.settings.collectAsState()
@@ -58,6 +59,9 @@ fun SettingsScreen(
     val followUpInterval by viewModel.followUpInterval.collectAsState()
     val keepAliveEnabled by viewModel.keepAliveEnabled.collectAsState()
     val themeSettings by viewModel.themeSettings.collectAsState()
+    val appGroups by viewModel.appGroups.collectAsState()
+    val activeAppGroupId by viewModel.activeAppGroupId.collectAsState()
+    val activeAppGroup = appGroups.firstOrNull { it.id == activeAppGroupId }
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     var overlayGranted by remember { mutableStateOf(PermissionHelper.hasOverlayPermission(context)) }
@@ -257,6 +261,23 @@ fun SettingsScreen(
             Divider()
 
             // ── 提醒时间 ──
+            SectionTitle("应用组管理")
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { navigateToAppGroups() }
+                    .padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    activeAppGroup?.let { "${it.name} · ${it.apps.size} 个 App" } ?: "管理应用组",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Text("→", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.outline)
+            }
+            Divider()
+
             SectionTitle("提醒时间")
             Text("提醒延迟", style = MaterialTheme.typography.titleMedium)
             PresetSelector(
