@@ -55,6 +55,24 @@ class UpdateGuardianStateUseCaseTest {
     }
 
     @Test
+    fun updating_active_group_mirrors_apps_and_resets_guardian_state() = runTest {
+        val fixture = fixture()
+        val activeId = fixture.groups.activeGroupId.value
+
+        val result = fixture.useCase.updateActiveGroup(
+            activeId,
+            "Social",
+            listOf(AppInfo("social.app", "Social"))
+        )
+
+        assertTrue(result.isSuccess)
+        assertEquals(listOf(AppInfo("social.app", "Social")), fixture.groups.groups.value.single().apps)
+        assertEquals(listOf(AppInfo("social.app", "Social")), fixture.settings.getSettings().targetApps)
+        assertEquals(listOf("cancel", "close", "settings", "quota"), fixture.events)
+        assertEquals(1L, fixture.cache.revision.value)
+    }
+
+    @Test
     fun missing_group_fails_without_changing_session_or_settings() = runTest {
         val fixture = fixture()
         val before = fixture.settings.getSettings()

@@ -29,7 +29,6 @@ import com.example.focus_app.ui.settings.CustomReturnAppPickerScreen
 import com.example.focus_app.ui.settings.AppGroupEditorScreen
 import com.example.focus_app.ui.settings.AppGroupsScreen
 import com.example.focus_app.ui.settings.SettingsScreen
-import com.example.focus_app.ui.settings.TargetAppsScreen
 import com.example.focus_app.ui.stats.StatsScreen
 import com.example.focus_app.ui.tasks.TaskListScreen
 import com.example.focus_app.util.PermissionHelper
@@ -41,7 +40,6 @@ sealed class Screen(val route: String) {
     object Mood : Screen("mood")
     object Settings : Screen("settings")
     object Stats : Screen("stats")
-    object TargetApps : Screen("target_apps")
     object CustomReturnPicker : Screen("custom_return_picker")
     object AppGroups : Screen("app_groups")
     object AppGroupEditor : Screen("app_group_editor/{groupId}") {
@@ -120,7 +118,6 @@ fun NavGraph() {
             composable(Screen.Settings.route) {
                 SettingsScreen(
                     onBack = { navController.popBackStack() },
-                    navigateToTargetApps = { navController.navigate(Screen.TargetApps.route) },
                     navigateToCustomReturnPicker = {
                         navController.navigate(Screen.CustomReturnPicker.route)
                     },
@@ -132,9 +129,6 @@ fun NavGraph() {
             }
             composable(Screen.Stats.route) {
                 StatsScreen(onBack = { navController.popBackStack() })
-            }
-            composable(Screen.TargetApps.route) {
-                TargetAppsScreen(onBack = { navController.popBackStack() })
             }
             composable(Screen.AppGroups.route) {
                 AppGroupsScreen(

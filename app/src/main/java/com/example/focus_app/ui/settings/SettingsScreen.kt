@@ -46,7 +46,6 @@ import kotlinx.coroutines.launch
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
-    navigateToTargetApps: () -> Unit,
     navigateToCustomReturnPicker: () -> Unit,
     navigateToAppGroups: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel()
@@ -131,7 +130,7 @@ fun SettingsScreen(
                 if (PermissionHelper.needsNotificationPermission(context)) {
                     notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                 }
-            PermissionCheckAction.OPEN_TARGET_APPS -> navigateToTargetApps()
+            PermissionCheckAction.OPEN_TARGET_APPS -> navigateToAppGroups()
             PermissionCheckAction.ENABLE_ACCESSIBILITY -> {
                 if (!s.enableAccessibility) {
                     viewModel.toggleAccessibility()
@@ -241,7 +240,7 @@ fun SettingsScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { navigateToTargetApps() }
+                    .clickable { navigateToAppGroups() }
                     .padding(vertical = 4.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically

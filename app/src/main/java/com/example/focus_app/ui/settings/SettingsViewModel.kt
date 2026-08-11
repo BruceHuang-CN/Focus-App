@@ -242,14 +242,16 @@ class SettingsViewModel @Inject constructor(
     fun updatePersonality(p: String) { update { it.copy(aiPersonality = p, toneKey = ReminderTone.fromKey(p)) } }
     fun toggleBreathingPause() { update { it.copy(enableBreathingPause = !it.enableBreathingPause) } }
     fun toggleAccessibility() { update { it.copy(enableAccessibility = !it.enableAccessibility) } }
-    fun updateTargetApps(apps: List<AppInfo>) { update { it.copy(targetApps = apps) } }
-
-    fun saveAppGroup(groupId: String?, name: String, apps: List<AppInfo>): Result<Unit> = runCatching {
+    suspend fun saveAppGroup(groupId: String?, name: String, apps: List<AppInfo>): Result<Unit> = runCatching {
         val validation = AppGroupEditorPolicy.validate(name, apps)
         require(validation.canSave) { validation.errorMessage.orEmpty() }
         val groups = requireNotNull(appGroupRepository)
         if (groupId == null) groups.create(validation.normalizedName, apps)
-        else groups.update(groupId, validation.normalizedName, apps)
+        else if (groupId == activeAppGroupId.value) {
+            requireNotNull(updateGuardianStateUseCase)
+                .updateActiveGroup(groupId, validation.normalizedName, apps)
+                .getOrThrow()
+        } else groups.update(groupId, validation.normalizedName, apps)
     }
 
     fun deleteAppGroup(groupId: String): Result<Unit> = runCatching {
@@ -258,10 +260,10 @@ class SettingsViewModel @Inject constructor(
 
     fun activateAppGroup(groupId: String) {
         viewModelScope.launch {
-            requireNotNull(updateGuardianStateUseCase).activateGroup(groupId)
-                .exceptionOrNull()
-                ?.message
-                ?.let { _appGroupMessages.emit("启用应用组失败：$it") }
+            val failure = requireNotNull(updateGuardianStateUseCase).activateGroup(groupId).exceptionOrNull()
+            if (failure != null) {
+                _appGroupMessages.emit("启用应用组失败：${failure.message ?: "请稍后重试"}")
+            }
         }
     }
 

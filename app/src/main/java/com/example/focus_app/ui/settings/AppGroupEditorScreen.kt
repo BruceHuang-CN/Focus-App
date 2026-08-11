@@ -18,12 +18,15 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -33,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.focus_app.data.repository.AppInfo
 import com.example.focus_app.util.loadInstalledApps
+import kotlinx.coroutines.launch
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
@@ -47,11 +51,13 @@ fun AppGroupEditorScreen(
     var name by remember(groupId) { mutableStateOf(group?.name.orEmpty()) }
     var selectedApps by remember(groupId) { mutableStateOf(group?.apps.orEmpty()) }
     var query by remember { mutableStateOf("") }
+    val snackbar = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
     val validation = AppGroupEditorPolicy.validate(name, selectedApps)
     val selectedPackages = selectedApps.map { it.packageName }.toSet()
     val filtered = installedApps.filter { query.isBlank() || it.appName.contains(query, true) || it.packageName.contains(query, true) }
 
-    Scaffold(topBar = {
+    Scaffold(snackbarHost = { SnackbarHost(snackbar) }, topBar = {
         TopAppBar(title = { Text(if (group == null) "新增应用组" else "编辑应用组") }, navigationIcon = {
             IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
         })
@@ -77,7 +83,17 @@ fun AppGroupEditorScreen(
                 }
             }
             validation.errorMessage?.let { Text(it) }
-            Button(onClick = { if (viewModel.saveAppGroup(groupId, name, selectedApps).isSuccess) onBack() }, enabled = validation.canSave, modifier = Modifier.fillMaxWidth()) { Text("保存") }
+            Button(
+                onClick = {
+                    scope.launch {
+                        val result = viewModel.saveAppGroup(groupId, name, selectedApps)
+                        if (result.isSuccess) onBack()
+                        else snackbar.showSnackbar("保存应用组失败：${result.exceptionOrNull()?.message ?: "请稍后重试"}")
+                    }
+                },
+                enabled = validation.canSave,
+                modifier = Modifier.fillMaxWidth()
+            ) { Text("保存") }
         }
     }
 }

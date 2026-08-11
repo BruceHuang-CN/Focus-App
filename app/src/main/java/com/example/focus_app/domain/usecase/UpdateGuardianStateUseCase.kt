@@ -1,6 +1,7 @@
 package com.example.focus_app.domain.usecase
 
 import com.example.focus_app.data.appgroup.AppGroupRepository
+import com.example.focus_app.data.repository.AppInfo
 import com.example.focus_app.data.repository.AppSessionRepository
 import com.example.focus_app.data.repository.ReminderCacheRepository
 import com.example.focus_app.data.repository.SettingsRepository
@@ -46,6 +47,16 @@ class UpdateGuardianStateUseCase private constructor(
         sessions.resetReminderQuota(quotaClock() - current.reminderWindowMinutes * 60_000L)
         reminderCache.requestRegeneration()
         groups.activate(groupId)
+    }
+
+    suspend fun updateActiveGroup(
+        groupId: String,
+        name: String,
+        apps: List<AppInfo>
+    ): Result<Unit> = runCatching {
+        require(groups.activeGroupId.value == groupId) { "Only the active app group can be updated here." }
+        groups.update(groupId, name, apps)
+        activateGroup(groupId).getOrThrow()
     }
 
     suspend fun setGuardianEnabled(enabled: Boolean) {

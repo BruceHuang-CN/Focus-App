@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
@@ -57,12 +59,14 @@ fun AppGroupsScreen(
             })
         }
     ) { padding ->
-        Column(
+        LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Button(onClick = onAdd, modifier = Modifier.fillMaxWidth()) { Text("新增应用组") }
-            groups.forEach { group ->
+            item {
+                Button(onClick = onAdd, modifier = Modifier.fillMaxWidth()) { Text("新增应用组") }
+            }
+            items(groups, key = { it.id }) { group ->
                 Column(modifier = Modifier.fillMaxWidth().clickable { onEdit(group.id) }.padding(vertical = 8.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(group.name, style = MaterialTheme.typography.titleMedium)
