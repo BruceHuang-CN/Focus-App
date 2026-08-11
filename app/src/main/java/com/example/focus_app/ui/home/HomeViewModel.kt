@@ -5,9 +5,13 @@ import androidx.lifecycle.viewModelScope
 import com.example.focus_app.data.repository.AppSessionRepository
 import com.example.focus_app.data.repository.MoodRepository
 import com.example.focus_app.data.repository.TaskRepository
+import com.example.focus_app.data.repository.SettingsRepository
+import com.example.focus_app.data.appgroup.AppGroupRepository
 import com.example.focus_app.domain.model.AppUsageSession
 import com.example.focus_app.domain.model.FocusTask
 import com.example.focus_app.domain.task.StreakCalculator
+import com.example.focus_app.domain.usecase.ResetReminderQuotaUseCase
+import com.example.focus_app.domain.usecase.UpdateGuardianStateUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -23,19 +27,47 @@ data class HomeUiState(
     val recentReminders: List<AppUsageSession> = emptyList(),
     val activeTask: FocusTask? = null,
     val completedToday: Int = 0,
-    val streakDays: Int = 0
+    val streakDays: Int = 0,
+    val guardianEnabled: Boolean = true,
+    val activeGroupName: String = "\u672a\u8bbe\u7f6e\u5e94\u7528\u7ec4"
 )
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val appSessionRepository: AppSessionRepository,
     private val moodRepository: MoodRepository,
-    private val taskRepository: TaskRepository
+    private val taskRepository: TaskRepository,
+    private val settingsRepository: SettingsRepository,
+    private val appGroupRepository: AppGroupRepository,
+    private val updateGuardianStateUseCase: UpdateGuardianStateUseCase,
+    private val resetReminderQuotaUseCase: ResetReminderQuotaUseCase
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
-    init { loadStats() }
+    init {
+        loadStats()
+        observeGuardianState()
+    }
+
+    private fun observeGuardianState() {
+        viewModelScope.launch {
+            combine(
+                settingsRepository.getSettingsFlow(),
+                appGroupRepository.groups,
+                appGroupRepository.activeGroupId
+            ) { settings, groups, activeGroupId ->
+                settings.guardianEnabled to groups.firstOrNull { it.id == activeGroupId }?.name
+            }.collect { (guardianEnabled, activeGroupName) ->
+                _uiState.update {
+                    it.copy(
+                        guardianEnabled = guardianEnabled,
+                        activeGroupName = activeGroupName ?: "\u672a\u8bbe\u7f6e\u5e94\u7528\u7ec4"
+                    )
+                }
+            }
+        }
+    }
 
     private fun loadStats() {
         viewModelScope.launch {
@@ -75,6 +107,14 @@ class HomeViewModel @Inject constructor(
     }
 
     fun refresh() { loadStats() }
+
+    fun setGuardianEnabled(enabled: Boolean) {
+        viewModelScope.launch { updateGuardianStateUseCase.setGuardianEnabled(enabled) }
+    }
+
+    fun resetReminderQuota() {
+        viewModelScope.launch { resetReminderQuotaUseCase() }
+    }
 
     private companion object {
         const val DAY_MILLIS = 86_400_000L
