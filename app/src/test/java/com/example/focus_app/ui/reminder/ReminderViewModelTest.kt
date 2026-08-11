@@ -6,6 +6,7 @@ import com.example.focus_app.domain.model.ReminderTone
 import com.example.focus_app.domain.model.ReturnDestination
 import com.example.focus_app.service.ReminderLaunchData
 import com.example.focus_app.service.ReminderLauncher
+import com.example.focus_app.service.ReminderPresentationRegistry
 import com.example.focus_app.service.SessionReminderScheduler
 import com.example.focus_app.service.CustomReturnResult
 import com.example.focus_app.ui.settings.TestFollowUpReminderStore
@@ -110,6 +111,7 @@ class ReminderViewModelTest {
     @Test
     fun failed_custom_return_keeps_the_reminder_open_and_does_not_record_an_exit() = runTest(dispatcher) {
         val fixture = fixture()
+        fixture.presentationRegistry.show(LAUNCH_DATA.sessionId)
         fixture.launcher.customLaunchSucceeds = false
         fixture.viewModel.init(
             LAUNCH_DATA.copy(
@@ -124,7 +126,20 @@ class ReminderViewModelTest {
 
         assertEquals(null, fixture.repository.action)
         assertEquals(false, completed)
+        assertEquals(true, fixture.presentationRegistry.isShowing())
         assertEquals("指定应用不可用，请重新选择", fixture.viewModel.uiState.value.customReturnError)
+    }
+
+    @Test
+    fun explicit_reminder_choice_clears_the_pending_presentation_first() = runTest(dispatcher) {
+        val fixture = fixture()
+        fixture.presentationRegistry.show(LAUNCH_DATA.sessionId)
+        fixture.viewModel.init(LAUNCH_DATA)
+
+        fixture.viewModel.continueTargetApp(LAUNCH_DATA.sessionId)
+        advanceUntilIdle()
+
+        assertEquals(false, fixture.presentationRegistry.isShowing())
     }
 
     private fun fixture(): Fixture {
@@ -133,11 +148,13 @@ class ReminderViewModelTest {
         val launcher = ActionRecordingLauncher(events)
         val scheduler = ActionRecordingScheduler()
         val store = TestFollowUpReminderStore().apply { minutes = 10 }
+        val presentationRegistry = ReminderPresentationRegistry()
         return Fixture(
-            ReminderViewModel(repository, launcher, scheduler, store),
+            ReminderViewModel(repository, launcher, scheduler, store, presentationRegistry),
             repository,
             launcher,
             scheduler,
+            presentationRegistry,
             events
         )
     }
@@ -147,6 +164,7 @@ class ReminderViewModelTest {
         val repository: ActionRecordingSessionRepository,
         val launcher: ActionRecordingLauncher,
         val scheduler: ActionRecordingScheduler,
+        val presentationRegistry: ReminderPresentationRegistry,
         val events: List<String>
     )
 

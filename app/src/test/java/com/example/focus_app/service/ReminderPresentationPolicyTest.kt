@@ -41,4 +41,10 @@ class ReminderPresentationPolicyTest {
         assertEquals(false, isReminderSessionCurrent(7L, 8L))
         assertEquals(false, isReminderSessionCurrent(0L, 0L))
     }
+
+    @Test
+    fun pending_reminder_protects_any_temporary_foreground_window() {
+        assertEquals(true, isReminderPresentationForForegroundChange(true))
+        assertEquals(false, isReminderPresentationForForegroundChange(false))
+    }
 }

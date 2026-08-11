@@ -104,6 +104,22 @@ class AppSessionCoordinatorTest {
     }
 
     @Test
+    fun pending_reminder_ignores_a_temporary_foreground_popup() = runTest {
+        val fixture = fixture()
+
+        fixture.coordinator.onPackageChanged(TARGET_A)
+        val sessionId = fixture.repository.sessions.single().id
+        fixture.coordinator.onPackageChanged(
+            packageName = "com.android.permissioncontroller",
+            isReminderPresentation = true
+        )
+
+        assertNull(fixture.repository.sessions.single().endedAt)
+        assertEquals(emptyList<Long>(), fixture.reminderScheduler.cancelledSessionIds)
+        assertEquals(sessionId, fixture.repository.currentOpenSession()?.id)
+    }
+
+    @Test
     fun compatibility_verifier_is_forwarded_to_the_delayed_reminder_check() = runTest {
         val fixture = fixture()
         val verifiedPackages = mutableListOf<String>()

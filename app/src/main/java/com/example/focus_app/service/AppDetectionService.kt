@@ -102,8 +102,9 @@ class AppDetectionService : Service() {
                         to = System.currentTimeMillis()
                     )?.packageName == expectedPackage
                 },
-                isReminderPresentation =
-                    foreground.packageName == packageName && reminderPresentationRegistry.isShowing()
+                isReminderPresentation = isReminderPresentationForForegroundChange(
+                    reminderPresentationRegistry.isShowing()
+                )
             )
         }
         return now

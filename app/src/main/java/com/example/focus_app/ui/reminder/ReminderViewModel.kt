@@ -7,6 +7,7 @@ import com.example.focus_app.data.followup.FollowUpReminderStore
 import com.example.focus_app.domain.model.ReturnDestination
 import com.example.focus_app.service.ReminderLaunchData
 import com.example.focus_app.service.ReminderLauncher
+import com.example.focus_app.service.ReminderPresentationRegistry
 import com.example.focus_app.service.SessionReminderScheduler
 import com.example.focus_app.service.CustomReturnResult
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -35,7 +36,8 @@ class ReminderViewModel @Inject constructor(
     private val sessionRepository: AppSessionRepository,
     private val launcher: ReminderLauncher,
     private val scheduler: SessionReminderScheduler,
-    private val followUpReminderStore: FollowUpReminderStore
+    private val followUpReminderStore: FollowUpReminderStore,
+    private val reminderPresentationRegistry: ReminderPresentationRegistry
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ReminderUiState())
     val uiState: StateFlow<ReminderUiState> = _uiState.asStateFlow()
@@ -66,6 +68,7 @@ class ReminderViewModel @Inject constructor(
 
     fun returnToFocus(sessionId: Long, onComplete: () -> Unit = {}) {
         val data = launchData?.takeIf { it.sessionId == sessionId } ?: return
+        reminderPresentationRegistry.hide(sessionId)
         viewModelScope.launch {
             sessionRepository.markUserAction(sessionId, "returned_to_focus")
             launcher.returnToFocus(data.taskId)
@@ -75,6 +78,7 @@ class ReminderViewModel @Inject constructor(
 
     fun returnHome(sessionId: Long, onComplete: () -> Unit = {}) {
         if (launchData?.sessionId != sessionId) return
+        reminderPresentationRegistry.hide(sessionId)
         viewModelScope.launch {
             sessionRepository.markUserAction(sessionId, "returned_home")
             launcher.returnHome()
@@ -87,6 +91,7 @@ class ReminderViewModel @Inject constructor(
         viewModelScope.launch {
             when (launcher.returnToCustom(data.returnPackageName)) {
                 CustomReturnResult.SUCCESS -> {
+                    reminderPresentationRegistry.hide(sessionId)
                     sessionRepository.markUserAction(sessionId, "returned_to_custom")
                     onComplete()
                 }
@@ -103,6 +108,7 @@ class ReminderViewModel @Inject constructor(
 
     fun continueTargetApp(sessionId: Long, onComplete: () -> Unit = {}) {
         if (launchData?.sessionId != sessionId) return
+        reminderPresentationRegistry.hide(sessionId)
         viewModelScope.launch {
             sessionRepository.markUserAction(sessionId, "continued")
             val minutes = followUpReminderStore.readMinutes().coerceIn(1, 120)

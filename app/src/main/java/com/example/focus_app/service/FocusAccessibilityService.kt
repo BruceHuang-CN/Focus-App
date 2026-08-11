@@ -31,6 +31,7 @@ private data class PackageChange(
 class FocusAccessibilityService : AccessibilityService() {
     @Inject lateinit var settingsRepository: SettingsRepository
     @Inject lateinit var appSessionCoordinator: AppSessionCoordinator
+    @Inject lateinit var reminderPresentationRegistry: ReminderPresentationRegistry
 
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private val packageChanges = Channel<PackageChange>(Channel.UNLIMITED)
@@ -67,7 +68,9 @@ class FocusAccessibilityService : AccessibilityService() {
         packageChanges.trySend(
             PackageChange(
                 packageName = pkg,
-                isReminderPresentation = event.className?.toString() == ReminderActivity::class.java.name
+                isReminderPresentation = isReminderPresentationForForegroundChange(
+                    reminderPresentationRegistry.isShowing()
+                )
             )
         )
     }

@@ -81,12 +81,16 @@ class ReminderActivity : ComponentActivity() {
     }
 
     override fun onStop() {
-        launchData?.let { reminderPresentationRegistry.hide(it.sessionId) }
         if (dismissReceiverRegistered) {
             unregisterReceiver(dismissReceiver)
             dismissReceiverRegistered = false
         }
         super.onStop()
+    }
+
+    override fun onDestroy() {
+        launchData?.let { reminderPresentationRegistry.hide(it.sessionId) }
+        super.onDestroy()
     }
 
     private fun renderIfSessionCurrent() {
