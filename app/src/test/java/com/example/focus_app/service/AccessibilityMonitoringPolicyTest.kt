@@ -8,7 +8,7 @@ import org.junit.Test
 
 class AccessibilityMonitoringPolicyTest {
     @Test
-    fun accessibility_events_require_realtime_mode_and_the_accessibility_toggle() {
+    fun accessibility_events_require_realtime_mode_accessibility_toggle_and_guardian_toggle() {
         assertTrue(
             shouldProcessAccessibilityEvents(
                 AppSettings(
@@ -30,6 +30,15 @@ class AccessibilityMonitoringPolicyTest {
                 AppSettings(
                     detectionMode = DetectionMode.COMPATIBILITY,
                     enableAccessibility = true
+                )
+            )
+        )
+        assertFalse(
+            shouldProcessAccessibilityEvents(
+                AppSettings(
+                    detectionMode = DetectionMode.REALTIME,
+                    enableAccessibility = true,
+                    guardianEnabled = false
                 )
             )
         )

@@ -42,13 +42,14 @@ class MainActivity : ComponentActivity() {
                 KeepAliveState(
                     mode = settings.detectionMode,
                     accessibilityEnabled = settings.enableAccessibility,
+                    guardianEnabled = settings.guardianEnabled,
                     keepAlive = keepAlive
                 )
             }
                 .distinctUntilChanged()
                 .collect { state ->
                     when {
-                        state.mode == DetectionMode.COMPATIBILITY -> {
+                        state.mode == DetectionMode.COMPATIBILITY && state.guardianEnabled -> {
                             stopKeepAliveService()
                             startCompatibilityService()
                         }
@@ -107,6 +108,7 @@ class MainActivity : ComponentActivity() {
     private data class KeepAliveState(
         val mode: DetectionMode,
         val accessibilityEnabled: Boolean,
+        val guardianEnabled: Boolean,
         val keepAlive: Boolean
     )
 }

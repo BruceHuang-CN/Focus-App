@@ -15,7 +15,9 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 internal fun shouldProcessAccessibilityEvents(settings: AppSettings): Boolean =
-    settings.detectionMode == DetectionMode.REALTIME && settings.enableAccessibility
+    settings.detectionMode == DetectionMode.REALTIME &&
+        settings.enableAccessibility &&
+        settings.guardianEnabled
 
 private data class PackageChange(
     val packageName: String,

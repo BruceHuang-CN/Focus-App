@@ -36,6 +36,16 @@ private data class ForegroundObservation(
     val timestamp: Long
 )
 
+private data class CompatibilityMonitoringState(
+    val mode: DetectionMode,
+    val guardianEnabled: Boolean
+)
+
+internal fun shouldRunCompatibilityMonitoring(
+    mode: DetectionMode,
+    guardianEnabled: Boolean
+): Boolean = mode == DetectionMode.COMPATIBILITY && guardianEnabled
+
 @AndroidEntryPoint
 class AppDetectionService : Service() {
     @Inject lateinit var settingsRepository: SettingsRepository
@@ -54,10 +64,15 @@ class AppDetectionService : Service() {
         pollingJob?.cancel()
         pollingJob = scope.launch {
             settingsRepository.getSettingsFlow()
-                .map { it.detectionMode }
+                .map {
+                    CompatibilityMonitoringState(
+                        mode = it.detectionMode,
+                        guardianEnabled = it.guardianEnabled
+                    )
+                }
                 .distinctUntilChanged()
-                .collectLatest { mode ->
-                    if (mode != DetectionMode.COMPATIBILITY) {
+                .collectLatest { state ->
+                    if (!shouldRunCompatibilityMonitoring(state.mode, state.guardianEnabled)) {
                         appSessionCoordinator.onPackageChanged(null)
                         stopSelf(startId)
                         return@collectLatest
