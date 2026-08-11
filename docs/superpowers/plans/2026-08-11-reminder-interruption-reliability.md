@@ -25,13 +25,13 @@
 - Modify: `app/src/main/java/com/example/focus_app/service/ReminderActivity.kt`
 - Modify: `app/src/main/java/com/example/focus_app/ui/reminder/ReminderViewModel.kt`
 - Test: `app/src/test/java/com/example/focus_app/service/AppSessionCoordinatorTest.kt`
-- Test: `app/src/test/java/com/example/focus_app/service/ReminderPresentationRegistryTest.kt`
+- Test: `app/src/test/java/com/example/focus_app/service/ReminderPresentationPolicyTest.kt`
 
 **Interfaces:**
 - Consumes `ReminderPresentationRegistry.show(sessionId)`, `hide(sessionId)`, and `isShowing()`.
 - Uses `AppSessionCoordinator.onPackageChanged(packageName, foregroundVerifier, isReminderPresentation)`.
 
-- [ ] **Step 1: Add the regression tests**
+- [x] **Step 1: Add the regression tests**
 
 ```kotlin
 @Test
@@ -49,24 +49,24 @@ fun pending_reminder_ignores_a_temporary_foreground_popup() = runTest {
 }
 ```
 
-Create `ReminderPresentationRegistryTest` asserting `show(12)`, `hide(11)`, and then `isShowing()` is true; then `hide(12)` makes it false.
+Add a policy test asserting `isReminderPresentationForForegroundChange(true)` is true and `isReminderPresentationForForegroundChange(false)` is false.
 
-- [ ] **Step 2: Run the focused tests before service and lifecycle changes**
+- [x] **Step 2: Run the focused tests before service and lifecycle changes**
 
 ```powershell
 $env:GRADLE_USER_HOME='C:\Users\6\.gradle'; .\gradlew.bat :app:testDebugUnitTest --no-daemon --no-configuration-cache --tests "com.example.focus_app.service.AppSessionCoordinatorTest" --tests "com.example.focus_app.service.ReminderPresentationRegistryTest"
 ```
 
-Expected: the narrow coordinator guard already passes; production wiring and lifecycle retention remain absent and are exercised by device regression after Step 4.
+Expected: compilation failure for the missing `isReminderPresentationForForegroundChange` policy function before the production implementation is added.
 
-- [ ] **Step 3: Add minimal pending-state wiring**
+- [x] **Step 3: Add minimal pending-state wiring**
 
 1. Inject `ReminderPresentationRegistry` into `FocusAccessibilityService`; set `PackageChange.isReminderPresentation` to `reminderPresentationRegistry.isShowing()`.
 2. In `AppDetectionService`, pass `reminderPresentationRegistry.isShowing()` without checking the foreground package is Focus.
 3. In `ReminderActivity`, retain `show` in `onStart`, remove `hide` from `onStop`, and call `hide` in `onDestroy`.
 4. In `ReminderViewModel`, inject the registry and call `hide(sessionId)` before each successful return/follow-up action, but not after a custom-return error.
 
-- [ ] **Step 4: Run focused tests and commit**
+- [x] **Step 4: Run focused tests and commit**
 
 ```powershell
 $env:GRADLE_USER_HOME='C:\Users\6\.gradle'; .\gradlew.bat :app:testDebugUnitTest --no-daemon --no-configuration-cache --tests "com.example.focus_app.service.AppSessionCoordinatorTest" --tests "com.example.focus_app.service.ReminderPresentationRegistryTest"
@@ -84,7 +84,7 @@ git commit -m "fix: preserve reminders through transient popups"
 **Interfaces:**
 - Produces `HomeViewModel.events: SharedFlow<HomeEvent>` where `HomeEvent.ReminderQuotaReset` is emitted only after `ResetReminderQuotaUseCase.invoke()` returns.
 
-- [ ] **Step 1: Add a failing reset event test**
+- [x] **Step 1: Add a failing reset event test**
 
 Use a suspending reset-use-case seam. Start `resetReminderQuota()`, assert no event while the seam is blocked, release it, then assert:
 
@@ -93,7 +93,7 @@ assertEquals(HomeEvent.ReminderQuotaReset, event)
 assertEquals(1, resetCalls)
 ```
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 ```powershell
 $env:GRADLE_USER_HOME='C:\Users\6\.gradle'; .\gradlew.bat :app:testDebugUnitTest --no-daemon --no-configuration-cache --tests "com.example.focus_app.ui.home.HomeViewModelGuardianTest"
@@ -101,13 +101,13 @@ $env:GRADLE_USER_HOME='C:\Users\6\.gradle'; .\gradlew.bat :app:testDebugUnitTest
 
 Expected: compilation error for missing `events` and `HomeEvent`.
 
-- [ ] **Step 3: Implement only the event and confirmation**
+- [x] **Step 3: Implement only the event and confirmation**
 
 1. Add `HomeEvent.ReminderQuotaReset` and a buffered `MutableSharedFlow` exposed as `events`.
 2. Emit the event after `resetReminderQuotaUseCase()` returns.
 3. Collect events in `HomeScreen` and show a `SnackbarHostState` message: `提醒额度已重置；下次进入目标应用后会按延迟提醒`.
 
-- [ ] **Step 4: Verify and commit**
+- [x] **Step 4: Verify and commit**
 
 ```powershell
 $env:GRADLE_USER_HOME='C:\Users\6\.gradle'; .\gradlew.bat :app:testDebugUnitTest --no-daemon --no-configuration-cache --tests "com.example.focus_app.ui.home.HomeViewModelGuardianTest"
@@ -120,13 +120,13 @@ git commit -m "fix: confirm reminder quota reset"
 **Files:**
 - Modify: `docs/superpowers/plans/2026-08-11-reminder-interruption-reliability.md`
 
-- [ ] **Step 1: Run full JVM tests and debug APK build**
+- [x] **Step 1: Run full JVM tests and debug APK build**
 
 ```powershell
 $env:GRADLE_USER_HOME='C:\Users\6\.gradle'; .\gradlew.bat :app:testDebugUnitTest :app:assembleDebug --no-daemon --no-configuration-cache
 ```
 
-- [ ] **Step 2: Mark tasks complete and commit verification record**
+- [x] **Step 2: Mark tasks complete and commit verification record**
 
 ```powershell
 git diff --check
