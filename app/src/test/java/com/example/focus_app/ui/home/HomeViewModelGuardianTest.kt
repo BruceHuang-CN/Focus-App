@@ -54,6 +54,8 @@ class HomeViewModelGuardianTest {
     fun disabled_guardian_with_active_group_is_exposed_in_home_state() = runTest(dispatcher) {
         val fixture = fixture(guardianEnabled = false)
         fixture.groups.create("\u5b66\u4e60\u7ec4", listOf(AppInfo("study.app", "Study")))
+        val created = fixture.groups.groups.value.single { it.name == "\u5b66\u4e60\u7ec4" }
+        fixture.updateGuardianState.activateGroup(created.id).getOrThrow()
         val viewModel = fixture.homeViewModel()
         runCurrent()
         assertFalse(viewModel.uiState.value.guardianEnabled)
