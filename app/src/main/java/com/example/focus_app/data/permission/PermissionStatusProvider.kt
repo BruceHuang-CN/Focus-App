@@ -27,8 +27,7 @@ class AndroidPermissionStatusProvider @Inject constructor(
     override fun usageStatsGranted(): Boolean =
         PermissionHelper.hasUsageStatsPermission(context)
 
-    override fun notificationGranted(): Boolean =
-        !PermissionHelper.needsNotificationPermission(context)
+    override fun notificationGranted(): Boolean = PermissionHelper.notificationsEnabled(context)
 
     override fun overlayGranted(): Boolean =
         PermissionHelper.hasOverlayPermission(context)

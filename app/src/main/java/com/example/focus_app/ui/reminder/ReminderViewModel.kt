@@ -106,7 +106,7 @@ class ReminderViewModel @Inject constructor(
 
     fun snooze(sessionId: Long, minutes: Int, onComplete: () -> Unit = {}) {
         if (launchData?.sessionId != sessionId) return
-        reminderPresentationRegistry.hide(sessionId)
+        reminderPresentationRegistry.keepSnoozeTransition(sessionId)
         viewModelScope.launch {
             val safeMinutes = minutes.coerceIn(1, 120)
             sessionRepository.markUserAction(sessionId, "snoozed_${safeMinutes}m")

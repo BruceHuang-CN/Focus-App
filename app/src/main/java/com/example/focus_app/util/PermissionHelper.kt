@@ -11,6 +11,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
 import android.os.Process
+import androidx.core.app.NotificationManagerCompat
 import android.provider.Settings
 import androidx.core.content.ContextCompat
 import com.example.focus_app.service.FocusAccessibilityService
@@ -45,6 +46,17 @@ object PermissionHelper {
                 Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                 Uri.parse("package:${context.packageName}")
             )
+        )
+    }
+
+    fun notificationsEnabled(context: Context): Boolean =
+        !needsNotificationPermission(context) &&
+            NotificationManagerCompat.from(context).areNotificationsEnabled()
+
+    fun openNotificationSettings(context: Context) {
+        context.startActivity(
+            Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
         )
     }
 

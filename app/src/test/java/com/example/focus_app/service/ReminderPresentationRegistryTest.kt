@@ -24,4 +24,20 @@ class ReminderPresentationRegistryTest {
 
         assertFalse(registry.isShowing())
     }
+
+    @Test
+    fun snoozed_reminder_keeps_session_protection_through_the_return_transition() {
+        var elapsedRealtime = 1_000L
+        val registry = ReminderPresentationRegistry { elapsedRealtime }
+
+        registry.show(sessionId = 9L, forceReminder = false)
+        registry.keepSnoozeTransition(sessionId = 9L)
+        registry.onActivityDestroyed(9L)
+
+        assertTrue(registry.isShowing())
+
+        elapsedRealtime += 8_001L
+
+        assertFalse(registry.isShowing())
+    }
 }

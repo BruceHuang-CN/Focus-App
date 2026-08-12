@@ -130,9 +130,7 @@ fun SettingsScreen(
             PermissionCheckAction.OPEN_OVERLAY ->
                 PermissionHelper.openOverlaySettings(context)
             PermissionCheckAction.REQUEST_NOTIFICATION ->
-                if (PermissionHelper.needsNotificationPermission(context)) {
-                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                }
+                PermissionHelper.openNotificationSettings(context)
             PermissionCheckAction.OPEN_TARGET_APPS -> navigateToAppGroups()
             PermissionCheckAction.ENABLE_ACCESSIBILITY -> {
                 if (!s.enableAccessibility) {
