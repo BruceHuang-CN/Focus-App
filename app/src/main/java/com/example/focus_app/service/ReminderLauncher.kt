@@ -113,7 +113,7 @@ class AndroidReminderLauncher @Inject constructor(
             },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        val notification = NotificationCompat.Builder(context, REMINDER_CHANNEL_ID)
+        val notification = NotificationCompat.Builder(context, REMINDER_ALERT_CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentTitle("Focus：先停一下")
             .setContentText(data.message)
@@ -131,7 +131,7 @@ class AndroidReminderLauncher @Inject constructor(
         val manager = context.getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(
             NotificationChannel(
-                REMINDER_CHANNEL_ID,
+                REMINDER_ALERT_CHANNEL_ID,
                 "Focus 任务召回",
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
@@ -146,6 +146,6 @@ class AndroidReminderLauncher @Inject constructor(
         const val ACTIVE_TASK_ID = "active_task_id"
         const val ACTION_DISMISS_REMINDER = "com.example.focus_app.action.DISMISS_REMINDER"
         const val EXTRA_DISMISS_SESSION_ID = "dismiss_session_id"
-        private const val REMINDER_CHANNEL_ID = "focus_task_reminders"
+        private const val REMINDER_ALERT_CHANNEL_ID = "focus_task_recall_alerts"
     }
 }

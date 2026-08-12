@@ -27,7 +27,7 @@ class ReminderPresentationPolicyTest {
     }
 
     @Test
-    fun overlay_permission_allows_direct_reminder_activity() {
+    fun overlay_permission_shows_direct_reminder_and_posts_notification() {
         var activityStarts = 0
         var notifications = 0
 
@@ -38,7 +38,7 @@ class ReminderPresentationPolicyTest {
         )
 
         assertEquals(1, activityStarts)
-        assertEquals(0, notifications)
+        assertEquals(1, notifications)
     }
 
     @Test

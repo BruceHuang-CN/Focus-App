@@ -70,6 +70,26 @@ object PermissionHelper {
         return powerManager.isIgnoringBatteryOptimizations(context.packageName)
     }
 
+    fun requestIgnoreBatteryOptimizations(context: Context) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M ||
+            isIgnoringBatteryOptimizations(context)
+        ) {
+            return
+        }
+        try {
+            context.startActivity(
+                Intent(
+                    Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                    Uri.parse("package:${context.packageName}")
+                )
+            )
+        } catch (_: ActivityNotFoundException) {
+            openBatteryOptimizationSettings(context)
+        } catch (_: SecurityException) {
+            openBatteryOptimizationSettings(context)
+        }
+    }
+
     fun openBatteryOptimizationSettings(context: Context) {
         try {
             context.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))

@@ -5,7 +5,8 @@ internal fun presentReminder(
     startActivity: () -> Unit,
     postNotification: () -> Unit
 ) {
-    if (canDrawOverlays) startActivity() else postNotification()
+    if (canDrawOverlays) startActivity()
+    postNotification()
 }
 
 internal fun isReminderSessionCurrent(sessionId: Long, currentSessionId: Long?): Boolean =

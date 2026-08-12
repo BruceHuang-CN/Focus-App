@@ -197,7 +197,7 @@ fun SettingsScreen(
             )
             BackgroundProtectionCard(
                 batteryOptimizationIgnored = batteryOptimizationIgnored,
-                onOpenSystemSettings = { PermissionHelper.openBatteryOptimizationSettings(context) }
+                onOpenSystemSettings = { PermissionHelper.requestIgnoreBatteryOptimizations(context) }
             )
 
 
@@ -742,7 +742,7 @@ private fun BackgroundProtectionCard(
                 style = MaterialTheme.typography.bodyMedium
             )
             if (!batteryOptimizationIgnored) {
-                TextButton(onClick = onOpenSystemSettings) { Text("\u6253\u5f00\u7cfb\u7edf\u8bbe\u7f6e") }
+                TextButton(onClick = onOpenSystemSettings) { Text("\u5141\u8bb8\u540e\u53f0\u4fdd\u62a4") }
             }
             Text(
                 "\u7cfb\u7edf\u201c\u5f3a\u884c\u505c\u6b62\u201d\u4f1a\u5173\u95ed\u540e\u53f0\u4efb\u52a1\uff1b\u8fd9\u662f Android \u7684\u5b89\u5168\u9650\u5236\uff0c\u91cd\u65b0\u6253\u5f00 Focus \u540e\u624d\u4f1a\u6062\u590d\u3002",
