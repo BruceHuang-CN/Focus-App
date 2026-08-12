@@ -13,3 +13,6 @@ internal fun isReminderSessionCurrent(sessionId: Long, currentSessionId: Long?):
 
 internal fun isReminderPresentationForForegroundChange(hasPendingReminder: Boolean): Boolean =
     hasPendingReminder
+
+internal fun shouldKeepReminderPending(forceReminder: Boolean, explicitAction: Boolean): Boolean =
+    forceReminder && !explicitAction

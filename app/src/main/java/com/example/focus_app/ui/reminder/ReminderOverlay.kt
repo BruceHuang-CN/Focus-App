@@ -13,11 +13,19 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
@@ -36,6 +44,11 @@ fun ReminderOverlay(
     viewModel: ReminderViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+
+    var exitMenuExpanded by remember { mutableStateOf(false) }
+    var snoozeMenuExpanded by remember { mutableStateOf(false) }
+    var customSnoozeVisible by remember { mutableStateOf(false) }
+    var customSnoozeMinutes by remember { mutableStateOf("") }
 
     LaunchedEffect(data) { viewModel.init(data) }
     LaunchedEffect(uiState.showBreathing, uiState.breathingStep) {
@@ -96,19 +109,12 @@ fun ReminderOverlay(
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Button(
-                            onClick = {
-                                when (uiState.returnDestination) {
-                                    ReturnDestination.FOCUS ->
-                                        viewModel.returnToFocus(data.sessionId, onDismiss)
-                                    ReturnDestination.HOME ->
-                                        viewModel.returnHome(data.sessionId, onDismiss)
-                                    ReturnDestination.CUSTOM ->
-                                        viewModel.returnToCustom(data.sessionId, onDismiss)
-                                }
-                            },
+                            onClick = { exitMenuExpanded = true },
                             modifier = Modifier.weight(1f),
                             colors = ButtonDefaults.buttonColors(containerColor = InkBlue)
                         ) {
+                            Text("\u9000\u51fa\u76ee\u6807\u5e94\u7528")
+                            if (false) {
                             Text(
                                 when (uiState.returnDestination) {
                                     ReturnDestination.FOCUS -> "不刷了，回到 Focus"
@@ -116,12 +122,92 @@ fun ReminderOverlay(
                                     ReturnDestination.CUSTOM -> "不刷了，去指定应用"
                                 }
                             )
+                            }
+                        }
+                        DropdownMenu(
+                            expanded = exitMenuExpanded,
+                            onDismissRequest = { exitMenuExpanded = false }
+                        ) {
+                            exitDestinations(uiState.returnPackageName).forEach { destination ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            when (destination) {
+                                                ReturnDestination.HOME -> "\u8fd4\u56de\u684c\u9762"
+                                                ReturnDestination.FOCUS -> "\u8fd4\u56de Focus"
+                                                ReturnDestination.CUSTOM -> "\u6253\u5f00\u6307\u5b9a\u5e94\u7528"
+                                            }
+                                        )
+                                    },
+                                    onClick = {
+                                        exitMenuExpanded = false
+                                        when (destination) {
+                                            ReturnDestination.FOCUS -> viewModel.returnToFocus(data.sessionId, onDismiss)
+                                            ReturnDestination.HOME -> viewModel.returnHome(data.sessionId, onDismiss)
+                                            ReturnDestination.CUSTOM -> viewModel.returnToCustom(data.sessionId, onDismiss)
+                                        }
+                                    }
+                                )
+                            }
                         }
                         OutlinedButton(
-                            onClick = { viewModel.continueTargetApp(data.sessionId, onDismiss) },
+                            onClick = { snoozeMenuExpanded = true },
                             modifier = Modifier.weight(1f)
                         ) {
+                            Text("\u7a0d\u540e\u63d0\u9192")
+                            if (false) {
                             Text("仍要使用")
+                            }
+                        }
+                        DropdownMenu(
+                            expanded = snoozeMenuExpanded,
+                            onDismissRequest = { snoozeMenuExpanded = false }
+                        ) {
+                            presetSnoozeMinutes.forEach { minutes ->
+                                DropdownMenuItem(
+                                    text = { Text("${minutes} \u5206\u949f\u540e\u63d0\u9192") },
+                                    onClick = {
+                                        snoozeMenuExpanded = false
+                                        viewModel.snooze(data.sessionId, minutes, onDismiss)
+                                    }
+                                )
+                            }
+                            DropdownMenuItem(
+                                text = { Text("\u81ea\u5b9a\u4e49\u5206\u949f\u6570") },
+                                onClick = {
+                                    snoozeMenuExpanded = false
+                                    customSnoozeVisible = true
+                                }
+                            )
+                        }
+                        if (customSnoozeVisible) {
+                            AlertDialog(
+                                onDismissRequest = { customSnoozeVisible = false },
+                                title = { Text("\u81ea\u5b9a\u4e49\u7a0d\u540e\u63d0\u9192") },
+                                text = {
+                                    OutlinedTextField(
+                                        value = customSnoozeMinutes,
+                                        onValueChange = { customSnoozeMinutes = it },
+                                        label = { Text("\u8bf7\u8f93\u5165 1-120 \u5206\u949f") },
+                                        singleLine = true
+                                    )
+                                },
+                                confirmButton = {
+                                    TextButton(
+                                        onClick = {
+                                            parseCustomSnoozeMinutes(customSnoozeMinutes)?.let { minutes ->
+                                                customSnoozeVisible = false
+                                                viewModel.snooze(data.sessionId, minutes, onDismiss)
+                                            }
+                                        }
+                                    ) { Text("\u786e\u5b9a") }
+                                },
+                                dismissButton = {
+                                    TextButton(onClick = { customSnoozeVisible = false }) {
+                                        Text("\u53d6\u6d88")
+                                    }
+                                }
+                            )
                         }
                     }
                 }

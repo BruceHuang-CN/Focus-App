@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
@@ -34,12 +35,23 @@ class ReminderActivity : ComponentActivity() {
                 AndroidReminderLauncher.EXTRA_DISMISS_SESSION_ID,
                 0L
             )
-            if (sessionId == launchData?.sessionId) finishAndRemoveTask()
+            if (sessionId == launchData?.sessionId) {
+                reminderPresentationRegistry.hide(sessionId)
+                finishAndRemoveTask()
+            }
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (launchData?.forceReminder != true) {
+                    isEnabled = false
+                    onBackPressedDispatcher.onBackPressed()
+                }
+            }
+        })
         val taskId = if (intent.hasExtra(ReminderLaunchData.EXTRA_TASK_ID)) {
             intent.getLongExtra(ReminderLaunchData.EXTRA_TASK_ID, 0L)
         } else {
@@ -70,7 +82,9 @@ class ReminderActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
-        launchData?.let { reminderPresentationRegistry.show(it.sessionId) }
+        launchData?.let { data ->
+            reminderPresentationRegistry.show(data.sessionId, data.forceReminder)
+        }
         ContextCompat.registerReceiver(
             this,
             dismissReceiver,
@@ -90,7 +104,7 @@ class ReminderActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
-        launchData?.let { reminderPresentationRegistry.hide(it.sessionId) }
+        launchData?.let { reminderPresentationRegistry.onActivityDestroyed(it.sessionId) }
         super.onDestroy()
     }
 

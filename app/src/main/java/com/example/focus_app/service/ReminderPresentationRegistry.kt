@@ -5,16 +5,29 @@ import javax.inject.Singleton
 
 @Singleton
 class ReminderPresentationRegistry @Inject constructor() {
-    @Volatile
-    private var activeSessionId: Long? = null
+    private data class Presentation(
+        val sessionId: Long,
+        val forceReminder: Boolean
+    )
 
-    fun show(sessionId: Long) {
-        activeSessionId = sessionId
+    @Volatile
+    private var activePresentation: Presentation? = null
+
+    fun show(sessionId: Long, forceReminder: Boolean = false) {
+        activePresentation = Presentation(sessionId, forceReminder)
     }
 
     fun hide(sessionId: Long) {
-        if (activeSessionId == sessionId) activeSessionId = null
+        if (activePresentation?.sessionId == sessionId) activePresentation = null
     }
 
-    fun isShowing(): Boolean = activeSessionId != null
+
+    fun onActivityDestroyed(sessionId: Long) {
+        val presentation = activePresentation ?: return
+        if (presentation.sessionId != sessionId) return
+        if (!shouldKeepReminderPending(presentation.forceReminder, explicitAction = false)) {
+            activePresentation = null
+        }
+    }
+    fun isShowing(): Boolean = activePresentation != null
 }

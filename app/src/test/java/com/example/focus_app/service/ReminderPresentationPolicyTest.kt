@@ -5,6 +5,13 @@ import org.junit.Test
 
 class ReminderPresentationPolicyTest {
     @Test
+    fun forced_reminder_requires_an_explicit_action_to_clear_pending_state() {
+        assertEquals(true, shouldKeepReminderPending(forceReminder = true, explicitAction = false))
+        assertEquals(false, shouldKeepReminderPending(forceReminder = true, explicitAction = true))
+        assertEquals(false, shouldKeepReminderPending(forceReminder = false, explicitAction = false))
+    }
+
+    @Test
     fun missing_overlay_permission_posts_notification_without_starting_activity() {
         var activityStarts = 0
         var notifications = 0
