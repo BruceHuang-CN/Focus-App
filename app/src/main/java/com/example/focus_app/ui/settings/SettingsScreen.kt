@@ -760,6 +760,7 @@ private fun BackgroundProtectionCard(
     }
 }
 
+@Composable
 private fun SectionTitle(title: String) {
     Text(
         title,
