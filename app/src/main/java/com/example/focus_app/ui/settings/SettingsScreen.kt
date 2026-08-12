@@ -65,6 +65,7 @@ fun SettingsScreen(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     var overlayGranted by remember { mutableStateOf(PermissionHelper.hasOverlayPermission(context)) }
+    var batteryOptimizationIgnored by remember { mutableStateOf(PermissionHelper.isIgnoringBatteryOptimizations(context)) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     var settingsEdited by remember { mutableStateOf(false) }
@@ -95,6 +96,7 @@ fun SettingsScreen(
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 overlayGranted = PermissionHelper.hasOverlayPermission(context)
+                batteryOptimizationIgnored = PermissionHelper.isIgnoringBatteryOptimizations(context)
                 viewModel.refreshPermissions()
                 if (viewModel.settings.value.detectionMode == DetectionMode.REALTIME &&
                     PermissionHelper.isAccessibilityServiceEnabled(context)
@@ -195,6 +197,11 @@ fun SettingsScreen(
                 items = permissionItems,
                 onAction = ::handlePermissionAction
             )
+            BackgroundProtectionCard(
+                batteryOptimizationIgnored = batteryOptimizationIgnored,
+                onOpenSystemSettings = { PermissionHelper.openBatteryOptimizationSettings(context) }
+            )
+
 
             // ── 外观主题 ──
             SectionTitle("外观主题")
@@ -718,6 +725,41 @@ private fun ThemeColorSwatch(
 }
 
 @Composable
+private fun BackgroundProtectionCard(
+    batteryOptimizationIgnored: Boolean,
+    onOpenSystemSettings: () -> Unit
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text("\u540e\u53f0\u4fdd\u62a4", style = MaterialTheme.typography.titleMedium)
+            Text(
+                if (batteryOptimizationIgnored) {
+                    "\u5df2\u5141\u8bb8\u7cfb\u7edf\u5ffd\u7565\u7535\u6c60\u4f18\u5316\uff1b\u7a0d\u540e\u63d0\u9192\u5728\u666e\u901a\u540e\u53f0\u56de\u6536\u540e\u4ecd\u53ef\u7ee7\u7eed\u6267\u884c\u3002"
+                } else {
+                    "\u672a\u5141\u8bb8\u5ffd\u7565\u7535\u6c60\u4f18\u5316\uff1b\u7cfb\u7edf\u53ef\u80fd\u5ef6\u540e\u6216\u53d6\u6d88\u540e\u53f0\u7684\u7a0d\u540e\u63d0\u9192\u3002"
+                },
+                style = MaterialTheme.typography.bodyMedium
+            )
+            if (!batteryOptimizationIgnored) {
+                TextButton(onClick = onOpenSystemSettings) { Text("\u6253\u5f00\u7cfb\u7edf\u8bbe\u7f6e") }
+            }
+            Text(
+                "\u7cfb\u7edf\u201c\u5f3a\u884c\u505c\u6b62\u201d\u4f1a\u5173\u95ed\u540e\u53f0\u4efb\u52a1\uff1b\u8fd9\u662f Android \u7684\u5b89\u5168\u9650\u5236\uff0c\u91cd\u65b0\u6253\u5f00 Focus \u540e\u624d\u4f1a\u6062\u590d\u3002",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.outline
+            )
+            Text(
+                PermissionHelper.backgroundProtectionHint(),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.outline
+            )
+        }
+    }
+}
+
 private fun SectionTitle(title: String) {
     Text(
         title,

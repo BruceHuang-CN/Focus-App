@@ -41,7 +41,8 @@ class ReminderScheduler(
     private val clock: Clock,
     private val scope: CoroutineScope,
     private val settingsProvider: suspend () -> AppSettings,
-    private val launchDataProvider: suspend (AppUsageSession, AppSettings) -> ReminderLaunchData
+    private val launchDataProvider: suspend (AppUsageSession, AppSettings) -> ReminderLaunchData,
+    private val followUpWorkScheduler: FollowUpReminderWorkScheduler = NoOpFollowUpReminderWorkScheduler
 ) : SessionReminderScheduler {
     private val jobs = ConcurrentHashMap<Long, Job>()
     private val quotaMutex = Mutex()
@@ -54,13 +55,15 @@ class ReminderScheduler(
         taskRepository: TaskRepository,
         cacheRepository: ReminderCacheRepository,
         launcher: ReminderLauncher,
-        customReturnAppStore: CustomReturnAppStore
+        customReturnAppStore: CustomReturnAppStore,
+        followUpWorkScheduler: FollowUpReminderWorkScheduler
     ) : this(
         repository = repository,
         launcher = launcher,
         clock = SystemClock,
         scope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
         settingsProvider = settingsRepository::getSettings,
+        followUpWorkScheduler = followUpWorkScheduler,
         launchDataProvider = { session, settings ->
             val taskTitle = session.taskId?.let { taskId ->
                 taskRepository.observeAll().first().firstOrNull { it.id == taskId }?.title
@@ -112,32 +115,14 @@ class ReminderScheduler(
 
     override fun cancel(sessionId: Long) {
         jobs.remove(sessionId)?.cancel()
+        followUpWorkScheduler.cancel(sessionId)
         launcher.dismiss(sessionId)
     }
 
     /**
      * 用户点击「仍要使用」后，在同一会话内按间隔再次提醒（受窗口额度限制）。
      */
-    override fun scheduleFollowUp(sessionId: Long, delayMillis: Long) {
-        val job = scope.launch {
-            delay(delayMillis)
-            val settings = settingsProvider()
-            quotaMutex.withLock {
-                val since = clock.nowMillis() - settings.reminderWindowMinutes * 60_000L
-                if (!policy.canShow(repository.reminderTimesSince(since), settings)) {
-                    return@withLock
-                }
-                val session = repository.sessionById(sessionId) ?: return@withLock
-                if (session.endedAt != null) return@withLock
-                if (repository.currentOpenSession()?.id != sessionId) return@withLock
-                repository.updateRemindedAt(sessionId, clock.nowMillis())
-                val data = launchDataProvider(session, settings)
-                launcher.show(data)
-            }
-        }
-        jobs.put(sessionId, job)?.cancel()
-        job.invokeOnCompletion { jobs.remove(sessionId, job) }
-    }
+    override fun scheduleFollowUp(sessionId: Long, delayMillis: Long) = followUpWorkScheduler.schedule(sessionId, delayMillis)
 
     private companion object {
         fun localFallback(appName: String, taskTitle: String?): String =

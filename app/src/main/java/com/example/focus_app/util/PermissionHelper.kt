@@ -2,12 +2,14 @@ package com.example.focus_app.util
 
 import android.Manifest
 import android.app.AppOpsManager
+import android.content.ActivityNotFoundException
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.os.PowerManager
 import android.os.Process
 import android.provider.Settings
 import androidx.core.content.ContextCompat
@@ -48,6 +50,32 @@ object PermissionHelper {
 
     fun openUsageStatsSettings(context: Context) {
         context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
+    }
+
+    fun isIgnoringBatteryOptimizations(context: Context): Boolean {
+        val powerManager = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
+            ?: return false
+        return powerManager.isIgnoringBatteryOptimizations(context.packageName)
+    }
+
+    fun openBatteryOptimizationSettings(context: Context) {
+        try {
+            context.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+        } catch (_: ActivityNotFoundException) {
+            context.startActivity(
+                Intent(
+                    Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                    Uri.parse("package:${context.packageName}")
+                )
+            )
+        }
+    }
+
+    fun backgroundProtectionHint(): String = when (Build.MANUFACTURER.lowercase()) {
+        "xiaomi", "redmi" -> "\u82e5\u4ecd\u6709\u5ef6\u8fdf\uff0c\u53ef\u5728\u5b89\u5168\u4e2d\u5fc3\u5141\u8bb8\u81ea\u542f\u52a8\u548c\u540e\u53f0\u6d3b\u52a8\u3002"
+        "huawei", "honor" -> "\u82e5\u4ecd\u6709\u5ef6\u8fdf\uff0c\u53ef\u5728\u5e94\u7528\u542f\u52a8\u7ba1\u7406\u5141\u8bb8\u81ea\u542f\u52a8\u548c\u540e\u53f0\u6d3b\u52a8\u3002"
+        "oppo", "realme", "vivo", "iqoo" -> "\u82e5\u4ecd\u6709\u5ef6\u8fdf\uff0c\u53ef\u5728\u7cfb\u7edf\u7ba1\u5bb6\u4e2d\u5141\u8bb8\u81ea\u542f\u52a8\u548c\u540e\u53f0\u6d3b\u52a8\u3002"
+        else -> "\u4e0d\u540c\u54c1\u724c\u540d\u79f0\u4e0d\u540c\uff1b\u8bf7\u5141\u8bb8 Focus \u81ea\u542f\u52a8\u548c\u540e\u53f0\u6d3b\u52a8\u3002"
     }
 
     fun isOnboardingDone(context: Context): Boolean {

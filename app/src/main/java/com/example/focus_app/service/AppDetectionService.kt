@@ -4,6 +4,7 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
+import android.app.PendingIntent
 import android.app.usage.UsageStatsManager
 import android.app.usage.UsageEvents
 import android.content.Context
@@ -12,6 +13,7 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import com.example.focus_app.MainActivity
 import com.example.focus_app.data.repository.SettingsRepository
 import com.example.focus_app.domain.model.DetectionMode
 import dagger.hilt.android.AndroidEntryPoint
@@ -143,8 +145,16 @@ class AppDetectionService : Service() {
             getSystemService(NotificationManager::class.java).createNotificationChannel(
                 NotificationChannel(channelId, "专注检测", NotificationManager.IMPORTANCE_LOW).apply { description = "Focus 正在守护你的专注力" })
         }
+        val openFocus = PendingIntent.getActivity(
+            this,
+            NOTIFICATION_ID,
+            Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         return NotificationCompat.Builder(this, channelId).setContentTitle("Focus 专注助手").setContentText("正在为你守护专注力...")
-            .setSmallIcon(android.R.drawable.ic_menu_view).setPriority(NotificationCompat.PRIORITY_LOW).setOngoing(true).build()
+            .setSmallIcon(android.R.drawable.ic_menu_view).setPriority(NotificationCompat.PRIORITY_LOW).setOngoing(true)
+            .setContentIntent(openFocus).build()
     }
 
     override fun onDestroy() {
