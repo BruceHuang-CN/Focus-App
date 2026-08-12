@@ -107,7 +107,10 @@ class AndroidReminderLauncher @Inject constructor(
         val contentIntent = PendingIntent.getActivity(
             context,
             notificationId,
-            reminderIntent(data),
+            Intent(context, MainActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                data.taskId?.let { putExtra(ACTIVE_TASK_ID, it) }
+            },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         val notification = NotificationCompat.Builder(context, REMINDER_CHANNEL_ID)

@@ -50,7 +50,12 @@ fun CustomReturnAppPickerScreen(
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
                     }
-                }
+                },
+                actions = {
+                    TextButton(onClick = onBack) {
+                        Text("\u5b8c\u6210")
+                    }
+                },
             )
         }
     ) { padding ->
@@ -70,7 +75,6 @@ fun CustomReturnAppPickerScreen(
                             .fillMaxWidth()
                             .clickable {
                                 viewModel.updateCustomReturnPackage(app.packageName)
-                                onBack()
                             }
                             .padding(horizontal = 16.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically

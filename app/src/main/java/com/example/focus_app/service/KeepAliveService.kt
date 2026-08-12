@@ -3,11 +3,13 @@ package com.example.focus_app.service
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
+import com.example.focus_app.MainActivity
 
 /**
  * 实时模式下的低打扰前台服务：仅用于保活进程，不做任何轮询。
@@ -37,12 +39,19 @@ class KeepAliveService : Service() {
                 }
             )
         }
+        val openFocus = PendingIntent.getActivity(
+            this, 0,
+            Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Focus 正在守护专注")
             .setContentText("打开目标应用时提醒你回到任务")
             .setSmallIcon(android.R.drawable.ic_menu_view)
             .setPriority(NotificationCompat.PRIORITY_MIN)
             .setOngoing(true)
+            .setContentIntent(openFocus)
             .build()
     }
 
