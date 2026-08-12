@@ -3,7 +3,6 @@ package com.example.focus_app.ui.reminder
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.focus_app.data.repository.AppSessionRepository
-import com.example.focus_app.data.followup.FollowUpReminderStore
 import com.example.focus_app.domain.model.ReturnDestination
 import com.example.focus_app.service.ReminderLaunchData
 import com.example.focus_app.service.ReminderLauncher
@@ -36,7 +35,6 @@ class ReminderViewModel @Inject constructor(
     private val sessionRepository: AppSessionRepository,
     private val launcher: ReminderLauncher,
     private val scheduler: SessionReminderScheduler,
-    private val followUpReminderStore: FollowUpReminderStore,
     private val reminderPresentationRegistry: ReminderPresentationRegistry
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ReminderUiState())
@@ -106,14 +104,17 @@ class ReminderViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(customReturnError = message)
     }
 
-    fun continueTargetApp(sessionId: Long, onComplete: () -> Unit = {}) {
+    fun snooze(sessionId: Long, minutes: Int, onComplete: () -> Unit = {}) {
         if (launchData?.sessionId != sessionId) return
         reminderPresentationRegistry.hide(sessionId)
         viewModelScope.launch {
-            sessionRepository.markUserAction(sessionId, "continued")
-            val minutes = followUpReminderStore.readMinutes().coerceIn(1, 120)
-            scheduler.scheduleFollowUp(sessionId, minutes * 60_000L)
+            val safeMinutes = minutes.coerceIn(1, 120)
+            sessionRepository.markUserAction(sessionId, "snoozed_${safeMinutes}m")
+            scheduler.scheduleFollowUp(sessionId, safeMinutes * 60_000L)
             onComplete()
         }
+    }
+    fun continueTargetApp(sessionId: Long, onComplete: () -> Unit = {}) {
+        snooze(sessionId, 10, onComplete)
     }
 }

@@ -98,6 +98,7 @@ class AndroidReminderLauncher @Inject constructor(
             putExtra(ReminderLaunchData.EXTRA_WINDOW_LIMIT, data.windowLimit)
             putExtra(ReminderLaunchData.EXTRA_WINDOW_MINUTES, data.windowMinutes)
             putExtra(ReminderLaunchData.EXTRA_RETURN_PACKAGE_NAME, data.returnPackageName)
+            putExtra(ReminderLaunchData.EXTRA_FORCE_REMINDER, data.forceReminder)
         }
 
     private fun postReminderNotification(data: ReminderLaunchData) {

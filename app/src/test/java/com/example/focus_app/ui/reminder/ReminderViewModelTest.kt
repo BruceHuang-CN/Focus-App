@@ -9,7 +9,6 @@ import com.example.focus_app.service.ReminderLauncher
 import com.example.focus_app.service.ReminderPresentationRegistry
 import com.example.focus_app.service.SessionReminderScheduler
 import com.example.focus_app.service.CustomReturnResult
-import com.example.focus_app.ui.settings.TestFollowUpReminderStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -76,16 +75,16 @@ class ReminderViewModelTest {
     }
 
     @Test
-    fun continue_target_app_only_records_the_choice() = runTest(dispatcher) {
+    fun snooze_uses_the_minutes_selected_in_the_overlay() = runTest(dispatcher) {
         val fixture = fixture()
         fixture.viewModel.init(LAUNCH_DATA)
 
-        fixture.viewModel.continueTargetApp(LAUNCH_DATA.sessionId)
+        fixture.viewModel.snooze(LAUNCH_DATA.sessionId, 5)
         advanceUntilIdle()
 
-        assertEquals("continued", fixture.repository.action)
+        assertEquals("snoozed_5m", fixture.repository.action)
         assertEquals(LAUNCH_DATA.sessionId, fixture.scheduler.followUpSessionId)
-        assertEquals(600_000L, fixture.scheduler.followUpDelay)
+        assertEquals(300_000L, fixture.scheduler.followUpDelay)
         assertEquals(null, fixture.launcher.focusTaskId)
         assertEquals(0, fixture.launcher.homeRequests)
     }
@@ -136,7 +135,7 @@ class ReminderViewModelTest {
         fixture.presentationRegistry.show(LAUNCH_DATA.sessionId)
         fixture.viewModel.init(LAUNCH_DATA)
 
-        fixture.viewModel.continueTargetApp(LAUNCH_DATA.sessionId)
+        fixture.viewModel.snooze(LAUNCH_DATA.sessionId, 5)
         advanceUntilIdle()
 
         assertEquals(false, fixture.presentationRegistry.isShowing())
@@ -147,10 +146,9 @@ class ReminderViewModelTest {
         val repository = ActionRecordingSessionRepository(events)
         val launcher = ActionRecordingLauncher(events)
         val scheduler = ActionRecordingScheduler()
-        val store = TestFollowUpReminderStore().apply { minutes = 10 }
         val presentationRegistry = ReminderPresentationRegistry()
         return Fixture(
-            ReminderViewModel(repository, launcher, scheduler, store, presentationRegistry),
+            ReminderViewModel(repository, launcher, scheduler, presentationRegistry),
             repository,
             launcher,
             scheduler,

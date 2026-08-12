@@ -61,7 +61,8 @@ class ReminderActivity : ComponentActivity() {
             ),
             windowLimit = intent.getIntExtra(ReminderLaunchData.EXTRA_WINDOW_LIMIT, 0),
             windowMinutes = intent.getIntExtra(ReminderLaunchData.EXTRA_WINDOW_MINUTES, 0),
-            returnPackageName = intent.getStringExtra(ReminderLaunchData.EXTRA_RETURN_PACKAGE_NAME).orEmpty()
+            returnPackageName = intent.getStringExtra(ReminderLaunchData.EXTRA_RETURN_PACKAGE_NAME).orEmpty(),
+            forceReminder = intent.getBooleanExtra(ReminderLaunchData.EXTRA_FORCE_REMINDER, false)
         )
 
         renderIfSessionCurrent()

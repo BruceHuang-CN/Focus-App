@@ -80,7 +80,8 @@ class ReminderScheduler(
                 windowReminderCount = repository.countShownRemindersSince(since),
                 windowLimit = settings.maxRemindersPerWindow,
                 windowMinutes = settings.reminderWindowMinutes,
-                returnPackageName = customReturnAppStore.read()
+                returnPackageName = customReturnAppStore.read(),
+                forceReminder = settings.forceReminder
             )
         }
     )
