@@ -26,7 +26,8 @@ data class SettingsEntity(
     @ColumnInfo(defaultValue = "30") val dailyShortVideoLimitMinutes: Int = 30,
     @ColumnInfo(defaultValue = "'gentle'") val toneKey: String = "gentle",
     @ColumnInfo(defaultValue = "''") val customToneInstruction: String = "",
-    @ColumnInfo(defaultValue = "1") val guardianEnabled: Boolean = true
+    @ColumnInfo(defaultValue = "1") val guardianEnabled: Boolean = true,
+    @ColumnInfo(defaultValue = "0") val forceReminder: Boolean = false
 ) {
     @get:Ignore
     val apiKey: String

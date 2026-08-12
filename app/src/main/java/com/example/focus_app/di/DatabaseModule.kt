@@ -12,6 +12,7 @@ import com.example.focus_app.data.local.dao.MoodRecordDao
 import com.example.focus_app.data.local.dao.SettingsDao
 import com.example.focus_app.data.local.migration.MIGRATION_1_2
 import com.example.focus_app.data.local.migration.MIGRATION_2_3
+import com.example.focus_app.data.local.migration.MIGRATION_3_4
 import com.example.focus_app.data.repository.AppSessionRepository
 import com.example.focus_app.data.repository.RoomAppSessionRepository
 import com.example.focus_app.data.repository.SettingsRepository
@@ -46,7 +47,7 @@ object DatabaseModule {
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): AppDatabase {
         return Room.databaseBuilder(context, AppDatabase::class.java, "focus_app_db")
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
             .build()
     }
 

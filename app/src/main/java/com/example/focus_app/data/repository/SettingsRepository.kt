@@ -28,6 +28,7 @@ data class AppSettings(
     val aiPersonality: String = "gentle",
     val enableAccessibility: Boolean = false,
     val guardianEnabled: Boolean = true,
+    val forceReminder: Boolean = false,
     val enableBreathingPause: Boolean = true,
     val reminderDelaySeconds: Int = 10,
     val reminderWindowMinutes: Int = 60,
