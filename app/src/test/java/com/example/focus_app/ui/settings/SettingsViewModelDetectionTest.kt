@@ -96,6 +96,20 @@ class SettingsViewModelDetectionTest {
 
         assertEquals("compatibility", dao.current.detectionMode)
     }
+    @Test
+    fun setting_force_reminder_persists_only_the_force_reminder_field() = runTest(dispatcher) {
+        val initial = SettingsEntity(targetApps = "[]", guardianEnabled = true)
+        val dao = DetectionSettingsDao(initial)
+        val viewModel = newViewModel(dao)
+        runCurrent()
+
+        viewModel.setForceReminder(true)
+        runCurrent()
+
+        assertTrue(dao.current.forceReminder)
+        assertTrue(dao.current.guardianEnabled)
+        assertEquals("[]", dao.current.targetApps)
+    }
 
     private fun newViewModel(dao: DetectionSettingsDao): SettingsViewModel =
         newViewModel(dao, TestCustomReturnAppStore(), TestFollowUpReminderStore(), TestKeepAliveStore())

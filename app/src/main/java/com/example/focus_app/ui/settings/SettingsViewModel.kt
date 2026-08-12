@@ -130,6 +130,8 @@ class SettingsViewModel @Inject constructor(
         update { it.copy(maxRemindersPerWindow = count.coerceIn(1, 20)) }
     }
 
+    fun setForceReminder(enabled: Boolean) { update { it.copy(forceReminder = enabled) } }
+
     fun updateDailyShortVideoLimitMinutes(minutes: Int) {
         update { it.copy(dailyShortVideoLimitMinutes = minutes.coerceIn(1, 1_440)) }
     }

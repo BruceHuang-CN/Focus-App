@@ -317,7 +317,29 @@ fun SettingsScreen(
                     }
                 )
             }
+            /* Legacy follow-up interval label retained temporarily. The overlay now owns this choice.
             Text("再次提醒间隔（点“仍要使用”后）", style = MaterialTheme.typography.titleMedium)
+            */
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("\u5f3a\u5236\u63d0\u9192", style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        "\u5f00\u542f\u540e\uff0c\u8fd4\u56de\u952e\u3001Home \u952e\u6216\u4e34\u65f6\u7cfb\u7edf\u7a97\u53e3\u4e0d\u4f1a\u89c6\u4e3a\u5df2\u5904\u7406\uff1b\u8bf7\u5728\u5f39\u7a97\u4e2d\u660e\u786e\u9009\u62e9\u3002",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                }
+                Switch(
+                    checked = s.forceReminder,
+                    onCheckedChange = { enabled ->
+                        viewModel.setForceReminder(enabled)
+                        onSettingChanged(
+                            if (enabled) "\u5f00\u542f\u5f3a\u5236\u63d0\u9192" else "\u5173\u95ed\u5f3a\u5236\u63d0\u9192"
+                        )
+                    }
+                )
+            }
+            /* Legacy follow-up interval selector retained temporarily.
             PresetSelector(
                 presets = listOf(1, 5, 10, 15, 30),
                 customRange = 1..120,
@@ -329,6 +351,7 @@ fun SettingsScreen(
                 }
             )
             Divider()
+            */
 
             // ── 提醒次数 ──
             SectionTitle("提醒次数")
@@ -474,6 +497,7 @@ fun SettingsScreen(
             }
             Divider()
 
+            /* Legacy return destination radio UI retained temporarily. The overlay now owns this choice.
             // ── 返回行为 ──
             SectionTitle("返回行为")
             ReturnDestination.entries.forEach { destination ->
@@ -488,7 +512,8 @@ fun SettingsScreen(
                     Text(returnLabel(destination))
                 }
             }
-            if (s.returnDestination == ReturnDestination.CUSTOM) {
+            */
+            run {
                 val selectedAppName = remember(customReturnPackage) {
                     loadInstalledApps(context)
                         .firstOrNull { it.packageName == customReturnPackage }

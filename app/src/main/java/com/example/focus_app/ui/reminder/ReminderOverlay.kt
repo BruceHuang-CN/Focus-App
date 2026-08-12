@@ -8,10 +8,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
@@ -108,12 +111,17 @@ fun ReminderOverlay(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
+                        Box(modifier = Modifier.weight(1f)) {
                         Button(
                             onClick = { exitMenuExpanded = true },
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.fillMaxWidth(),
                             colors = ButtonDefaults.buttonColors(containerColor = InkBlue)
                         ) {
                             Text("\u9000\u51fa\u76ee\u6807\u5e94\u7528")
+                            Icon(
+                                imageVector = Icons.Filled.KeyboardArrowDown,
+                                contentDescription = "\u5c55\u5f00\u9000\u51fa\u9009\u9879"
+                            )
                             if (false) {
                             Text(
                                 when (uiState.returnDestination) {
@@ -150,11 +158,17 @@ fun ReminderOverlay(
                                 )
                             }
                         }
+                        }
+                        Box(modifier = Modifier.weight(1f)) {
                         OutlinedButton(
                             onClick = { snoozeMenuExpanded = true },
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.fillMaxWidth()
                         ) {
                             Text("\u7a0d\u540e\u63d0\u9192")
+                            Icon(
+                                imageVector = Icons.Filled.KeyboardArrowDown,
+                                contentDescription = "\u5c55\u5f00\u7a0d\u540e\u63d0\u9192\u9009\u9879"
+                            )
                             if (false) {
                             Text("仍要使用")
                             }
@@ -179,6 +193,7 @@ fun ReminderOverlay(
                                     customSnoozeVisible = true
                                 }
                             )
+                        }
                         }
                         if (customSnoozeVisible) {
                             AlertDialog(
