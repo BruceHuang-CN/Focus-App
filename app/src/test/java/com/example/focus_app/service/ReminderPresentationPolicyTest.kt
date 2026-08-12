@@ -42,6 +42,20 @@ class ReminderPresentationPolicyTest {
     }
 
     @Test
+    fun overlay_permission_marks_presentation_before_starting_reminder_activity() {
+        val events = mutableListOf<String>()
+
+        presentReminder(
+            canDrawOverlays = true,
+            onBeforeStartActivity = { events += "mark" },
+            startActivity = { events += "activity" },
+            postNotification = { events += "notification" }
+        )
+
+        assertEquals(listOf("mark", "activity", "notification"), events)
+    }
+
+    @Test
     fun reminder_is_only_valid_for_its_current_open_session() {
         assertEquals(true, isReminderSessionCurrent(7L, 7L))
         assertEquals(false, isReminderSessionCurrent(7L, null))

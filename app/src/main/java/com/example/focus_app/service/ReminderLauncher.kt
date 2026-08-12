@@ -32,11 +32,15 @@ enum class CustomReturnResult {
 
 @Singleton
 class AndroidReminderLauncher @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val reminderPresentationRegistry: ReminderPresentationRegistry
 ) : ReminderLauncher {
     override fun show(data: ReminderLaunchData) {
         presentReminder(
             canDrawOverlays = Settings.canDrawOverlays(context),
+            onBeforeStartActivity = {
+                reminderPresentationRegistry.show(data.sessionId, data.forceReminder)
+            },
             startActivity = { context.startActivity(reminderIntent(data)) },
             postNotification = { postReminderNotification(data) }
         )

@@ -2,10 +2,14 @@ package com.example.focus_app.service
 
 internal fun presentReminder(
     canDrawOverlays: Boolean,
+    onBeforeStartActivity: () -> Unit = {},
     startActivity: () -> Unit,
     postNotification: () -> Unit
 ) {
-    if (canDrawOverlays) startActivity()
+    if (canDrawOverlays) {
+        onBeforeStartActivity()
+        startActivity()
+    }
     postNotification()
 }
 
