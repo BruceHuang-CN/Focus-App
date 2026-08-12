@@ -28,6 +28,7 @@ import com.example.focus_app.ui.onboarding.OnboardingScreen
 import com.example.focus_app.ui.settings.CustomReturnAppPickerScreen
 import com.example.focus_app.ui.settings.AppGroupEditorScreen
 import com.example.focus_app.ui.settings.AppGroupsScreen
+import com.example.focus_app.ui.settings.FeedbackAndSupportScreen
 import com.example.focus_app.ui.settings.SettingsScreen
 import com.example.focus_app.ui.stats.StatsScreen
 import com.example.focus_app.ui.tasks.TaskListScreen
@@ -40,6 +41,7 @@ sealed class Screen(val route: String) {
     object Mood : Screen("mood")
     object Settings : Screen("settings")
     object Stats : Screen("stats")
+    object FeedbackAndSupport : Screen("feedback_and_support")
     object CustomReturnPicker : Screen("custom_return_picker")
     object AppGroups : Screen("app_groups")
     object AppGroupEditor : Screen("app_group_editor/{groupId}") {
@@ -121,8 +123,12 @@ fun NavGraph() {
                     navigateToCustomReturnPicker = {
                         navController.navigate(Screen.CustomReturnPicker.route)
                     },
+                    navigateToFeedbackAndSupport = { navController.navigate(Screen.FeedbackAndSupport.route) },
                     navigateToAppGroups = { navController.navigate(Screen.AppGroups.route) }
                 )
+            }
+            composable(Screen.FeedbackAndSupport.route) {
+                FeedbackAndSupportScreen(onBack = { navController.popBackStack() })
             }
             composable(Screen.CustomReturnPicker.route) {
                 CustomReturnAppPickerScreen(onBack = { navController.popBackStack() })

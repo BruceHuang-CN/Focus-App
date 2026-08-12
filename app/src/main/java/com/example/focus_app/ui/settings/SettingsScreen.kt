@@ -48,6 +48,7 @@ fun SettingsScreen(
     onBack: () -> Unit,
     navigateToCustomReturnPicker: () -> Unit,
     navigateToAppGroups: () -> Unit,
+    navigateToFeedbackAndSupport: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val s by viewModel.settings.collectAsState()
@@ -614,6 +615,30 @@ fun SettingsScreen(
             }
 
             Spacer(modifier = Modifier.height(32.dp))
+            Divider()
+            SectionTitle("\u53cd\u9988\u4e0e\u652f\u6301")
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { navigateToFeedbackAndSupport() }
+                    .padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "\u95ee\u5377\u661f\u3001\u516c\u4f17\u53f7\u4e0e\u8d5e\u52a9\u5165\u53e3",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        "\u4e8c\u7ef4\u7801\u6216\u94fe\u63a5\u7531\u4f60\u540e\u7eed\u63d0\u4f9b",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                }
+                Text("\u2192", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.outline)
+            }
+
         }
     }
 
