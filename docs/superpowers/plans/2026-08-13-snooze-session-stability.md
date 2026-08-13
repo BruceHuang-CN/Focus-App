@@ -31,7 +31,7 @@
 - Consumes: AppSessionCoordinator.onPackageChanged(packageName, foregroundVerifier, isReminderPresentation)
 - Produces: 使用 TestScope.backgroundScope 和虚拟时间构造协调器的测试夹具；测试依赖构造参数 scope: CoroutineScope 与 departureConfirmationDelayMillis: Long。
 
-- [ ] **Step 1: 先写会失败的行为测试**
+- [x] **Step 1: 先写会失败的行为测试**
 
 把测试夹具改为向协调器注入 backgroundScope 和字面量 1_500L，并增加以下核心测试：
 
@@ -82,11 +82,11 @@
 
 测试分别防止立即关闭、事件风暴无限延长计时和旧协程关闭新会话。
 
-- [ ] **Step 2: 调整既有会话测试的时间语义**
+- [x] **Step 2: 调整既有会话测试的时间语义**
 
 对原有“离开关闭”“目标 App 切换”“取消提醒”测试，在非目标事件后使用 advanceTimeBy(1_500L) 与 runCurrent()。保留 stopCurrentSession() 测试的立即断言，确保显式停止没有被延迟。
 
-- [ ] **Step 3: 运行聚焦测试确认 RED**
+- [x] **Step 3: 运行聚焦测试确认 RED**
 
 运行：
 
@@ -111,11 +111,11 @@
 - Consumes: 实时模式传入 foregroundVerifier: suspend (String) -> Boolean，使用 rootInActiveWindow.packageName 与目标包名比较。
 - Preserves: SessionReminderScheduler.cancel(sessionId) 仍同时取消首次延迟、WorkManager 稍后提醒、通知和已展示提醒。
 
-- [ ] **Step 1: 增加最小的待确认状态**
+- [x] **Step 1: 增加最小的待确认状态**
 
 在协调器中加入 PendingDeparture(sessionId, candidatePackage, revision, job)、departureRevision 和 pendingDeparture。锁内取消函数必须递增版本、取消旧 Job 并清空引用。
 
-- [ ] **Step 2: 把目标会话的非目标事件改成单次延迟确认**
+- [x] **Step 2: 把目标会话的非目标事件改成单次延迟确认**
 
 当 openSession 不为空且收到不同包名时：
 
@@ -129,11 +129,11 @@
 
 延迟发生在 eventMutex 外；只在读取和提交状态时进入互斥锁，避免阻塞目标 App 返回事件。
 
-- [ ] **Step 3: 保持显式停止立即生效**
+- [x] **Step 3: 保持显式停止立即生效**
 
 stopCurrentSession() 先取消待确认，再执行调度取消、会话关闭和前台状态清空。旧确认任务醒来后必须通过版本和 sessionId 双重校验，不能影响新状态。
 
-- [ ] **Step 4: 为实时无障碍模式提供真实前台复核**
+- [x] **Step 4: 为实时无障碍模式提供真实前台复核**
 
 FocusAccessibilityService 调用协调器时增加：
 
@@ -143,13 +143,13 @@ FocusAccessibilityService 调用协调器时增加：
 
 兼容模式保持现有 UsageStats 验证器。该读取只发生在单次离开确认和既有首次提醒校验时。
 
-- [ ] **Step 5: 运行聚焦测试确认 GREEN**
+- [x] **Step 5: 运行聚焦测试确认 GREEN**
 
 运行 Task 1 Step 3 的同一命令。
 
 预期：AppSessionCoordinatorTest 全部通过；没有测试失败或 Kotlin 编译错误。
 
-- [ ] **Step 6: 提交会话稳定性修复**
+- [x] **Step 6: 提交会话稳定性修复**
 
     git add -- app/src/main/java/com/example/focus_app/service/AppSessionCoordinator.kt app/src/main/java/com/example/focus_app/service/FocusAccessibilityService.kt app/src/test/java/com/example/focus_app/service/AppSessionCoordinatorTest.kt
     git commit -m "fix: confirm target app departures"
@@ -169,20 +169,20 @@ FocusAccessibilityService 调用协调器时增加：
 - Consumes: Task 2 的协调器行为和聚焦测试结果。
 - Produces: 一次完整 JVM 测试记录和仍需用户在 Android Studio 真机验证的清单。
 
-- [ ] **Step 1: 运行一次完整 JVM 单元测试**
+- [x] **Step 1: 运行一次完整 JVM 单元测试**
 
     $env:GRADLE_USER_HOME='C:\Users\6\.gradle'
     .\gradlew.bat :app:testDebugUnitTest --no-daemon --no-configuration-cache
 
 预期：BUILD SUCCESSFUL，没有失败测试；不运行 assembleDebug 或安装 APK。
 
-- [ ] **Step 2: 更新文档状态**
+- [x] **Step 2: 更新文档状态**
 
 在开发日志的 2026-08-13 条目中把“待实现”改成“代码已实现，待真机验证”，记录实际聚焦测试与完整 JVM 测试结果。
 
 在任务清单中仅勾选稳定稍后提醒绑定会话、1.5 秒单次复核和真正离开后取消提醒。保留“自定义 3 分钟真机回归”和不同厂商验证为未完成。
 
-- [ ] **Step 3: 做提交前验证**
+- [x] **Step 3: 做提交前验证**
 
     git diff --check
     git status --short
@@ -190,12 +190,12 @@ FocusAccessibilityService 调用协调器时增加：
 
 确认没有 .idea、.gradle-user-home、APK、数据库、API Key 或其他无关文件进入暂存区。
 
-- [ ] **Step 4: 提交验证记录**
+- [x] **Step 4: 提交验证记录**
 
     git add -- DEVELOPMENT_LOG.md docs/PROJECT_TASKS.md docs/superpowers/plans/2026-08-13-snooze-session-stability.md
     git commit -m "docs: record snooze stability verification"
 
-- [ ] **Step 5: 交给用户集中真机验证**
+- [x] **Step 5: 交给用户集中真机验证**
 
 1. 抖音中出现提醒，选择自定义 3 分钟，继续停留抖音，3 分钟后再次提醒。
 2. 选择稍后提醒后打开输入法、拉下通知栏或短暂出现系统窗口，再回到抖音，计时不丢失。
