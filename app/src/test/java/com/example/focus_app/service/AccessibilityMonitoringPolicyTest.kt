@@ -8,6 +8,22 @@ import org.junit.Test
 
 class AccessibilityMonitoringPolicyTest {
     @Test
+    fun system_overlay_windows_do_not_replace_the_last_real_application_package() {
+        val foregroundState = AccessibilityForegroundState()
+
+        foregroundState.onWindowStateChanged("com.ss.android.ugc.aweme", isApplicationTask = true)
+        assertTrue(foregroundState.isForeground("com.ss.android.ugc.aweme"))
+
+        foregroundState.onWindowStateChanged("com.coloros.colordirectservice", isApplicationTask = false)
+        assertTrue(foregroundState.isForeground("com.ss.android.ugc.aweme"))
+        foregroundState.onWindowStateChanged("com.coloros.smartsidebar", isApplicationTask = false)
+        assertTrue(foregroundState.isForeground("com.ss.android.ugc.aweme"))
+
+        foregroundState.onWindowStateChanged("com.oppo.launcher", isApplicationTask = true)
+        assertFalse(foregroundState.isForeground("com.ss.android.ugc.aweme"))
+    }
+
+    @Test
     fun queued_accessibility_events_are_ignored_after_guardian_is_disabled() {
         assertFalse(
             shouldProcessQueuedAccessibilityEvent(

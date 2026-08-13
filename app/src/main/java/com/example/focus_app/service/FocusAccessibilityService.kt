@@ -22,6 +22,18 @@ internal fun shouldProcessAccessibilityEvents(settings: AppSettings): Boolean =
 internal fun shouldProcessQueuedAccessibilityEvent(settings: AppSettings): Boolean =
     shouldProcessAccessibilityEvents(settings)
 
+internal class AccessibilityForegroundState {
+    @Volatile private var latestPackageName: String? = null
+
+    fun onWindowStateChanged(packageName: String, isApplicationTask: Boolean) {
+        if (isApplicationTask) {
+            latestPackageName = packageName
+        }
+    }
+
+    fun isForeground(expectedPackage: String): Boolean = latestPackageName == expectedPackage
+}
+
 private data class PackageChange(
     val packageName: String,
     val isReminderPresentation: Boolean
@@ -35,6 +47,7 @@ class FocusAccessibilityService : AccessibilityService() {
 
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private val packageChanges = Channel<PackageChange>(Channel.UNLIMITED)
+    private val foregroundState = AccessibilityForegroundState()
     @Volatile private var isRealtimeMode = false
     @Volatile private var currentSettings = AppSettings()
     private var monitoringStarted = false
@@ -56,9 +69,7 @@ class FocusAccessibilityService : AccessibilityService() {
                 if (!shouldProcessQueuedAccessibilityEvent(currentSettings)) continue
                 appSessionCoordinator.onPackageChanged(
                     packageName = change.packageName,
-                    foregroundVerifier = { expectedPackage ->
-                        rootInActiveWindow?.packageName?.toString() == expectedPackage
-                    },
+                    foregroundVerifier = foregroundState::isForeground,
                     isReminderPresentation = change.isReminderPresentation
                 )
             }
@@ -66,8 +77,13 @@ class FocusAccessibilityService : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        if (!isRealtimeMode || event?.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
+        if (event?.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
         val pkg = event.packageName?.toString() ?: return
+        foregroundState.onWindowStateChanged(
+            packageName = pkg,
+            isApplicationTask = packageManager.getLaunchIntentForPackage(pkg) != null
+        )
+        if (!isRealtimeMode) return
         packageChanges.trySend(
             PackageChange(
                 packageName = pkg,
