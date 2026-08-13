@@ -130,7 +130,7 @@ class ReminderViewModelTest {
     }
 
     @Test
-    fun explicit_reminder_choice_clears_the_pending_presentation_first() = runTest(dispatcher) {
+    fun snooze_keeps_presentation_during_target_app_return_transition() = runTest(dispatcher) {
         val fixture = fixture()
         fixture.presentationRegistry.show(LAUNCH_DATA.sessionId)
         fixture.viewModel.init(LAUNCH_DATA)
@@ -138,7 +138,7 @@ class ReminderViewModelTest {
         fixture.viewModel.snooze(LAUNCH_DATA.sessionId, 5)
         advanceUntilIdle()
 
-        assertEquals(false, fixture.presentationRegistry.isShowing())
+        assertEquals(true, fixture.presentationRegistry.isShowing())
     }
 
     private fun fixture(): Fixture {
@@ -146,7 +146,7 @@ class ReminderViewModelTest {
         val repository = ActionRecordingSessionRepository(events)
         val launcher = ActionRecordingLauncher(events)
         val scheduler = ActionRecordingScheduler()
-        val presentationRegistry = ReminderPresentationRegistry()
+        val presentationRegistry = ReminderPresentationRegistry(elapsedRealtime = { 0L })
         return Fixture(
             ReminderViewModel(repository, launcher, scheduler, presentationRegistry),
             repository,

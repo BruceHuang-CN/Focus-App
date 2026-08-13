@@ -116,28 +116,29 @@ class ReminderSchedulerTest {
     }
 
     @Test
-    fun follow_up_reminder_fires_after_interval_within_quota() = runTest {
+    fun follow_up_reminder_delegates_to_persistent_work_scheduler() = runTest {
         val fixture = fixture()
 
         fixture.scheduler.scheduleFollowUp(fixture.session.id, 60_000L)
-        advanceTimeBy(60_001L)
-        runCurrent()
 
-        assertEquals(1, fixture.launcher.shown.size)
-        assertNotNull(fixture.repository.session(fixture.session.id)?.remindedAt)
+        assertEquals(
+            listOf(fixture.session.id to 60_000L),
+            fixture.followUpWorkScheduler.scheduled
+        )
+        assertEquals(0, fixture.launcher.shown.size)
     }
 
     @Test
-    fun follow_up_reminder_does_not_fire_when_session_closed() = runTest {
+    fun cancelling_session_cancels_persistent_follow_up_work() = runTest {
         val fixture = fixture()
 
         fixture.scheduler.scheduleFollowUp(fixture.session.id, 60_000L)
-        fixture.repository.closeSession(fixture.session.id, NOW + 5_000L)
-        advanceTimeBy(60_001L)
-        runCurrent()
+        fixture.scheduler.cancel(fixture.session.id)
 
-        assertEquals(0, fixture.launcher.shown.size)
-        assertEquals(0, fixture.repository.remindedCount)
+        assertEquals(
+            listOf(fixture.session.id),
+            fixture.followUpWorkScheduler.cancelledSessionIds
+        )
     }
 
     @Test
@@ -192,6 +193,7 @@ class ReminderSchedulerTest {
             returnDestination = ReturnDestination.HOME
         )
         var launchDataBuildCount = 0
+        val followUpWorkScheduler = RecordingFollowUpWorkScheduler()
         val scheduler = ReminderScheduler(
             repository = repository,
             launcher = launcher,
@@ -209,9 +211,17 @@ class ReminderSchedulerTest {
                     showBreathing = currentSettings.enableBreathingPause,
                     returnDestination = currentSettings.returnDestination
                 )
-            }
+            },
+            followUpWorkScheduler = followUpWorkScheduler
         )
-        return Fixture(scheduler, repository, launcher, session, { launchDataBuildCount })
+        return Fixture(
+            scheduler,
+            repository,
+            launcher,
+            session,
+            followUpWorkScheduler,
+            { launchDataBuildCount }
+        )
     }
 
     private data class Fixture(
@@ -219,6 +229,7 @@ class ReminderSchedulerTest {
         val repository: FakeReminderSessionRepository,
         val launcher: RecordingReminderLauncher,
         val session: AppUsageSession,
+        val followUpWorkScheduler: RecordingFollowUpWorkScheduler,
         val launchDataBuildCount: () -> Int
     )
 
@@ -227,6 +238,18 @@ class ReminderSchedulerTest {
     }
 }
 
+private class RecordingFollowUpWorkScheduler : FollowUpReminderWorkScheduler {
+    val scheduled = mutableListOf<Pair<Long, Long>>()
+    val cancelledSessionIds = mutableListOf<Long>()
+
+    override fun schedule(sessionId: Long, delayMillis: Long) {
+        scheduled += sessionId to delayMillis
+    }
+
+    override fun cancel(sessionId: Long) {
+        cancelledSessionIds += sessionId
+    }
+}
 private class RecordingReminderLauncher(
     private val repository: FakeReminderSessionRepository
 ) : ReminderLauncher {
