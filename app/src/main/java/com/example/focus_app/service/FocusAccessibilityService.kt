@@ -44,6 +44,7 @@ class FocusAccessibilityService : AccessibilityService() {
     @Inject lateinit var settingsRepository: SettingsRepository
     @Inject lateinit var appSessionCoordinator: AppSessionCoordinator
     @Inject lateinit var reminderPresentationRegistry: ReminderPresentationRegistry
+    @Inject lateinit var realtimeForegroundProvider: RealtimeForegroundProvider
 
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private val packageChanges = Channel<PackageChange>(Channel.UNLIMITED)
@@ -79,10 +80,14 @@ class FocusAccessibilityService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event?.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
         val pkg = event.packageName?.toString() ?: return
+        val isApplicationTask = packageManager.getLaunchIntentForPackage(pkg) != null
         foregroundState.onWindowStateChanged(
             packageName = pkg,
-            isApplicationTask = packageManager.getLaunchIntentForPackage(pkg) != null
+            isApplicationTask = isApplicationTask
         )
+        if (isApplicationTask) {
+            realtimeForegroundProvider.onRealApplicationForeground(pkg)
+        }
         if (!isRealtimeMode) return
         packageChanges.trySend(
             PackageChange(
@@ -110,3 +115,4 @@ class FocusAccessibilityService : AccessibilityService() {
             activeService?.performGlobalAction(GLOBAL_ACTION_HOME) == true
     }
 }
+

@@ -53,6 +53,7 @@ class AppDetectionService : Service() {
     @Inject lateinit var settingsRepository: SettingsRepository
     @Inject lateinit var appSessionCoordinator: AppSessionCoordinator
     @Inject lateinit var reminderPresentationRegistry: ReminderPresentationRegistry
+    @Inject lateinit var realtimeForegroundProvider: RealtimeForegroundProvider
 
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private var pollingJob: Job? = null
@@ -96,6 +97,7 @@ class AppDetectionService : Service() {
         val now = System.currentTimeMillis()
         val observation = queryLatestForeground(queryStartedAt, now)
         observation?.let { foreground ->
+            realtimeForegroundProvider.onRealApplicationForeground(foreground.packageName)
             appSessionCoordinator.onPackageChanged(
                 packageName = foreground.packageName,
                 foregroundVerifier = { expectedPackage ->
@@ -168,3 +170,4 @@ class AppDetectionService : Service() {
         private const val TAG = "AppDetectionService"
     }
 }
+

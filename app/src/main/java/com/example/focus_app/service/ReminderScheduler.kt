@@ -42,7 +42,7 @@ class ReminderScheduler(
     private val scope: CoroutineScope,
     private val settingsProvider: suspend () -> AppSettings,
     private val launchDataProvider: suspend (AppUsageSession, AppSettings) -> ReminderLaunchData,
-    private val followUpWorkScheduler: FollowUpReminderWorkScheduler = NoOpFollowUpReminderWorkScheduler
+    private val followUpScheduler: FollowUpScheduler = NoOpFollowUpScheduler
 ) : SessionReminderScheduler {
     private val jobs = ConcurrentHashMap<Long, Job>()
     private val quotaMutex = Mutex()
@@ -56,14 +56,14 @@ class ReminderScheduler(
         cacheRepository: ReminderCacheRepository,
         launcher: ReminderLauncher,
         customReturnAppStore: CustomReturnAppStore,
-        followUpWorkScheduler: FollowUpReminderWorkScheduler
+        followUpScheduler: FollowUpScheduler
     ) : this(
         repository = repository,
         launcher = launcher,
         clock = SystemClock,
         scope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
         settingsProvider = settingsRepository::getSettings,
-        followUpWorkScheduler = followUpWorkScheduler,
+        followUpScheduler = followUpScheduler,
         launchDataProvider = { session, settings ->
             val taskTitle = session.taskId?.let { taskId ->
                 taskRepository.observeAll().first().firstOrNull { it.id == taskId }?.title
@@ -115,14 +115,14 @@ class ReminderScheduler(
 
     override fun cancel(sessionId: Long) {
         jobs.remove(sessionId)?.cancel()
-        followUpWorkScheduler.cancel(sessionId)
+        followUpScheduler.cancel(sessionId)
         launcher.dismiss(sessionId)
     }
 
     /**
      * 用户点击「仍要使用」后，在同一会话内按间隔再次提醒（受窗口额度限制）。
      */
-    override fun scheduleFollowUp(sessionId: Long, delayMillis: Long) = followUpWorkScheduler.schedule(sessionId, delayMillis)
+    override fun scheduleFollowUp(sessionId: Long, delayMillis: Long) = followUpScheduler.schedule(sessionId, delayMillis)
 
     private companion object {
         fun localFallback(appName: String, taskTitle: String?): String =
@@ -133,3 +133,4 @@ class ReminderScheduler(
             }
     }
 }
+

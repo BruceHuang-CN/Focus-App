@@ -2,6 +2,40 @@
 
 本文件记录开发过程中发现的问题、根因分析与修复，随代码一并提交到仓库。
 
+
+---
+
+## 2026-08-13（第二轮，代码已实现，待真机验证）
+
+### 核心 Bug：稍后提醒到期后完全不提醒
+
+**现象：**
+
+- 点击「稍后 1 分钟提醒」后，1 分钟到期没有提醒，也不发通知。
+- 实时模式（无障碍）下更明显：初始提醒正常弹出，但稍后提醒全部静默丢失。
+- 后台锁定或进程被回收后，稍后提醒同样失效。
+
+**根因（沿 `FollowUpReminderWorker` 的守卫链逐一排查）：**
+
+1. 前台校验使用 `UsageStatsManager.queryEvents`，需要「使用情况访问权限」；实时模式（无障碍）下用户通常未开启该权限，查询抛 `SecurityException` 被吞掉后返回 null，与目标包名比较永远不相等，导致到期后静默放弃，稍后提醒永不弹出。
+2. 锁屏（`isDeviceInteractive() == false`）时直接放弃本次提醒，解锁后也不会补提醒。
+3. WorkManager 的 `setInitialDelay` 在省电/Doze 下不保证准时，1 分钟可能被延迟数分钟。
+4. 进程被回收后，协调器恢复时会关闭残留会话，到期 Worker 因会话已关闭而放弃。
+
+**修复：**
+
+- 新增 `FollowUpReminderGate`：把「是否展示」抽成纯决策。前台状态无法确认（null）时不再视为已离开，宁可多提醒也不静默丢失；锁屏返回 `RETRY` 而不是放弃；确认已离开目标 App、会话已关闭、额度用尽等仍正确跳过。
+- 新增 `FollowUpReminderExecutor`：Worker 与内存调度共用同一套决策与展示逻辑。
+- 新增 `HybridFollowUpScheduler`：进程存活时用协程 delay 准时触发（锁屏时每 15 秒重试，最多 20 次）；同时保留 WorkManager 一次性任务作为进程被回收后的兜底；内存触发后取消 WorkManager 任务避免重复提醒。
+- 新增 `RealtimeForegroundProvider`：无障碍/兼容检测确认过的真实前台包名共享给稍后提醒，避免重复查询系统服务；仅在没有该状态时才回退 UsageStats。
+- `FollowUpReminderWorker` 简化为调用执行器，`RETRY` 映射为 `Result.retry()`。
+
+**自动化验证：**
+
+- 新增 `FollowUpReminderGateTest` 8 项、`FollowUpReminderExecutorTest` 5 项、`HybridFollowUpSchedulerTest` 4 项（均为 TDD RED→GREEN）。
+- 全量 `:app:testDebugUnitTest`：46 个测试套件、190 项测试、0 失败、0 错误、0 跳过，`BUILD SUCCESSFUL`。
+- 未构建/未安装 APK；请用户在 Android Studio 构建后真机复测：实时/兼容模式下点击稍后 1/5/10 分钟与自定义分钟，覆盖锁屏、后台锁定、快速切换应用等场景。
+
 ---
 
 ## 2026-08-13（代码已实现，待真机验证）
@@ -327,3 +361,4 @@
 `app/build/outputs/apk/release/app-release-unsigned.apk`（未签名，需在 Android Studio 签名向导中导出正式包）。
 
 ---
+

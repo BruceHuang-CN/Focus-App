@@ -1,4 +1,4 @@
-package com.example.focus_app.service
+﻿package com.example.focus_app.service
 
 import com.example.focus_app.data.repository.AppInfo
 import com.example.focus_app.data.repository.AppSessionRepository
@@ -116,14 +116,14 @@ class ReminderSchedulerTest {
     }
 
     @Test
-    fun follow_up_reminder_delegates_to_persistent_work_scheduler() = runTest {
+    fun follow_up_reminder_delegates_to_follow_up_scheduler() = runTest {
         val fixture = fixture()
 
         fixture.scheduler.scheduleFollowUp(fixture.session.id, 60_000L)
 
         assertEquals(
             listOf(fixture.session.id to 60_000L),
-            fixture.followUpWorkScheduler.scheduled
+            fixture.followUpScheduler.scheduled
         )
         assertEquals(0, fixture.launcher.shown.size)
     }
@@ -137,7 +137,7 @@ class ReminderSchedulerTest {
 
         assertEquals(
             listOf(fixture.session.id),
-            fixture.followUpWorkScheduler.cancelledSessionIds
+            fixture.followUpScheduler.cancelledSessionIds
         )
     }
 
@@ -193,7 +193,7 @@ class ReminderSchedulerTest {
             returnDestination = ReturnDestination.HOME
         )
         var launchDataBuildCount = 0
-        val followUpWorkScheduler = RecordingFollowUpWorkScheduler()
+        val followUpScheduler = RecordingFollowUpScheduler()
         val scheduler = ReminderScheduler(
             repository = repository,
             launcher = launcher,
@@ -212,14 +212,14 @@ class ReminderSchedulerTest {
                     returnDestination = currentSettings.returnDestination
                 )
             },
-            followUpWorkScheduler = followUpWorkScheduler
+            followUpScheduler = followUpScheduler
         )
         return Fixture(
             scheduler,
             repository,
             launcher,
             session,
-            followUpWorkScheduler,
+            followUpScheduler,
             { launchDataBuildCount }
         )
     }
@@ -229,7 +229,7 @@ class ReminderSchedulerTest {
         val repository: FakeReminderSessionRepository,
         val launcher: RecordingReminderLauncher,
         val session: AppUsageSession,
-        val followUpWorkScheduler: RecordingFollowUpWorkScheduler,
+        val followUpScheduler: RecordingFollowUpScheduler,
         val launchDataBuildCount: () -> Int
     )
 
@@ -238,7 +238,7 @@ class ReminderSchedulerTest {
     }
 }
 
-private class RecordingFollowUpWorkScheduler : FollowUpReminderWorkScheduler {
+private class RecordingFollowUpScheduler : FollowUpScheduler {
     val scheduled = mutableListOf<Pair<Long, Long>>()
     val cancelledSessionIds = mutableListOf<Long>()
 
@@ -327,3 +327,6 @@ private class FakeReminderSessionRepository(
         sessions[sessionId] = current.copy(remindedAt = remindedAt)
     }
 }
+
+
+
