@@ -56,6 +56,9 @@ class FocusAccessibilityService : AccessibilityService() {
                 if (!shouldProcessQueuedAccessibilityEvent(currentSettings)) continue
                 appSessionCoordinator.onPackageChanged(
                     packageName = change.packageName,
+                    foregroundVerifier = { expectedPackage ->
+                        rootInActiveWindow?.packageName?.toString() == expectedPackage
+                    },
                     isReminderPresentation = change.isReminderPresentation
                 )
             }

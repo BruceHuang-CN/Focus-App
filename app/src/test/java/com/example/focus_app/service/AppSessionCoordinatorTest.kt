@@ -4,11 +4,17 @@ import com.example.focus_app.data.repository.AppSessionRepository
 import com.example.focus_app.domain.model.AppUsageSession
 import com.example.focus_app.domain.model.ReminderTone
 import com.example.focus_app.domain.time.FakeClock
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class AppSessionCoordinatorTest {
     @Test
     fun same_package_window_changes_create_one_session_and_leaving_closes_it() = runTest {
@@ -18,6 +24,8 @@ class AppSessionCoordinatorTest {
         fixture.clock.epochMillis += 1_000L
         fixture.coordinator.onPackageChanged(TARGET_A)
         fixture.coordinator.onPackageChanged(LAUNCHER)
+        advanceTimeBy(DEPARTURE_CONFIRMATION_MS)
+        runCurrent()
 
         assertEquals(1, fixture.repository.sessions.size)
         val session = fixture.repository.sessions.single()
@@ -31,6 +39,8 @@ class AppSessionCoordinatorTest {
         fixture.coordinator.onPackageChanged(TARGET_A)
         fixture.clock.epochMillis += 2_000L
         fixture.coordinator.onPackageChanged(TARGET_B)
+        advanceTimeBy(DEPARTURE_CONFIRMATION_MS)
+        runCurrent()
 
         assertEquals(2, fixture.repository.sessions.size)
         assertEquals(TARGET_A, fixture.repository.sessions[0].packageName)
@@ -40,6 +50,8 @@ class AppSessionCoordinatorTest {
 
         fixture.clock.epochMillis += 500L
         fixture.coordinator.onPackageChanged(LAUNCHER)
+        advanceTimeBy(DEPARTURE_CONFIRMATION_MS)
+        runCurrent()
 
         assertEquals(2, fixture.repository.sessions.size)
         assertEquals(STARTED_AT + 2_500L, fixture.repository.sessions[1].endedAt)
@@ -78,6 +90,8 @@ class AppSessionCoordinatorTest {
         fixture.coordinator.onPackageChanged(TARGET_A)
         val sessionId = fixture.repository.sessions.single().id
         fixture.coordinator.onPackageChanged(LAUNCHER)
+        advanceTimeBy(DEPARTURE_CONFIRMATION_MS)
+        runCurrent()
 
         assertEquals(listOf(sessionId), fixture.reminderScheduler.startedSessionIds)
         assertEquals(listOf(sessionId), fixture.reminderScheduler.cancelledSessionIds)
@@ -98,6 +112,8 @@ class AppSessionCoordinatorTest {
         assertEquals(emptyList<Long>(), fixture.reminderScheduler.cancelledSessionIds)
 
         fixture.coordinator.onPackageChanged(FOCUS_PACKAGE)
+        advanceTimeBy(DEPARTURE_CONFIRMATION_MS)
+        runCurrent()
 
         assertEquals(sessionId, fixture.reminderScheduler.cancelledSessionIds.single())
         assertEquals(STARTED_AT, fixture.repository.sessions.single().endedAt)
@@ -117,6 +133,99 @@ class AppSessionCoordinatorTest {
         assertNull(fixture.repository.sessions.single().endedAt)
         assertEquals(emptyList<Long>(), fixture.reminderScheduler.cancelledSessionIds)
         assertEquals(sessionId, fixture.repository.currentOpenSession()?.id)
+    }
+
+    @Test
+    fun target_return_before_confirmation_keeps_session_and_reminder() = runTest {
+        val fixture = fixture()
+
+        fixture.coordinator.onPackageChanged(TARGET_A)
+        val sessionId = fixture.repository.sessions.single().id
+        fixture.coordinator.onPackageChanged(LAUNCHER)
+        advanceTimeBy(1_000L)
+        fixture.coordinator.onPackageChanged(TARGET_A)
+        advanceTimeBy(501L)
+        runCurrent()
+
+        assertNull(fixture.repository.sessions.single().endedAt)
+        assertEquals(emptyList<Long>(), fixture.reminderScheduler.cancelledSessionIds)
+        assertEquals(sessionId, fixture.repository.currentOpenSession()?.id)
+    }
+
+    @Test
+    fun confirmed_leave_closes_session_and_cancels_reminder_after_1500_ms() = runTest {
+        val fixture = fixture()
+
+        fixture.coordinator.onPackageChanged(TARGET_A)
+        val sessionId = fixture.repository.sessions.single().id
+        fixture.coordinator.onPackageChanged(
+            packageName = LAUNCHER,
+            foregroundVerifier = { false }
+        )
+        fixture.clock.epochMillis += DEPARTURE_CONFIRMATION_MS
+
+        advanceTimeBy(DEPARTURE_CONFIRMATION_MS - 1L)
+        runCurrent()
+        assertNull(fixture.repository.sessions.single().endedAt)
+
+        advanceTimeBy(1L)
+        runCurrent()
+
+        assertEquals(
+            STARTED_AT + DEPARTURE_CONFIRMATION_MS,
+            fixture.repository.sessions.single().endedAt
+        )
+        assertEquals(listOf(sessionId), fixture.reminderScheduler.cancelledSessionIds)
+    }
+
+    @Test
+    fun repeated_same_candidate_does_not_restart_departure_confirmation() = runTest {
+        val fixture = fixture()
+
+        fixture.coordinator.onPackageChanged(TARGET_A)
+        fixture.coordinator.onPackageChanged(LAUNCHER)
+        advanceTimeBy(1_000L)
+        fixture.coordinator.onPackageChanged(LAUNCHER)
+        fixture.clock.epochMillis += DEPARTURE_CONFIRMATION_MS
+        advanceTimeBy(500L)
+        runCurrent()
+
+        assertEquals(
+            STARTED_AT + DEPARTURE_CONFIRMATION_MS,
+            fixture.repository.sessions.single().endedAt
+        )
+    }
+
+    @Test
+    fun verifier_confirming_target_foreground_keeps_session_open() = runTest {
+        val fixture = fixture()
+
+        fixture.coordinator.onPackageChanged(TARGET_A)
+        fixture.coordinator.onPackageChanged(
+            packageName = "com.android.systemui",
+            foregroundVerifier = { expectedPackage -> expectedPackage == TARGET_A }
+        )
+        advanceTimeBy(DEPARTURE_CONFIRMATION_MS)
+        runCurrent()
+
+        assertNull(fixture.repository.sessions.single().endedAt)
+        assertEquals(emptyList<Long>(), fixture.reminderScheduler.cancelledSessionIds)
+    }
+
+    @Test
+    fun stopped_session_confirmation_cannot_close_new_session() = runTest {
+        val fixture = fixture()
+
+        fixture.coordinator.onPackageChanged(TARGET_A)
+        fixture.coordinator.onPackageChanged(LAUNCHER)
+        fixture.coordinator.stopCurrentSession()
+        fixture.coordinator.onPackageChanged(TARGET_B)
+        advanceTimeBy(DEPARTURE_CONFIRMATION_MS)
+        runCurrent()
+
+        assertEquals(2, fixture.repository.sessions.size)
+        assertEquals(TARGET_B, fixture.repository.sessions.last().packageName)
+        assertNull(fixture.repository.sessions.last().endedAt)
     }
 
     @Test
@@ -169,7 +278,7 @@ class AppSessionCoordinatorTest {
         assertEquals(listOf(sessionId), fixture.reminderScheduler.cancelledSessionIds)
     }
 
-    private fun fixture(
+    private fun TestScope.fixture(
         activeTaskId: Long? = 7L,
         toneKey: String = ReminderTone.GENTLE.key,
         repository: FakeAppSessionRepository = FakeAppSessionRepository(),
@@ -192,7 +301,9 @@ class AppSessionCoordinatorTest {
                 repository,
                 contextProvider,
                 clock,
-                reminderScheduler
+                reminderScheduler,
+                scope = backgroundScope,
+                departureConfirmationDelayMillis = DEPARTURE_CONFIRMATION_MS
             ),
             repository = repository,
             contextProvider = contextProvider,
@@ -201,7 +312,7 @@ class AppSessionCoordinatorTest {
         )
     }
 
-    private fun staleFixture(observedAfter: Long): Fixture {
+    private fun TestScope.staleFixture(observedAfter: Long): Fixture {
         val repository = FakeAppSessionRepository(
             initialSessions = listOf(
                 AppUsageSession(
@@ -235,6 +346,7 @@ class AppSessionCoordinatorTest {
         const val FOCUS_PACKAGE = "com.example.focus_app"
         const val STARTED_AT = 1_000_000L
         const val HOUR_MS = 60 * 60 * 1_000L
+        const val DEPARTURE_CONFIRMATION_MS = 1_500L
     }
 }
 
