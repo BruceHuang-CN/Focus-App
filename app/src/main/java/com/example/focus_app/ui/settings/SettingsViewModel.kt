@@ -180,11 +180,9 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    /**
-     * 系统无障碍已开启时，确保应用内开关同步为开启，恢复实时检测。
-     */
-    fun ensureAccessibilityEnabled() {
-        update { it.copy(enableAccessibility = true) }
+    /** 保存用户选择；系统是否真正授予无障碍权限由界面和服务单独判断。 */
+    fun setAccessibilityEnabled(enabled: Boolean) {
+        update { it.copy(enableAccessibility = enabled) }
     }
     fun updateCustomToneInstruction(instruction: String) { update { it.copy(customToneInstruction = instruction) } }
 
@@ -243,7 +241,6 @@ class SettingsViewModel @Inject constructor(
     }
     fun updatePersonality(p: String) { update { it.copy(aiPersonality = p, toneKey = ReminderTone.fromKey(p)) } }
     fun toggleBreathingPause() { update { it.copy(enableBreathingPause = !it.enableBreathingPause) } }
-    fun toggleAccessibility() { update { it.copy(enableAccessibility = !it.enableAccessibility) } }
     suspend fun saveAppGroup(groupId: String?, name: String, apps: List<AppInfo>): Result<Unit> = runCatching {
         val validation = AppGroupEditorPolicy.validate(name, apps)
         require(validation.canSave) { validation.errorMessage.orEmpty() }

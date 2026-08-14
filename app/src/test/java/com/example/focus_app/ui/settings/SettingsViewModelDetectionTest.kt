@@ -74,15 +74,22 @@ class SettingsViewModelDetectionTest {
     }
 
     @Test
-    fun ensure_accessibility_enabled_turns_on_the_flag() = runTest(dispatcher) {
-        val dao = DetectionSettingsDao(SettingsEntity(targetApps = "[]"))
+    fun setting_accessibility_enabled_uses_the_requested_value() = runTest(dispatcher) {
+        val dao = DetectionSettingsDao(
+            SettingsEntity(targetApps = "[]", enableAccessibility = true)
+        )
         val viewModel = newViewModel(dao)
         runCurrent()
 
-        viewModel.ensureAccessibilityEnabled()
+        viewModel.setAccessibilityEnabled(true)
         runCurrent()
 
         assertTrue(dao.current.enableAccessibility)
+
+        viewModel.setAccessibilityEnabled(false)
+        runCurrent()
+
+        assertFalse(dao.current.enableAccessibility)
     }
 
     @Test

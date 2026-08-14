@@ -36,6 +36,7 @@ import com.example.focus_app.domain.model.DetectionMode
 import com.example.focus_app.domain.model.ReminderTone
 import com.example.focus_app.domain.model.ReturnDestination
 import com.example.focus_app.domain.permission.PermissionCheckAction
+import com.example.focus_app.domain.permission.isAccessibilityDetectionReady
 import com.example.focus_app.ui.components.PresetSelector
 import com.example.focus_app.util.PermissionHelper
 import com.example.focus_app.util.loadInstalledApps
@@ -66,6 +67,9 @@ fun SettingsScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     var overlayGranted by remember { mutableStateOf(PermissionHelper.hasOverlayPermission(context)) }
     var batteryOptimizationIgnored by remember { mutableStateOf(PermissionHelper.isIgnoringBatteryOptimizations(context)) }
+    var systemAccessibilityEnabled by remember {
+        mutableStateOf(PermissionHelper.isAccessibilityServiceEnabled(context))
+    }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     var settingsEdited by remember { mutableStateOf(false) }
@@ -91,18 +95,14 @@ fun SettingsScreen(
         }
     }
 
-    // 从系统设置返回时刷新悬浮窗状态；实时模式下若系统无障碍已开启，自动恢复应用内开关
+    // 从系统设置返回时刷新真实权限状态，不覆盖用户在应用内的开关选择。
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 overlayGranted = PermissionHelper.hasOverlayPermission(context)
                 batteryOptimizationIgnored = PermissionHelper.isIgnoringBatteryOptimizations(context)
+                systemAccessibilityEnabled = PermissionHelper.isAccessibilityServiceEnabled(context)
                 viewModel.refreshPermissions()
-                if (viewModel.settings.value.detectionMode == DetectionMode.REALTIME &&
-                    PermissionHelper.isAccessibilityServiceEnabled(context)
-                ) {
-                    viewModel.ensureAccessibilityEnabled()
-                }
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -134,7 +134,7 @@ fun SettingsScreen(
             PermissionCheckAction.OPEN_TARGET_APPS -> navigateToAppGroups()
             PermissionCheckAction.ENABLE_ACCESSIBILITY -> {
                 if (!s.enableAccessibility) {
-                    viewModel.toggleAccessibility()
+                    viewModel.setAccessibilityEnabled(true)
                     onSettingChanged("开启无障碍检测")
                 }
                 context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
@@ -581,11 +581,14 @@ fun SettingsScreen(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("启用无障碍检测", modifier = Modifier.weight(1f))
                 Switch(
-                    checked = s.enableAccessibility,
+                    checked = isAccessibilityDetectionReady(
+                        userEnabled = s.enableAccessibility,
+                        systemEnabled = systemAccessibilityEnabled
+                    ),
                     onCheckedChange = { enabled ->
-                        viewModel.toggleAccessibility()
+                        viewModel.setAccessibilityEnabled(enabled)
                         onSettingChanged(if (enabled) "开启无障碍检测" else "关闭无障碍检测")
-                        if (enabled && !PermissionHelper.isAccessibilityServiceEnabled(context)) {
+                        if (enabled && !systemAccessibilityEnabled) {
                             context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
                         }
                     }
