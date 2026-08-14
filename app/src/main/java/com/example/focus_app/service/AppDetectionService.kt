@@ -31,12 +31,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 private const val POLL_INTERVAL_MS = 10_000L
-private const val INITIAL_QUERY_WINDOW_MS = 20_000L
-
-private data class ForegroundObservation(
-    val packageName: String,
-    val timestamp: Long
-)
+private const val FOREGROUND_QUERY_OVERLAP_MS = 30_000L
 
 private data class CompatibilityMonitoringState(
     val mode: DetectionMode,
@@ -57,6 +52,7 @@ class AppDetectionService : Service() {
 
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private var pollingJob: Job? = null
+    private val observationCursor = ForegroundObservationCursor(FOREGROUND_QUERY_OVERLAP_MS)
 
     override fun onCreate() {
         super.onCreate()
@@ -81,9 +77,8 @@ class AppDetectionService : Service() {
                         return@collectLatest
                     }
 
-                    var queryStartedAt = System.currentTimeMillis() - INITIAL_QUERY_WINDOW_MS
                     while (isActive) {
-                        queryStartedAt = publishLatestForegroundPackage(queryStartedAt)
+                        publishLatestForegroundPackage()
                         delay(POLL_INTERVAL_MS)
                     }
                 }
@@ -93,10 +88,10 @@ class AppDetectionService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
-    private suspend fun publishLatestForegroundPackage(queryStartedAt: Long): Long {
+    private suspend fun publishLatestForegroundPackage() {
         val now = System.currentTimeMillis()
-        val observation = queryLatestForeground(queryStartedAt, now)
-        observation?.let { foreground ->
+        val observation = queryLatestForeground(observationCursor.queryStart(now), now)
+        observationCursor.takeIfNew(observation)?.let { foreground ->
             realtimeForegroundProvider.onRealApplicationForeground(foreground.packageName)
             appSessionCoordinator.onPackageChanged(
                 packageName = foreground.packageName,
@@ -111,7 +106,6 @@ class AppDetectionService : Service() {
                 )
             )
         }
-        return now
     }
 
     @Suppress("DEPRECATION")
