@@ -80,7 +80,8 @@ Android 实现使用稳定的 action、会话 ID 和稳定 request code 创建�
 1. 读取 session ID；无效 ID 直接结束。
 2. 取消该会话的其他待执行路径，减少重复唤醒。
 3. 调用现有 `FollowUpReminderExecutor.execute(sessionId)`。
-4. `SHOW` 和 `SKIP` 结束；`RETRY` 通过同一调度器安排下一次短间隔唤醒。
+4. `SHOW` 和 `SKIP` 取消其余路径；`RETRY` 以 PendingIntent 中的重试次数安排下一次短间隔唤醒，
+   最多沿用现有 20 次上限，避免锁屏期间无限唤醒。
 5. 无论成功或异常都调用 PendingResult.finish()；异常保留持久化截止时间并留下可诊断日志。
 
 执行器继续负责：守护开关、原会话仍开放、当前会话一致、目标 App 仍在前台、屏幕状态、滚动额度、
