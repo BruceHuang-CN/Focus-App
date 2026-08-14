@@ -18,6 +18,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -78,13 +79,17 @@ class ReminderViewModelTest {
     fun snooze_uses_the_minutes_selected_in_the_overlay() = runTest(dispatcher) {
         val fixture = fixture()
         fixture.viewModel.init(LAUNCH_DATA)
+        val before = System.currentTimeMillis()
 
         fixture.viewModel.snooze(LAUNCH_DATA.sessionId, 5)
         advanceUntilIdle()
 
         assertEquals("snoozed_5m", fixture.repository.action)
+        val snoozeUntil = checkNotNull(fixture.repository.snoozeUntil)
+        assertTrue(snoozeUntil in (before + 300_000L)..(System.currentTimeMillis() + 300_000L))
         assertEquals(LAUNCH_DATA.sessionId, fixture.scheduler.followUpSessionId)
         assertEquals(300_000L, fixture.scheduler.followUpDelay)
+        assertEquals(listOf("saved", "snooze_saved", "scheduled"), fixture.events)
         assertEquals(null, fixture.launcher.focusTaskId)
         assertEquals(0, fixture.launcher.homeRequests)
     }
@@ -145,7 +150,7 @@ class ReminderViewModelTest {
         val events = mutableListOf<String>()
         val repository = ActionRecordingSessionRepository(events)
         val launcher = ActionRecordingLauncher(events)
-        val scheduler = ActionRecordingScheduler()
+        val scheduler = ActionRecordingScheduler(events)
         val presentationRegistry = ReminderPresentationRegistry(elapsedRealtime = { 0L })
         return Fixture(
             ReminderViewModel(repository, launcher, scheduler, presentationRegistry),
@@ -179,7 +184,9 @@ class ReminderViewModelTest {
     }
 }
 
-private class ActionRecordingScheduler : SessionReminderScheduler {
+private class ActionRecordingScheduler(
+    private val events: MutableList<String>
+) : SessionReminderScheduler {
     var followUpSessionId: Long? = null
     var followUpDelay: Long = -1L
 
@@ -193,6 +200,7 @@ private class ActionRecordingScheduler : SessionReminderScheduler {
     override fun scheduleFollowUp(sessionId: Long, delayMillis: Long) {
         followUpSessionId = sessionId
         followUpDelay = delayMillis
+        events += "scheduled"
     }
 }
 
@@ -233,6 +241,7 @@ private class ActionRecordingSessionRepository(
     private val events: MutableList<String>
 ) : AppSessionRepository {
     var action: String? = null
+    var snoozeUntil: Long? = null
 
     override suspend fun openSession(
         packageName: String,
@@ -250,5 +259,10 @@ private class ActionRecordingSessionRepository(
     override suspend fun markUserAction(sessionId: Long, action: String) {
         this.action = action
         events += "saved"
+    }
+
+    override suspend fun setSnoozeUntil(sessionId: Long, snoozeUntil: Long?) {
+        this.snoozeUntil = snoozeUntil
+        events += "snooze_saved"
     }
 }

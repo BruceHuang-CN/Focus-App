@@ -109,8 +109,13 @@ class ReminderViewModel @Inject constructor(
         reminderPresentationRegistry.keepSnoozeTransition(sessionId)
         viewModelScope.launch {
             val safeMinutes = minutes.coerceIn(1, 120)
+            val delayMillis = safeMinutes * 60_000L
             sessionRepository.markUserAction(sessionId, "snoozed_${safeMinutes}m")
-            scheduler.scheduleFollowUp(sessionId, safeMinutes * 60_000L)
+            sessionRepository.setSnoozeUntil(
+                sessionId = sessionId,
+                snoozeUntil = System.currentTimeMillis() + delayMillis
+            )
+            scheduler.scheduleFollowUp(sessionId, delayMillis)
             onComplete()
         }
     }

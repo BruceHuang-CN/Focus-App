@@ -9,5 +9,6 @@ data class AppUsageSession(
     val taskId: Long? = null,
     val remindedAt: Long? = null,
     val userAction: String? = null,
-    val toneKey: String
+    val toneKey: String,
+    val snoozeUntil: Long? = null
 )

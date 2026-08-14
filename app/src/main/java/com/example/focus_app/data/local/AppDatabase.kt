@@ -24,7 +24,7 @@ import com.example.focus_app.data.local.entity.SettingsEntity
         AppUsageSessionEntity::class,
         AiReminderCacheEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {

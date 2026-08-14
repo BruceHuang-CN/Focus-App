@@ -39,6 +39,12 @@ interface AppSessionRepository {
     suspend fun sessionById(id: Long): AppUsageSession? = null
 
     suspend fun updateRemindedAt(sessionId: Long, remindedAt: Long) = Unit
+
+    suspend fun setSnoozeUntil(sessionId: Long, snoozeUntil: Long?) = Unit
+
+    suspend fun claimSnooze(sessionId: Long): Boolean = false
+
+    suspend fun pendingSnoozes(): List<AppUsageSession> = emptyList()
 }
 
 class RoomAppSessionRepository @Inject constructor(
@@ -100,4 +106,14 @@ class RoomAppSessionRepository @Inject constructor(
     override suspend fun updateRemindedAt(sessionId: Long, remindedAt: Long) {
         dao.updateRemindedAt(sessionId, remindedAt)
     }
+
+    override suspend fun setSnoozeUntil(sessionId: Long, snoozeUntil: Long?) {
+        dao.setSnoozeUntil(sessionId, snoozeUntil)
+    }
+
+    override suspend fun claimSnooze(sessionId: Long): Boolean =
+        dao.claimSnooze(sessionId) == 1
+
+    override suspend fun pendingSnoozes(): List<AppUsageSession> =
+        dao.pendingSnoozes().map { it.toDomain() }
 }

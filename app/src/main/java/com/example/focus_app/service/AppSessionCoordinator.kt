@@ -68,7 +68,7 @@ class AppSessionCoordinator(
         isReminderPresentation: Boolean = false
     ) = eventMutex.withLock {
         val now = clock.nowMillis()
-        recoverStaleSession(now)
+        recoverStaleSession(now, packageName)
 
         val session = openSession
         if (session != null) {
@@ -207,10 +207,17 @@ class AppSessionCoordinator(
         }
     }
 
-    private suspend fun recoverStaleSession(now: Long) {
+    private suspend fun recoverStaleSession(now: Long, observedPackageName: String?) {
         if (initialized) return
 
         repository.currentOpenSession()?.let { stale ->
+            val recentEnough = now - stale.startedAt <= MAX_SESSION_DURATION_MS
+            if (recentEnough && stale.packageName == observedPackageName) {
+                openSession = stale
+                foregroundPackage = stale.packageName
+                initialized = true
+                return
+            }
             val cappedEnd = minOf(now, stale.startedAt + MAX_SESSION_DURATION_MS)
                 .coerceAtLeast(stale.startedAt)
             repository.closeSession(stale.id, cappedEnd)

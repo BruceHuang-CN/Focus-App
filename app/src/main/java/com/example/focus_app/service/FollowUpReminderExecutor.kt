@@ -43,14 +43,25 @@ class FollowUpReminderExecutor(
                 maxRemindersPerWindow = settings.maxRemindersPerWindow
             )
         )
-        if (decision != FollowUpDecision.SHOW) return decision
+        if (decision != FollowUpDecision.SHOW) {
+            if (decision == FollowUpDecision.SKIP) {
+                sessionRepository.setSnoozeUntil(sessionId, null)
+            }
+            return decision
+        }
 
-        val session = sessionRepository.sessionById(sessionId) ?: return FollowUpDecision.SKIP
+        val session = sessionRepository.sessionById(sessionId) ?: run {
+            sessionRepository.setSnoozeUntil(sessionId, null)
+            return FollowUpDecision.SKIP
+        }
         val taskTitle = taskTitleProvider(session.taskId)
         val message = messageProvider(session) ?: if (taskTitle.isNullOrBlank()) {
             "先放下 ${session.appName}。回到 Focus 选一件真正想完成的事。"
         } else {
             "你原本准备完成「${taskTitle.take(24)}」。现在回去继续。"
+        }
+        if (!sessionRepository.claimSnooze(sessionId)) {
+            return FollowUpDecision.SKIP
         }
         sessionRepository.updateRemindedAt(sessionId, now)
         launcher.show(

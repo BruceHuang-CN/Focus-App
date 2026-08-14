@@ -265,6 +265,17 @@ class AppSessionCoordinatorTest {
     }
 
     @Test
+    fun startup_adopts_recent_open_session_when_same_target_is_still_foreground() = runTest {
+        val fixture = staleFixture(observedAfter = 2 * HOUR_MS)
+
+        fixture.coordinator.onPackageChanged(TARGET_A)
+
+        assertEquals(1, fixture.repository.sessions.size)
+        assertNull(fixture.repository.sessions.single().endedAt)
+        assertEquals(10L, fixture.repository.currentOpenSession()?.id)
+    }
+
+    @Test
     fun stop_current_session_cancels_pending_reminder_closes_session_and_clears_foreground_package() = runTest {
         val fixture = fixture()
         fixture.coordinator.onPackageChanged(TARGET_A)

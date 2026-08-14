@@ -18,7 +18,8 @@ class FollowUpReminderExecutorTest {
         appName = "抖音",
         startedAt = 1_000L,
         taskId = 7L,
-        toneKey = "gentle"
+        toneKey = "gentle",
+        snoozeUntil = 20_000L
     )
     private val settings = AppSettings(
         guardianEnabled = true,
@@ -41,6 +42,7 @@ class FollowUpReminderExecutorTest {
         assertEquals(1, fixture.launcher.shown.size)
         assertEquals(session.id, fixture.launcher.shown.single().sessionId)
         assertNotNull(fixture.repository.session(session.id)?.remindedAt)
+        assertNull(fixture.repository.session(session.id)?.snoozeUntil)
     }
 
     @Test
@@ -53,6 +55,7 @@ class FollowUpReminderExecutorTest {
         assertEquals(FollowUpDecision.RETRY, decision)
         assertEquals(0, fixture.launcher.shown.size)
         assertNull(fixture.repository.session(session.id)?.remindedAt)
+        assertEquals(20_000L, fixture.repository.session(session.id)?.snoozeUntil)
     }
 
     @Test
@@ -64,6 +67,7 @@ class FollowUpReminderExecutorTest {
 
         assertEquals(FollowUpDecision.SKIP, decision)
         assertEquals(0, fixture.launcher.shown.size)
+        assertNull(fixture.repository.session(session.id)?.snoozeUntil)
     }
 
     @Test
@@ -87,6 +91,18 @@ class FollowUpReminderExecutorTest {
         assertEquals("写方案", shown.taskTitle)
         assertEquals(7L, shown.taskId)
         assertEquals("Return to 写方案.", shown.message)
+    }
+
+    @Test
+    fun same_persisted_snooze_can_only_be_shown_once() = kotlinx.coroutines.test.runTest {
+        val fixture = fixture()
+
+        val first = fixture.executor.execute(session.id)
+        val second = fixture.executor.execute(session.id)
+
+        assertEquals(FollowUpDecision.SHOW, first)
+        assertEquals(FollowUpDecision.SKIP, second)
+        assertEquals(1, fixture.launcher.shown.size)
     }
 
     private fun fixture(
@@ -170,6 +186,18 @@ class FollowUpReminderExecutorTest {
             val current = sessions[sessionId] ?: return
             if (current.endedAt != null) return
             sessions[sessionId] = current.copy(remindedAt = remindedAt)
+        }
+
+        override suspend fun setSnoozeUntil(sessionId: Long, snoozeUntil: Long?) {
+            val current = sessions[sessionId] ?: return
+            sessions[sessionId] = current.copy(snoozeUntil = snoozeUntil)
+        }
+
+        override suspend fun claimSnooze(sessionId: Long): Boolean {
+            val current = sessions[sessionId] ?: return false
+            if (current.endedAt != null || current.snoozeUntil == null) return false
+            sessions[sessionId] = current.copy(snoozeUntil = null)
+            return true
         }
     }
 

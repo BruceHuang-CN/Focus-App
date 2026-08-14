@@ -18,7 +18,8 @@ data class AppUsageSessionEntity(
     val taskId: Long? = null,
     val remindedAt: Long? = null,
     val userAction: String? = null,
-    val toneKey: String
+    val toneKey: String,
+    val snoozeUntil: Long? = null
 )
 
 fun AppUsageSessionEntity.toDomain() = AppUsageSession(
@@ -30,7 +31,8 @@ fun AppUsageSessionEntity.toDomain() = AppUsageSession(
     taskId = taskId,
     remindedAt = remindedAt,
     userAction = userAction,
-    toneKey = toneKey
+    toneKey = toneKey,
+    snoozeUntil = snoozeUntil
 )
 
 fun AppUsageSession.toEntity() = AppUsageSessionEntity(
@@ -42,5 +44,6 @@ fun AppUsageSession.toEntity() = AppUsageSessionEntity(
     taskId = taskId,
     remindedAt = remindedAt,
     userAction = userAction,
-    toneKey = toneKey
+    toneKey = toneKey,
+    snoozeUntil = snoozeUntil
 )

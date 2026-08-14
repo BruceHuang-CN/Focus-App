@@ -18,7 +18,7 @@ interface AppUsageSessionDao {
     suspend fun currentOpen(): AppUsageSessionEntity?
 
     @Query(
-        "UPDATE app_usage_sessions SET endedAt = :endedAt " +
+        "UPDATE app_usage_sessions SET endedAt = :endedAt, snoozeUntil = NULL " +
             "WHERE id = :sessionId AND endedAt IS NULL"
     )
     suspend fun close(sessionId: Long, endedAt: Long): Int
@@ -73,6 +73,25 @@ interface AppUsageSessionDao {
             "WHERE id = :sessionId AND endedAt IS NULL"
     )
     suspend fun updateRemindedAt(sessionId: Long, remindedAt: Long): Int
+
+    @Query(
+        "UPDATE app_usage_sessions SET snoozeUntil = :value " +
+            "WHERE id = :sessionId AND endedAt IS NULL"
+    )
+    suspend fun setSnoozeUntil(sessionId: Long, value: Long?): Int
+
+    @Query(
+        "UPDATE app_usage_sessions SET snoozeUntil = NULL " +
+            "WHERE id = :sessionId AND endedAt IS NULL AND snoozeUntil IS NOT NULL"
+    )
+    suspend fun claimSnooze(sessionId: Long): Int
+
+    @Query(
+        "SELECT * FROM app_usage_sessions " +
+            "WHERE endedAt IS NULL AND snoozeUntil IS NOT NULL " +
+            "ORDER BY snoozeUntil ASC"
+    )
+    suspend fun pendingSnoozes(): List<AppUsageSessionEntity>
 
     @Query(
         "SELECT COUNT(*) FROM app_usage_sessions WHERE remindedAt >= :since " +
