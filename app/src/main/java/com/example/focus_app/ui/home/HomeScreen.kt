@@ -162,6 +162,9 @@ internal fun HomeContent(
                 GuardianControlCard(
                     guardianEnabled = uiState.guardianEnabled,
                     activeGroupName = uiState.activeGroupName,
+                    reminderWindowMinutes = uiState.reminderWindowMinutes,
+                    windowReminderCount = uiState.windowReminderCount,
+                    windowReminderLimit = uiState.windowReminderLimit,
                     onGuardianEnabledChange = onGuardianEnabledChange,
                     onResetReminderQuota = onResetReminderQuota
                 )
@@ -220,6 +223,9 @@ internal fun HomeContent(
 private fun GuardianControlCard(
     guardianEnabled: Boolean,
     activeGroupName: String,
+    reminderWindowMinutes: Int,
+    windowReminderCount: Int,
+    windowReminderLimit: Int,
     onGuardianEnabledChange: (Boolean) -> Unit,
     onResetReminderQuota: () -> Unit
 ) {
@@ -238,6 +244,15 @@ private fun GuardianControlCard(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.outline
             )
+            Text(
+                text = reminderQuotaLabel(
+                    minutes = reminderWindowMinutes,
+                    count = windowReminderCount,
+                    limit = windowReminderLimit
+                ),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.outline
+            )
             Spacer(modifier = Modifier.height(8.dp))
             Text("当前应用组：$activeGroupName", style = MaterialTheme.typography.bodyMedium)
             Spacer(modifier = Modifier.height(12.dp))
@@ -245,6 +260,9 @@ private fun GuardianControlCard(
         }
     }
 }
+
+internal fun reminderQuotaLabel(minutes: Int, count: Int, limit: Int): String =
+    "本时段（$minutes 分钟）已提醒 $count/$limit 次"
 
 @Composable
 private fun ReminderRecordCard(session: AppUsageSession) {
@@ -282,7 +300,10 @@ private fun HomeContentPreview() {
                 exitedCountToday = 2,
                 activeTask = FocusTask(title = "写作业", scheduleStartMinute = 9 * 60, scheduleEndMinute = 10 * 60),
                 completedToday = 1,
-                streakDays = 2
+                streakDays = 2,
+                reminderWindowMinutes = 30,
+                windowReminderCount = 2,
+                windowReminderLimit = 5
             ),
             onRecordMood = {},
             onManageTasks = {},

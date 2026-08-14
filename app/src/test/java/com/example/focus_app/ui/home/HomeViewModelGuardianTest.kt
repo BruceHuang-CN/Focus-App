@@ -95,10 +95,46 @@ class HomeViewModelGuardianTest {
         assertEquals(1, fixture.sessions.resetQuotaCalls)
     }
 
-    private fun fixture(guardianEnabled: Boolean = true): Fixture {
-        val settings = SettingsRepository(HomeSettingsDao(guardianEnabled))
+    @Test
+    fun current_window_quota_is_exposed_on_home() = runTest(dispatcher) {
+        val fixture = fixture(
+            windowMinutes = 30,
+            windowLimit = 5,
+            shownReminders = 2
+        )
+
+        val viewModel = fixture.homeViewModel()
+        runCurrent()
+
+        assertEquals(30, viewModel.uiState.value.reminderWindowMinutes)
+        assertEquals(2, viewModel.uiState.value.windowReminderCount)
+        assertEquals(5, viewModel.uiState.value.windowReminderLimit)
+    }
+
+    @Test
+    fun resetting_quota_refreshes_home_count() = runTest(dispatcher) {
+        val fixture = fixture(shownReminders = 2)
+        val viewModel = fixture.homeViewModel()
+        runCurrent()
+        assertEquals(2, viewModel.uiState.value.windowReminderCount)
+
+        viewModel.resetReminderQuota()
+        runCurrent()
+
+        assertEquals(0, viewModel.uiState.value.windowReminderCount)
+    }
+
+    private fun fixture(
+        guardianEnabled: Boolean = true,
+        windowMinutes: Int = 60,
+        windowLimit: Int = 3,
+        shownReminders: Int = 0
+    ): Fixture {
+        val settings = SettingsRepository(
+            HomeSettingsDao(guardianEnabled, windowMinutes, windowLimit)
+        )
         val groups = AppGroupRepository(AppGroupStore(HomePreferences()), settings)
-        val sessions = HomeSessions()
+        val sessions = HomeSessions(shownReminders)
         val coordinator = AppSessionCoordinator(sessions, object : AppSessionContextProvider {
             override suspend fun currentContext() = AppSessionContext(emptyMap(), null, "gentle")
         }, FakeClock(1_000_000L), HomeReminderScheduler())
@@ -111,22 +147,38 @@ class HomeViewModelGuardianTest {
     }
 }
 
-private class HomeSettingsDao(guardianEnabled: Boolean) : SettingsDao {
-    private val state = MutableStateFlow<SettingsEntity?>(SettingsEntity(targetApps = "[]", guardianEnabled = guardianEnabled))
+private class HomeSettingsDao(
+    guardianEnabled: Boolean,
+    windowMinutes: Int,
+    windowLimit: Int
+) : SettingsDao {
+    private val state = MutableStateFlow<SettingsEntity?>(
+        SettingsEntity(
+            targetApps = "[]",
+            guardianEnabled = guardianEnabled,
+            reminderWindowMinutes = windowMinutes,
+            maxRemindersPerWindow = windowLimit
+        )
+    )
     override suspend fun insertOrUpdate(settings: SettingsEntity) { state.value = settings }
     override fun getSettings(): Flow<SettingsEntity?> = state
     override suspend fun getSettingsOnce(): SettingsEntity? = state.value
     override suspend fun clearLegacyApiKey() = Unit
 }
-private class HomeSessions : AppSessionRepository {
+private class HomeSessions(shownReminders: Int) : AppSessionRepository {
     var resetQuotaCalls = 0
+    private var shownReminderCount = shownReminders
     override suspend fun openSession(packageName: String, appName: String, startedAt: Long, taskId: Long?, toneKey: String): AppUsageSession = error("unused")
     override suspend fun closeSession(sessionId: Long, endedAt: Long) = Unit
     override suspend fun currentOpenSession(): AppUsageSession? = null
     override suspend fun reminderTimesSince(since: Long): List<Long> = emptyList()
     override suspend fun markRemindedIfNeeded(sessionId: Long, remindedAt: Long) = false
     override suspend fun markUserAction(sessionId: Long, action: String) = Unit
-    override suspend fun resetReminderQuota(since: Long) { resetQuotaCalls++ }
+    override suspend fun countShownRemindersSince(since: Long): Int = shownReminderCount
+    override suspend fun resetReminderQuota(since: Long) {
+        resetQuotaCalls++
+        shownReminderCount = 0
+    }
 }
 private class HomeMoodDao : MoodRecordDao {
     override suspend fun insert(mood: MoodRecordEntity) = Unit

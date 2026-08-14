@@ -29,7 +29,10 @@ data class HomeUiState(
     val completedToday: Int = 0,
     val streakDays: Int = 0,
     val guardianEnabled: Boolean = true,
-    val activeGroupName: String = "\u672a\u8bbe\u7f6e\u5e94\u7528\u7ec4"
+    val activeGroupName: String = "\u672a\u8bbe\u7f6e\u5e94\u7528\u7ec4",
+    val reminderWindowMinutes: Int = 60,
+    val windowReminderCount: Int = 0,
+    val windowReminderLimit: Int = 3
 )
 
 sealed interface HomeEvent {
@@ -88,6 +91,11 @@ class HomeViewModel @Inject constructor(
                 .sortedByDescending { it.startedAt }
                 .take(20)
             val completedToday = taskRepository.completedCountBetween(todayStart, tomorrowStart)
+            val settings = settingsRepository.getSettings()
+            val windowStart = System.currentTimeMillis() -
+                settings.reminderWindowMinutes * MINUTE_MILLIS
+            val windowReminderCount =
+                appSessionRepository.countShownRemindersSince(windowStart)
             _uiState.update {
                 it.copy(
                     openCountToday = todaySessions.size,
@@ -97,6 +105,9 @@ class HomeViewModel @Inject constructor(
                     activeTask = taskRepository.observeActive().first(),
                     completedToday = completedToday,
                     recentReminders = recentReminders,
+                    reminderWindowMinutes = settings.reminderWindowMinutes,
+                    windowReminderCount = windowReminderCount,
+                    windowReminderLimit = settings.maxRemindersPerWindow,
                     streakDays = StreakCalculator.streakDays(today) { day ->
                         val start = day.atStartOfDay(zone).toInstant().toEpochMilli()
                         taskRepository.completedCountBetween(start, start + DAY_MILLIS)
@@ -121,12 +132,14 @@ class HomeViewModel @Inject constructor(
     fun resetReminderQuota() {
         viewModelScope.launch {
             resetReminderQuotaUseCase()
+            loadStats()
             _events.emit(HomeEvent.ReminderQuotaReset)
         }
     }
 
     private companion object {
         const val DAY_MILLIS = 86_400_000L
+        const val MINUTE_MILLIS = 60_000L
         val ACTIVE_EXIT_ACTIONS = setOf("returned_to_focus", "returned_home")
     }
 }
