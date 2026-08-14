@@ -32,28 +32,38 @@ object NoOpFollowUpScheduler : FollowUpScheduler {
 class HybridFollowUpScheduler @Inject constructor(
     private val executor: FollowUpExecutor,
     private val workScheduler: FollowUpReminderWorkScheduler,
+    private val alarmScheduler: FollowUpAlarmScheduler,
     private val scope: CoroutineScope
 ) : FollowUpScheduler {
     private val jobs = ConcurrentHashMap<Long, Job>()
 
     override fun schedule(sessionId: Long, delayMillis: Long) {
+        val safeDelayMillis = delayMillis.coerceAtLeast(0L)
         cancelInProcess(sessionId)
-        scheduleOnce(sessionId, delayMillis.coerceAtLeast(0L), attempts = 0)
-        workScheduler.schedule(sessionId, delayMillis)
+        scheduleOnce(sessionId, safeDelayMillis, attempts = 0)
+        workScheduler.schedule(sessionId, safeDelayMillis)
+        alarmScheduler.schedule(sessionId, safeDelayMillis, retryAttempt = 0)
     }
 
     override fun cancel(sessionId: Long) {
         cancelInProcess(sessionId)
         workScheduler.cancel(sessionId)
+        alarmScheduler.cancel(sessionId)
     }
 
     private fun scheduleOnce(sessionId: Long, delayMillis: Long, attempts: Int) {
         val job = scope.launch {
             delay(delayMillis)
             workScheduler.cancel(sessionId)
+            alarmScheduler.cancel(sessionId)
             when (executor.execute(sessionId)) {
                 FollowUpDecision.RETRY -> {
                     if (attempts < MAX_RETRY_ATTEMPTS) {
+                        alarmScheduler.schedule(
+                            sessionId,
+                            RETRY_INTERVAL_MS,
+                            retryAttempt = attempts + 1
+                        )
                         scheduleOnce(sessionId, RETRY_INTERVAL_MS, attempts + 1)
                     }
                     jobs.remove(sessionId, coroutineContext[Job])
