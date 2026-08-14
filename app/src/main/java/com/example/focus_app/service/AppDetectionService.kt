@@ -43,6 +43,8 @@ internal fun shouldRunCompatibilityMonitoring(
     guardianEnabled: Boolean
 ): Boolean = mode == DetectionMode.COMPATIBILITY && guardianEnabled
 
+internal fun compatibilityServiceStartMode(): Int = Service.START_STICKY
+
 @AndroidEntryPoint
 class AppDetectionService : Service() {
     @Inject lateinit var settingsRepository: SettingsRepository
@@ -83,7 +85,7 @@ class AppDetectionService : Service() {
                     }
                 }
         }
-        return START_NOT_STICKY
+        return compatibilityServiceStartMode()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
