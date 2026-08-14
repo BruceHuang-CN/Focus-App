@@ -4,7 +4,7 @@
 
 ---
 
-## 2026-08-14（ColorOS 冻结下的再次提醒设计，待实施）
+## 2026-08-14（ColorOS 冻结下的再次提醒修复，待真机计时复测）
 
 ### 真机证据
 
@@ -26,6 +26,33 @@
 - 离开目标 App、关闭守护或替换稍后时间时，必须同步取消系统唤醒、WorkManager 和进程内任务。
 - 三条路径同时到期时复用 `claimSnooze()` 原子领取，只允许一次弹窗和一次额度计数。
 
+### 已实施
+
+- 新增 `FollowUpAlarmScheduler`、`AndroidFollowUpAlarmScheduler`、
+  `FollowUpAlarmReceiver` 和可单测的 `FollowUpAlarmHandler`。
+- `HybridFollowUpScheduler` 现在同时登记进程内协程、WorkManager 与一次性 AlarmManager 唤醒；
+  任一路成功、离开目标 App、关闭守护或重新选择稍后时间时统一取消其余路径。
+- Alarm 到期后仍调用 Focus 原有 `FollowUpReminderExecutor`，继续复用目标 App、守护状态、
+  锁屏条件、提醒额度、AI 文案和 `claimSnooze()` 去重；不使用 `setAlarmClock()`，
+  不显示系统闹钟界面或播放系统闹铃。
+- 锁屏等临时条件不满足时，以 15 秒为间隔重新布防，最多 20 次，避免无限唤醒。
+- 首页「守护控制」新增实际滚动窗口额度：
+  `本时段（N 分钟）已提醒 X/Y 次`；点击重置额度后立即刷新为真实数据库计数。
+
+### 自动化与安装证据
+
+- TDD 已逐项完成 RED/GREEN：Alarm 策略与处理器、三路调度/取消、首页额度状态与文案均有回归测试。
+- 完整命令 `:app:testDebugUnitTest :app:assembleDebug` 于 2026-08-14 11:41 执行成功；
+  共 52 个测试套件、213 项测试，`failures=0`、`errors=0`、`skipped=0`。
+- Debug APK 大小为 15,450,376 字节，SHA-256 为
+  `932B3F3074B6A59C3210B75B4BDDF6891D40A62CE88C1ED5B42355B60269F86E`。
+- 已通过 USB 使用完整 APK 覆盖安装到 RMX3350，安装器返回 `Success`；
+  手机 `base.apk` 与本地构建 SHA-256 完全一致，更新时间为 2026-08-14 11:42:56，
+  旧 `code_cache/.overlay` 已不存在。
+- APK Manifest 已确认包含非导出的
+  `com.example.focus_app.service.FollowUpAlarmReceiver`。
+- 手机的使用情况访问、悬浮窗权限和电池白名单仍有效。
+
 ### 验收口径
 
 - 选择 1 分钟后提醒：正常目标为 1～3 分钟内再次显示 Focus AI 提醒。
@@ -36,7 +63,9 @@
 
 ### 当前状态
 
-设计已确认，代码和真机验证尚未开始。本节不得作为修复完成或设备已验证的证明。
+代码、单元测试、完整构建和 APK 来源验证已完成。覆盖安装后 ColorOS 将无障碍总开关关闭，
+且手机停在密码锁屏，ADB 不能也不应绕过密码；因此首页可见文案和 1～3/5～8 分钟再次提醒
+仍需用户解锁并重新启用 Focus 无障碍服务后进行一次实际交互计时。本节不得作为真机行为已验证的证明。
 
 ---
 
