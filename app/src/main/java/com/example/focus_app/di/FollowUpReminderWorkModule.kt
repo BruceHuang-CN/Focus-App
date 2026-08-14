@@ -3,7 +3,9 @@ package com.example.focus_app.di
 import android.content.Context
 import androidx.work.WorkManager
 import com.example.focus_app.service.AndroidFollowUpEnvironment
+import com.example.focus_app.service.AndroidFollowUpAlarmScheduler
 import com.example.focus_app.service.AndroidFollowUpReminderWorkScheduler
+import com.example.focus_app.service.FollowUpAlarmScheduler
 import com.example.focus_app.service.FollowUpEnvironment
 import com.example.focus_app.service.FollowUpExecutor
 import com.example.focus_app.service.FollowUpReminderExecutor
@@ -24,6 +26,12 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class FollowUpReminderWorkModule {
+    @Binds
+    @Singleton
+    abstract fun bindFollowUpAlarmScheduler(
+        impl: AndroidFollowUpAlarmScheduler
+    ): FollowUpAlarmScheduler
+
     @Binds
     @Singleton
     abstract fun bindFollowUpReminderWorkScheduler(

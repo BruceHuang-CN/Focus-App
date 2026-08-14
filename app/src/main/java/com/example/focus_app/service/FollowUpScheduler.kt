@@ -71,6 +71,6 @@ class HybridFollowUpScheduler @Inject constructor(
     companion object {
         /** 锁屏等临时条件解除后的重试间隔。 */
         const val RETRY_INTERVAL_MS = 15_000L
-        private const val MAX_RETRY_ATTEMPTS = 20
+        internal const val MAX_RETRY_ATTEMPTS = 20
     }
 }

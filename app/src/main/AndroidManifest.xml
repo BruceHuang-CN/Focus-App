@@ -58,6 +58,10 @@
             android:launchMode="singleInstance"
             android:excludeFromRecents="true" />
 
+        <receiver
+            android:name=".service.FollowUpAlarmReceiver"
+            android:exported="false" />
+
         <service
             android:name=".service.AppDetectionService"
             android:foregroundServiceType="specialUse"
