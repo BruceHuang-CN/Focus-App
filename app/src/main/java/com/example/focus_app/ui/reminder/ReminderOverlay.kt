@@ -5,8 +5,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -31,6 +34,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -52,6 +56,9 @@ fun ReminderOverlay(
     var snoozeMenuExpanded by remember { mutableStateOf(false) }
     var customSnoozeVisible by remember { mutableStateOf(false) }
     var customSnoozeMinutes by remember { mutableStateOf("") }
+    val urgency = remember(data.windowReminderCount, data.windowLimit) {
+        reminderUrgency(data.windowReminderCount, data.windowLimit)
+    }
 
     LaunchedEffect(data) { viewModel.init(data) }
     LaunchedEffect(uiState.showBreathing, uiState.breathingStep) {
@@ -65,11 +72,17 @@ fun ReminderOverlay(
 
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Card(
-            modifier = Modifier.fillMaxWidth(0.9f).padding(16.dp),
+            modifier = Modifier
+                .fillMaxWidth(urgency.widthFraction)
+                .fillMaxHeight(urgency.heightFraction),
+            shape = if (urgency.isFinalReminder) RectangleShape else MaterialTheme.shapes.large,
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
             Column(
-                modifier = Modifier.padding(24.dp),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
@@ -98,6 +111,14 @@ fun ReminderOverlay(
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.outline
                         )
+                        if (urgency.isFinalReminder) {
+                            Text(
+                                "这是本时间段最后一次提醒",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.error,
+                                textAlign = TextAlign.Center
+                            )
+                        }
                     }
                     uiState.customReturnError?.let { error ->
                         Text(
