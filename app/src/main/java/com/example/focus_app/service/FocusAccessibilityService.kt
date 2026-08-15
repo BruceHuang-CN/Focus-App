@@ -45,6 +45,7 @@ class FocusAccessibilityService : AccessibilityService() {
     @Inject lateinit var appSessionCoordinator: AppSessionCoordinator
     @Inject lateinit var reminderPresentationRegistry: ReminderPresentationRegistry
     @Inject lateinit var realtimeForegroundProvider: RealtimeForegroundProvider
+    @Inject lateinit var accessibilityDiagnosticsStore: AccessibilityDiagnosticsStore
 
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private val packageChanges = Channel<PackageChange>(Channel.UNLIMITED)
@@ -56,6 +57,7 @@ class FocusAccessibilityService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
         activeService = this
+        accessibilityDiagnosticsStore.recordServiceConnected()
         if (monitoringStarted) return
         monitoringStarted = true
 
@@ -99,10 +101,13 @@ class FocusAccessibilityService : AccessibilityService() {
         )
     }
 
-    override fun onInterrupt() {}
+    override fun onInterrupt() {
+        accessibilityDiagnosticsStore.recordServiceInterrupted()
+    }
 
     override fun onDestroy() {
         if (activeService === this) activeService = null
+        accessibilityDiagnosticsStore.recordServiceDestroyed()
         packageChanges.close()
         scope.cancel()
         super.onDestroy()

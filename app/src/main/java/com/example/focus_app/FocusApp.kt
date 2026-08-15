@@ -5,6 +5,7 @@ import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import com.example.focus_app.data.remote.ReminderBatchCoordinator
 import com.example.focus_app.service.PendingFollowUpRestorer
+import com.example.focus_app.service.AccessibilityDiagnosticsStore
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
@@ -26,8 +27,12 @@ class FocusApp : Application(), Configuration.Provider {
     @Inject
     lateinit var pendingFollowUpRestorer: PendingFollowUpRestorer
 
+    @Inject
+    lateinit var accessibilityDiagnosticsStore: AccessibilityDiagnosticsStore
+
     override fun onCreate() {
         super.onCreate()
+        accessibilityDiagnosticsStore.recordAppLaunch(packageLastUpdateTime())
         reminderBatchCoordinator.start(applicationScope)
         applicationScope.launch {
             pendingFollowUpRestorer.restore()
@@ -38,4 +43,8 @@ class FocusApp : Application(), Configuration.Provider {
         get() = Configuration.Builder()
             .setWorkerFactory(workerFactory)
             .build()
+
+    @Suppress("DEPRECATION")
+    private fun packageLastUpdateTime(): Long =
+        packageManager.getPackageInfo(packageName, 0).lastUpdateTime
 }
