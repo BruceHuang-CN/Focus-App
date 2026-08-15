@@ -22,6 +22,7 @@ import com.example.focus_app.domain.model.AiProvider
 import com.example.focus_app.domain.model.DetectionMode
 import com.example.focus_app.domain.model.ReminderTone
 import com.example.focus_app.domain.model.ReturnDestination
+import com.example.focus_app.domain.reminder.SnoozeDurationPolicy
 import com.example.focus_app.domain.permission.PermissionCheckEvaluator
 import com.example.focus_app.domain.permission.PermissionCheckItem
 import com.example.focus_app.domain.reminder.ReminderTonePreview
@@ -146,7 +147,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun updateFollowUpInterval(minutes: Int) {
-        val value = minutes.coerceIn(1, 120)
+        val value = SnoozeDurationPolicy.normalizeStored(minutes)
         followUpReminderStore.writeMinutes(value)
         _followUpInterval.value = value
     }

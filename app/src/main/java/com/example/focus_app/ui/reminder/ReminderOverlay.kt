@@ -203,7 +203,7 @@ fun ReminderOverlay(
                                     OutlinedTextField(
                                         value = customSnoozeMinutes,
                                         onValueChange = { customSnoozeMinutes = it },
-                                        label = { Text("\u8bf7\u8f93\u5165 1-120 \u5206\u949f") },
+                                        label = { Text("\u8bf7\u8f93\u5165 1-60 \u5206\u949f") },
                                         singleLine = true
                                     )
                                 },

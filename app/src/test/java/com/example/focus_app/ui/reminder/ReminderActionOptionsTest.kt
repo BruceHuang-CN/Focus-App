@@ -19,9 +19,11 @@ class ReminderActionOptionsTest {
     }
 
     @Test
-    fun custom_snooze_accepts_only_one_to_120_minutes() {
-        assertEquals(17, parseCustomSnoozeMinutes("17"))
+    fun custom_snooze_accepts_only_one_to_60_minutes() {
+        assertEquals(1, parseCustomSnoozeMinutes("1"))
+        assertEquals(60, parseCustomSnoozeMinutes("60"))
         assertNull(parseCustomSnoozeMinutes("0"))
-        assertNull(parseCustomSnoozeMinutes("121"))
+        assertNull(parseCustomSnoozeMinutes("61"))
+        assertNull(parseCustomSnoozeMinutes("abc"))
     }
 }

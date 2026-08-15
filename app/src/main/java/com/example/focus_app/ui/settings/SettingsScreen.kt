@@ -348,7 +348,7 @@ fun SettingsScreen(
             /* Legacy follow-up interval selector retained temporarily.
             PresetSelector(
                 presets = listOf(1, 5, 10, 15, 30),
-                customRange = 1..120,
+                customRange = 1..60,
                 value = followUpInterval,
                 formatPreset = { "${it} 分钟" },
                 onValueChange = {

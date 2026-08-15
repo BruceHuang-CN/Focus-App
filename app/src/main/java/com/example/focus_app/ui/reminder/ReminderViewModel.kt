@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.focus_app.data.repository.AppSessionRepository
 import com.example.focus_app.domain.model.ReturnDestination
+import com.example.focus_app.domain.reminder.SnoozeDurationPolicy
 import com.example.focus_app.service.ReminderLaunchData
 import com.example.focus_app.service.ReminderLauncher
 import com.example.focus_app.service.ReminderPresentationRegistry
@@ -106,11 +107,11 @@ class ReminderViewModel @Inject constructor(
 
     fun snooze(sessionId: Long, minutes: Int, onComplete: () -> Unit = {}) {
         if (launchData?.sessionId != sessionId) return
+        if (!SnoozeDurationPolicy.isValid(minutes)) return
         reminderPresentationRegistry.keepSnoozeTransition(sessionId)
         viewModelScope.launch {
-            val safeMinutes = minutes.coerceIn(1, 120)
-            val delayMillis = safeMinutes * 60_000L
-            sessionRepository.markUserAction(sessionId, "snoozed_${safeMinutes}m")
+            val delayMillis = minutes * 60_000L
+            sessionRepository.markUserAction(sessionId, "snoozed_${minutes}m")
             sessionRepository.setSnoozeUntil(
                 sessionId = sessionId,
                 snoozeUntil = System.currentTimeMillis() + delayMillis

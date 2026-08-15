@@ -1,6 +1,7 @@
 package com.example.focus_app.ui.reminder
 
 import com.example.focus_app.domain.model.ReturnDestination
+import com.example.focus_app.domain.reminder.SnoozeDurationPolicy
 
 internal val presetSnoozeMinutes = listOf(1, 5, 10)
 
@@ -12,4 +13,4 @@ internal fun exitDestinations(customPackageName: String): List<ReturnDestination
     }
 
 internal fun parseCustomSnoozeMinutes(raw: String): Int? =
-    raw.trim().toIntOrNull()?.takeIf { it in 1..120 }
+    raw.trim().toIntOrNull()?.takeIf(SnoozeDurationPolicy::isValid)

@@ -95,6 +95,19 @@ class ReminderViewModelTest {
     }
 
     @Test
+    fun snooze_rejects_more_than_60_minutes_without_persisting_or_scheduling() = runTest(dispatcher) {
+        val fixture = fixture()
+        fixture.viewModel.init(LAUNCH_DATA)
+
+        fixture.viewModel.snooze(LAUNCH_DATA.sessionId, 61)
+        advanceUntilIdle()
+
+        assertEquals(null, fixture.repository.action)
+        assertEquals(null, fixture.repository.snoozeUntil)
+        assertEquals(null, fixture.scheduler.followUpSessionId)
+    }
+
+    @Test
     fun return_to_custom_records_action_and_opens_package() = runTest(dispatcher) {
         val fixture = fixture()
         fixture.viewModel.init(
