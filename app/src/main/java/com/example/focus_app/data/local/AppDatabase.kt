@@ -7,12 +7,14 @@ import com.example.focus_app.data.local.dao.AppUsageEventDao
 import com.example.focus_app.data.local.dao.AppUsageSessionDao
 import com.example.focus_app.data.local.dao.FocusTaskDao
 import com.example.focus_app.data.local.dao.MoodRecordDao
+import com.example.focus_app.data.local.dao.ReminderDisplayEventDao
 import com.example.focus_app.data.local.dao.SettingsDao
 import com.example.focus_app.data.local.entity.AiReminderCacheEntity
 import com.example.focus_app.data.local.entity.AppUsageEventEntity
 import com.example.focus_app.data.local.entity.AppUsageSessionEntity
 import com.example.focus_app.data.local.entity.FocusTaskEntity
 import com.example.focus_app.data.local.entity.MoodRecordEntity
+import com.example.focus_app.data.local.entity.ReminderDisplayEventEntity
 import com.example.focus_app.data.local.entity.SettingsEntity
 
 @Database(
@@ -22,9 +24,10 @@ import com.example.focus_app.data.local.entity.SettingsEntity
         SettingsEntity::class,
         FocusTaskEntity::class,
         AppUsageSessionEntity::class,
+        ReminderDisplayEventEntity::class,
         AiReminderCacheEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -34,4 +37,5 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun focusTaskDao(): FocusTaskDao
     abstract fun appUsageSessionDao(): AppUsageSessionDao
     abstract fun aiReminderCacheDao(): AiReminderCacheDao
+    abstract fun reminderDisplayEventDao(): ReminderDisplayEventDao
 }

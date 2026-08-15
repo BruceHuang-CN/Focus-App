@@ -9,12 +9,16 @@ import com.example.focus_app.data.local.dao.AppUsageEventDao
 import com.example.focus_app.data.local.dao.AppUsageSessionDao
 import com.example.focus_app.data.local.dao.FocusTaskDao
 import com.example.focus_app.data.local.dao.MoodRecordDao
+import com.example.focus_app.data.local.dao.ReminderDisplayEventDao
 import com.example.focus_app.data.local.dao.SettingsDao
 import com.example.focus_app.data.local.migration.MIGRATION_1_2
 import com.example.focus_app.data.local.migration.MIGRATION_2_3
 import com.example.focus_app.data.local.migration.MIGRATION_3_4
 import com.example.focus_app.data.local.migration.MIGRATION_4_5
+import com.example.focus_app.data.local.migration.MIGRATION_5_6
 import com.example.focus_app.data.repository.AppSessionRepository
+import com.example.focus_app.data.repository.ReminderDisplayRepository
+import com.example.focus_app.data.repository.RoomReminderDisplayRepository
 import com.example.focus_app.data.repository.RoomAppSessionRepository
 import com.example.focus_app.data.repository.SettingsRepository
 import com.example.focus_app.data.repository.TaskRepository
@@ -48,7 +52,13 @@ object DatabaseModule {
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): AppDatabase {
         return Room.databaseBuilder(context, AppDatabase::class.java, "focus_app_db")
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+            .addMigrations(
+                MIGRATION_1_2,
+                MIGRATION_2_3,
+                MIGRATION_3_4,
+                MIGRATION_4_5,
+                MIGRATION_5_6
+            )
             .build()
     }
 
@@ -58,6 +68,17 @@ object DatabaseModule {
     @Provides fun provideFocusTaskDao(db: AppDatabase): FocusTaskDao = db.focusTaskDao()
     @Provides fun provideAppUsageSessionDao(db: AppDatabase): AppUsageSessionDao = db.appUsageSessionDao()
     @Provides fun provideAiReminderCacheDao(db: AppDatabase): AiReminderCacheDao = db.aiReminderCacheDao()
+    @Provides
+    fun provideReminderDisplayEventDao(db: AppDatabase): ReminderDisplayEventDao =
+        db.reminderDisplayEventDao()
+
+    @Provides
+    @Singleton
+    fun provideReminderDisplayRepository(
+        db: AppDatabase,
+        displayDao: ReminderDisplayEventDao,
+        sessionDao: AppUsageSessionDao
+    ): ReminderDisplayRepository = RoomReminderDisplayRepository(db, displayDao, sessionDao)
 
     @Provides
     @Singleton
