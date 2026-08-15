@@ -3,6 +3,9 @@ package com.example.focus_app.service
 import com.example.focus_app.data.repository.AppInfo
 import com.example.focus_app.data.repository.AppSessionRepository
 import com.example.focus_app.data.repository.AppSettings
+import com.example.focus_app.data.repository.ReminderDisplayKind
+import com.example.focus_app.data.repository.ReminderDisplayRepository
+import com.example.focus_app.data.repository.ReminderDisplayResult
 import com.example.focus_app.domain.model.AppUsageSession
 import com.example.focus_app.domain.model.ReturnDestination
 import org.junit.Assert.assertEquals
@@ -92,6 +95,8 @@ class FollowUpReminderExecutorTest {
 
         assertEquals(FollowUpDecision.SHOW, decision)
         val shown = fixture.launcher.shown.single()
+        assertEquals("attempt-1", shown.attemptId)
+        assertEquals(ReminderDisplayKind.FOLLOW_UP, shown.displayKind)
         assertEquals("写方案", shown.taskTitle)
         assertEquals(7L, shown.taskId)
         assertEquals("Return to 写方案.", shown.message)
@@ -129,7 +134,9 @@ class FollowUpReminderExecutorTest {
             returnPackageProvider = { "" },
             launcher = launcher,
             gate = FollowUpReminderGate(),
-            environment = environment
+            environment = environment,
+            displayRepository = FakeDisplayRepository(),
+            attemptIdProvider = { "attempt-1" }
         )
         return Fixture(executor, repository, launcher)
     }
@@ -140,6 +147,21 @@ class FollowUpReminderExecutorTest {
     ) : FollowUpEnvironment {
         override fun isDeviceInteractive(): Boolean = interactive
         override fun foregroundSnapshot(): ForegroundSnapshot = snapshot
+    }
+
+    private class FakeDisplayRepository : ReminderDisplayRepository {
+        override suspend fun recordDisplay(
+            attemptId: String,
+            sessionId: Long,
+            displayedAt: Long,
+            kind: ReminderDisplayKind,
+            windowStart: Long,
+            limit: Int
+        ): ReminderDisplayResult = error("Not used")
+
+        override suspend fun countSince(since: Long): Int = 0
+        override suspend fun timesSince(since: Long): List<Long> = emptyList()
+        override suspend fun resetSince(since: Long) = Unit
     }
 
     private data class Fixture(

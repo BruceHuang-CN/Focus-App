@@ -3,6 +3,9 @@
 import com.example.focus_app.data.repository.AppInfo
 import com.example.focus_app.data.repository.AppSessionRepository
 import com.example.focus_app.data.repository.AppSettings
+import com.example.focus_app.data.repository.ReminderDisplayKind
+import com.example.focus_app.data.repository.ReminderDisplayRepository
+import com.example.focus_app.data.repository.ReminderDisplayResult
 import com.example.focus_app.domain.model.AppUsageSession
 import com.example.focus_app.domain.model.ReminderTone
 import com.example.focus_app.domain.model.ReturnDestination
@@ -46,6 +49,8 @@ class ReminderSchedulerTest {
         runCurrent()
 
         assertEquals(1, fixture.launcher.shown.size)
+        assertEquals("attempt-1", fixture.launcher.shown.single().attemptId)
+        assertEquals(ReminderDisplayKind.INITIAL, fixture.launcher.shown.single().displayKind)
         assertNotNull(fixture.repository.session(fixture.session.id)?.remindedAt)
         assertNotNull(fixture.launcher.remindedAtWhenShown)
         assertEquals(
@@ -56,7 +61,9 @@ class ReminderSchedulerTest {
                 appName = "Douyin",
                 message = "Return to Write proposal.",
                 showBreathing = false,
-                returnDestination = ReturnDestination.HOME
+                returnDestination = ReturnDestination.HOME,
+                attemptId = "attempt-1",
+                displayKind = ReminderDisplayKind.INITIAL
             ),
             fixture.launcher.shown.single()
         )
@@ -194,12 +201,15 @@ class ReminderSchedulerTest {
         )
         var launchDataBuildCount = 0
         val followUpScheduler = RecordingFollowUpScheduler()
+        val displayRepository = FakeSchedulerDisplayRepository(previousReminderTimes)
         val scheduler = ReminderScheduler(
             repository = repository,
             launcher = launcher,
             clock = FakeClock(NOW),
             scope = backgroundScope,
             settingsProvider = { settings },
+            displayRepository = displayRepository,
+            attemptIdProvider = { "attempt-1" },
             launchDataProvider = { usageSession, currentSettings ->
                 launchDataBuildCount++
                 ReminderLaunchData(
@@ -235,6 +245,27 @@ class ReminderSchedulerTest {
 
     private companion object {
         const val NOW = 2_000_000L
+    }
+}
+
+private class FakeSchedulerDisplayRepository(
+    initialTimes: List<Long>
+) : ReminderDisplayRepository {
+    private val times = initialTimes.toMutableList()
+
+    override suspend fun recordDisplay(
+        attemptId: String,
+        sessionId: Long,
+        displayedAt: Long,
+        kind: ReminderDisplayKind,
+        windowStart: Long,
+        limit: Int
+    ): ReminderDisplayResult = error("Not used")
+
+    override suspend fun countSince(since: Long): Int = times.count { it >= since }
+    override suspend fun timesSince(since: Long): List<Long> = times.filter { it >= since }
+    override suspend fun resetSince(since: Long) {
+        times.removeAll { it >= since }
     }
 }
 

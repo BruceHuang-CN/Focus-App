@@ -3,6 +3,8 @@ package com.example.focus_app.service
 import com.example.focus_app.data.repository.AppSessionRepository
 import com.example.focus_app.data.repository.AppSettings
 import com.example.focus_app.data.repository.ReminderCacheRepository
+import com.example.focus_app.data.repository.ReminderDisplayKind
+import com.example.focus_app.data.repository.ReminderDisplayRepository
 import com.example.focus_app.data.repository.SettingsRepository
 import com.example.focus_app.data.repository.TaskRepository
 import com.example.focus_app.data.returnapp.CustomReturnAppStore
@@ -42,6 +44,8 @@ class ReminderScheduler(
     private val scope: CoroutineScope,
     private val settingsProvider: suspend () -> AppSettings,
     private val launchDataProvider: suspend (AppUsageSession, AppSettings) -> ReminderLaunchData,
+    private val displayRepository: ReminderDisplayRepository,
+    private val attemptIdProvider: () -> String,
     private val followUpScheduler: FollowUpScheduler = NoOpFollowUpScheduler
 ) : SessionReminderScheduler {
     private val jobs = ConcurrentHashMap<Long, Job>()
@@ -56,13 +60,17 @@ class ReminderScheduler(
         cacheRepository: ReminderCacheRepository,
         launcher: ReminderLauncher,
         customReturnAppStore: CustomReturnAppStore,
-        followUpScheduler: FollowUpScheduler
+        followUpScheduler: FollowUpScheduler,
+        displayRepository: ReminderDisplayRepository,
+        attemptIdGenerator: ReminderAttemptIdGenerator
     ) : this(
         repository = repository,
         launcher = launcher,
         clock = SystemClock,
         scope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
         settingsProvider = settingsRepository::getSettings,
+        displayRepository = displayRepository,
+        attemptIdProvider = attemptIdGenerator::newId,
         followUpScheduler = followUpScheduler,
         launchDataProvider = { session, settings ->
             val taskTitle = session.taskId?.let { taskId ->
@@ -80,7 +88,7 @@ class ReminderScheduler(
                 message = cachedMessage ?: localFallback(session.appName, taskTitle),
                 showBreathing = settings.enableBreathingPause,
                 returnDestination = settings.returnDestination,
-                windowReminderCount = repository.countShownRemindersSince(since),
+                windowReminderCount = displayRepository.countSince(since),
                 windowLimit = settings.maxRemindersPerWindow,
                 windowMinutes = settings.reminderWindowMinutes,
                 returnPackageName = customReturnAppStore.read(),
@@ -100,12 +108,15 @@ class ReminderScheduler(
             if (repository.currentOpenSession()?.id != session.id) return@launch
 
             quotaMutex.withLock {
-                val reminderTimes = repository.reminderTimesSince(
+                val reminderTimes = displayRepository.timesSince(
                     clock.nowMillis() - settings.reminderWindowMinutes * 60_000L
                 )
                 if (!policy.canShow(reminderTimes, settings)) return@withLock
                 if (!repository.markRemindedIfNeeded(session.id, clock.nowMillis())) return@withLock
-                val data = launchDataProvider(session, settings)
+                val data = launchDataProvider(session, settings).copy(
+                    attemptId = attemptIdProvider(),
+                    displayKind = ReminderDisplayKind.INITIAL
+                )
                 launcher.show(data)
             }
         }

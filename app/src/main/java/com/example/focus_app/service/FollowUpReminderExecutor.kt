@@ -3,6 +3,8 @@ package com.example.focus_app.service
 import com.example.focus_app.data.repository.AppSessionRepository
 import com.example.focus_app.data.repository.AppSettings
 import com.example.focus_app.data.repository.ReminderCacheRepository
+import com.example.focus_app.data.repository.ReminderDisplayKind
+import com.example.focus_app.data.repository.ReminderDisplayRepository
 import com.example.focus_app.data.repository.SettingsRepository
 import com.example.focus_app.data.repository.TaskRepository
 import com.example.focus_app.data.returnapp.CustomReturnAppStore
@@ -25,7 +27,9 @@ class FollowUpReminderExecutor(
     private val returnPackageProvider: () -> String,
     private val launcher: ReminderLauncher,
     private val gate: FollowUpReminderGate,
-    private val environment: FollowUpEnvironment
+    private val environment: FollowUpEnvironment,
+    private val displayRepository: ReminderDisplayRepository,
+    private val attemptIdProvider: () -> String
 ) : FollowUpExecutor {
     override suspend fun execute(sessionId: Long): FollowUpDecision {
         val settings = settingsProvider()
@@ -39,7 +43,7 @@ class FollowUpReminderExecutor(
                 targetPackages = settings.targetApps.map { it.packageName },
                 deviceInteractive = environment.isDeviceInteractive(),
                 foregroundSnapshot = environment.foregroundSnapshot(),
-                remindedCountSinceWindow = sessionRepository.reminderTimesSince(since).size,
+                remindedCountSinceWindow = displayRepository.countSince(since),
                 maxRemindersPerWindow = settings.maxRemindersPerWindow
             )
         )
@@ -63,7 +67,6 @@ class FollowUpReminderExecutor(
         if (!sessionRepository.claimSnooze(sessionId)) {
             return FollowUpDecision.SKIP
         }
-        sessionRepository.updateRemindedAt(sessionId, now)
         launcher.show(
             ReminderLaunchData(
                 sessionId = session.id,
@@ -73,11 +76,13 @@ class FollowUpReminderExecutor(
                 message = message,
                 showBreathing = settings.enableBreathingPause,
                 returnDestination = settings.returnDestination,
-                windowReminderCount = sessionRepository.countShownRemindersSince(since),
+                windowReminderCount = displayRepository.countSince(since),
                 windowLimit = settings.maxRemindersPerWindow,
                 windowMinutes = settings.reminderWindowMinutes,
                 returnPackageName = returnPackageProvider(),
-                forceReminder = settings.forceReminder
+                forceReminder = settings.forceReminder,
+                attemptId = attemptIdProvider(),
+                displayKind = ReminderDisplayKind.FOLLOW_UP
             )
         )
         return FollowUpDecision.SHOW
@@ -92,7 +97,9 @@ class FollowUpReminderExecutor(
         launcher: ReminderLauncher,
         customReturnAppStore: CustomReturnAppStore,
         gate: FollowUpReminderGate,
-        environment: FollowUpEnvironment
+        environment: FollowUpEnvironment,
+        displayRepository: ReminderDisplayRepository,
+        attemptIdGenerator: ReminderAttemptIdGenerator
     ) : this(
         sessionRepository = sessionRepository,
         settingsProvider = settingsRepository::getSettings,
@@ -109,7 +116,9 @@ class FollowUpReminderExecutor(
         returnPackageProvider = customReturnAppStore::read,
         launcher = launcher,
         gate = gate,
-        environment = environment
+        environment = environment,
+        displayRepository = displayRepository,
+        attemptIdProvider = attemptIdGenerator::newId
     )
 }
 
