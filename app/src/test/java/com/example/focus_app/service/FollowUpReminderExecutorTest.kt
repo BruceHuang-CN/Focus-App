@@ -6,7 +6,6 @@ import com.example.focus_app.data.repository.AppSettings
 import com.example.focus_app.domain.model.AppUsageSession
 import com.example.focus_app.domain.model.ReturnDestination
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Test
 
@@ -32,22 +31,24 @@ class FollowUpReminderExecutorTest {
     )
 
     @Test
-    fun shows_reminder_when_foreground_cannot_be_verified() = kotlinx.coroutines.test.runTest {
-        val env = FakeEnvironment(interactive = true, latestForeground = null)
+    fun retries_when_foreground_cannot_be_verified() = kotlinx.coroutines.test.runTest {
+        val env = FakeEnvironment(interactive = true, snapshot = ForegroundSnapshot.Unknown)
         val fixture = fixture(environment = env)
 
         val decision = fixture.executor.execute(session.id)
 
-        assertEquals(FollowUpDecision.SHOW, decision)
-        assertEquals(1, fixture.launcher.shown.size)
-        assertEquals(session.id, fixture.launcher.shown.single().sessionId)
-        assertNotNull(fixture.repository.session(session.id)?.remindedAt)
-        assertNull(fixture.repository.session(session.id)?.snoozeUntil)
+        assertEquals(FollowUpDecision.RETRY, decision)
+        assertEquals(0, fixture.launcher.shown.size)
+        assertNull(fixture.repository.session(session.id)?.remindedAt)
+        assertEquals(20_000L, fixture.repository.session(session.id)?.snoozeUntil)
     }
 
     @Test
     fun returns_retry_when_device_is_locked_without_showing() = kotlinx.coroutines.test.runTest {
-        val env = FakeEnvironment(interactive = false, latestForeground = session.packageName)
+        val env = FakeEnvironment(
+            interactive = false,
+            snapshot = ForegroundSnapshot.Confirmed(session.packageName, ForegroundSource.REALTIME)
+        )
         val fixture = fixture(environment = env)
 
         val decision = fixture.executor.execute(session.id)
@@ -60,7 +61,10 @@ class FollowUpReminderExecutorTest {
 
     @Test
     fun skips_when_user_confirmed_to_have_left_target_app() = kotlinx.coroutines.test.runTest {
-        val env = FakeEnvironment(interactive = true, latestForeground = "com.tencent.mm")
+        val env = FakeEnvironment(
+            interactive = true,
+            snapshot = ForegroundSnapshot.Confirmed("com.tencent.mm", ForegroundSource.USAGE_EVENTS)
+        )
         val fixture = fixture(environment = env)
 
         val decision = fixture.executor.execute(session.id)
@@ -109,7 +113,7 @@ class FollowUpReminderExecutorTest {
         repository: FakeSessionRepository = FakeSessionRepository(session),
         environment: FakeEnvironment = FakeEnvironment(
             interactive = true,
-            latestForeground = session.packageName
+            snapshot = ForegroundSnapshot.Confirmed(session.packageName, ForegroundSource.REALTIME)
         )
     ): Fixture {
         val launcher = RecordingLauncher()
@@ -132,10 +136,10 @@ class FollowUpReminderExecutorTest {
 
     private class FakeEnvironment(
         var interactive: Boolean,
-        var latestForeground: String?
+        var snapshot: ForegroundSnapshot
     ) : FollowUpEnvironment {
         override fun isDeviceInteractive(): Boolean = interactive
-        override fun latestForegroundPackage(): String? = latestForeground
+        override fun foregroundSnapshot(): ForegroundSnapshot = snapshot
     }
 
     private data class Fixture(

@@ -38,7 +38,7 @@ class FollowUpReminderExecutor(
                 currentOpenSessionId = sessionRepository.currentOpenSession()?.id,
                 targetPackages = settings.targetApps.map { it.packageName },
                 deviceInteractive = environment.isDeviceInteractive(),
-                latestForegroundPackage = environment.latestForegroundPackage(),
+                foregroundSnapshot = environment.foregroundSnapshot(),
                 remindedCountSinceWindow = sessionRepository.reminderTimesSince(since).size,
                 maxRemindersPerWindow = settings.maxRemindersPerWindow
             )

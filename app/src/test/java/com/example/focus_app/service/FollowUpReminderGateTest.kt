@@ -16,17 +16,22 @@ class FollowUpReminderGateTest {
     )
 
     @Test
-    fun when_foreground_cannot_be_verified_reminder_still_shows() {
+    fun when_foreground_cannot_be_verified_reminder_retries() {
         val decision = gate.decide(
-            ok().copy(latestForegroundPackage = null)
+            ok().copy(foregroundSnapshot = ForegroundSnapshot.Unknown)
         )
-        assertEquals(FollowUpDecision.SHOW, decision)
+        assertEquals(FollowUpDecision.RETRY, decision)
     }
 
     @Test
     fun when_foreground_is_a_different_package_reminder_is_skipped() {
         val decision = gate.decide(
-            ok().copy(latestForegroundPackage = "com.tencent.mm")
+            ok().copy(
+                foregroundSnapshot = ForegroundSnapshot.Confirmed(
+                    "com.tencent.mm",
+                    ForegroundSource.USAGE_EVENTS
+                )
+            )
         )
         assertEquals(FollowUpDecision.SKIP, decision)
     }
@@ -82,7 +87,10 @@ class FollowUpReminderGateTest {
         currentOpenSessionId = session.id,
         targetPackages = listOf("com.ss.android.ugc.aweme"),
         deviceInteractive = true,
-        latestForegroundPackage = "com.ss.android.ugc.aweme",
+        foregroundSnapshot = ForegroundSnapshot.Confirmed(
+            "com.ss.android.ugc.aweme",
+            ForegroundSource.REALTIME
+        ),
         remindedCountSinceWindow = 2,
         maxRemindersPerWindow = 3
     )

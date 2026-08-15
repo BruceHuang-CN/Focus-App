@@ -5,27 +5,63 @@ import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.os.Build
 import android.os.PowerManager
+import android.os.SystemClock
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** 稍后提醒到期时需要的设备状态。 */
 interface FollowUpEnvironment {
     fun isDeviceInteractive(): Boolean
-    /** 当前真实前台包名；null 表示无法确认（例如缺少使用情况访问权限）。 */
-    fun latestForegroundPackage(): String?
+    fun foregroundSnapshot(): ForegroundSnapshot
 }
 
-/** 记录无障碍/兼容检测最后确认的真实前台应用包名，供稍后提醒复用，避免重复查询系统服务。 */
+enum class ForegroundSource {
+    REALTIME,
+    USAGE_EVENTS
+}
+
+sealed interface ForegroundSnapshot {
+    data class Confirmed(
+        val packageName: String,
+        val source: ForegroundSource
+    ) : ForegroundSnapshot
+
+    data object Unknown : ForegroundSnapshot
+}
+
+data class TimedForegroundPackage(
+    val packageName: String,
+    val observedAtElapsedRealtime: Long
+)
+
+internal fun selectForegroundSnapshot(
+    cached: TimedForegroundPackage?,
+    nowElapsedRealtime: Long,
+    maxCacheAgeMillis: Long,
+    usagePackage: () -> String?
+): ForegroundSnapshot {
+    val cacheAge = cached?.let { nowElapsedRealtime - it.observedAtElapsedRealtime }
+    if (cached != null && cacheAge != null && cacheAge in 0..maxCacheAgeMillis) {
+        return ForegroundSnapshot.Confirmed(cached.packageName, ForegroundSource.REALTIME)
+    }
+    return usagePackage()?.let {
+        ForegroundSnapshot.Confirmed(it, ForegroundSource.USAGE_EVENTS)
+    } ?: ForegroundSnapshot.Unknown
+}
+
 @Singleton
 class RealtimeForegroundProvider @Inject constructor() {
-    @Volatile private var latestPackageName: String? = null
+    @Volatile
+    private var latest: TimedForegroundPackage? = null
 
-    fun onRealApplicationForeground(packageName: String) {
-        latestPackageName = packageName
+    fun onRealApplicationForeground(
+        packageName: String,
+        observedAtElapsedRealtime: Long = SystemClock.elapsedRealtime()
+    ) {
+        latest = TimedForegroundPackage(packageName, observedAtElapsedRealtime)
     }
 
-    fun current(): String? = latestPackageName
+    fun current(): TimedForegroundPackage? = latest
 }
 
 @Singleton
@@ -39,8 +75,12 @@ class AndroidFollowUpEnvironment @Inject constructor(
         return powerManager?.isInteractive != false
     }
 
-    override fun latestForegroundPackage(): String? =
-        realtimeForegroundProvider.current() ?: queryUsageStatsForeground()
+    override fun foregroundSnapshot(): ForegroundSnapshot = selectForegroundSnapshot(
+        cached = realtimeForegroundProvider.current(),
+        nowElapsedRealtime = SystemClock.elapsedRealtime(),
+        maxCacheAgeMillis = REALTIME_CACHE_MAX_AGE_MS,
+        usagePackage = ::queryUsageStatsForeground
+    )
 
     @Suppress("DEPRECATION")
     private fun queryUsageStatsForeground(): String? = try {
@@ -70,6 +110,7 @@ class AndroidFollowUpEnvironment @Inject constructor(
     }
 
     private companion object {
+        const val REALTIME_CACHE_MAX_AGE_MS = 3_000L
         const val FOREGROUND_LOOKBACK_MS = 24 * 60 * 60 * 1_000L
     }
 }

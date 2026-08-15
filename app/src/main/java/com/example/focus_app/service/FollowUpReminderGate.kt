@@ -22,7 +22,7 @@ data class FollowUpGateInput(
     val targetPackages: List<String>,
     val deviceInteractive: Boolean,
     /** 当前真实前台包名；null 表示无法确认（例如缺少使用情况访问权限）。 */
-    val latestForegroundPackage: String?,
+    val foregroundSnapshot: ForegroundSnapshot,
     val remindedCountSinceWindow: Int,
     val maxRemindersPerWindow: Int
 )
@@ -41,15 +41,19 @@ class FollowUpReminderGate @Inject constructor() {
         if (input.currentOpenSessionId != session.id) return FollowUpDecision.SKIP
         if (session.packageName !in input.targetPackages) return FollowUpDecision.SKIP
 
-        if (!input.deviceInteractive) return FollowUpDecision.RETRY
-
-        val foreground = input.latestForegroundPackage
-        if (foreground != null && foreground != session.packageName) {
+        if (input.remindedCountSinceWindow >= input.maxRemindersPerWindow) {
             return FollowUpDecision.SKIP
         }
 
-        if (input.remindedCountSinceWindow >= input.maxRemindersPerWindow) {
-            return FollowUpDecision.SKIP
+        if (!input.deviceInteractive) return FollowUpDecision.RETRY
+
+        when (val foreground = input.foregroundSnapshot) {
+            ForegroundSnapshot.Unknown -> return FollowUpDecision.RETRY
+            is ForegroundSnapshot.Confirmed -> {
+                if (foreground.packageName != session.packageName) {
+                    return FollowUpDecision.SKIP
+                }
+            }
         }
         return FollowUpDecision.SHOW
     }
