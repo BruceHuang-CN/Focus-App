@@ -10,6 +10,9 @@ import com.example.focus_app.data.local.entity.SettingsEntity
 import com.example.focus_app.data.repository.AppInfo
 import com.example.focus_app.data.repository.AppSessionRepository
 import com.example.focus_app.data.repository.ReminderCacheRepository
+import com.example.focus_app.data.repository.ReminderDisplayKind
+import com.example.focus_app.data.repository.ReminderDisplayRepository
+import com.example.focus_app.data.repository.ReminderDisplayResult
 import com.example.focus_app.data.repository.SettingsRepository
 import com.example.focus_app.domain.model.AppUsageSession
 import com.example.focus_app.domain.time.FakeClock
@@ -41,7 +44,7 @@ class UpdateGuardianStateUseCaseTest {
             fixture.events
         )
         assertEquals(listOf(AppInfo("social.app", "Social")), fixture.settings.getSettings().targetApps)
-        assertEquals(4_400_000L, fixture.sessions.resetSince.single())
+        assertEquals(4_400_000L, fixture.displays.resetSince.single())
     }
 
     @Test
@@ -99,6 +102,7 @@ class UpdateGuardianStateUseCaseTest {
         val events = mutableListOf<String>()
         val settings = SettingsRepository(RecordingSettingsDao(events, enableAccessibility))
         val sessions = RecordingSessions(events)
+        val displays = RecordingDisplays(events)
         val coordinator = AppSessionCoordinator(
             repository = sessions,
             contextProvider = object : AppSessionContextProvider {
@@ -109,7 +113,7 @@ class UpdateGuardianStateUseCaseTest {
         )
         val groups = AppGroupRepository(AppGroupStore(MemoryPreferences()), settings)
         val cache = ReminderCacheRepository(NoOpCacheDao(), FakeClock(8_000_000L))
-        return Fixture(UpdateGuardianStateUseCase(groups, settings, sessions, cache, coordinator, FakeClock(8_000_000L)), groups, settings, sessions, cache, events)
+        return Fixture(UpdateGuardianStateUseCase(groups, settings, sessions, displays, cache, coordinator, FakeClock(8_000_000L)), groups, settings, sessions, displays, cache, events)
     }
 
     private data class Fixture(
@@ -117,6 +121,7 @@ class UpdateGuardianStateUseCaseTest {
         val groups: AppGroupRepository,
         val settings: SettingsRepository,
         val sessions: RecordingSessions,
+        val displays: RecordingDisplays,
         val cache: ReminderCacheRepository,
         val events: MutableList<String>
     )
@@ -131,7 +136,6 @@ private class RecordingSettingsDao(private val events: MutableList<String>, acce
 }
 
 private class RecordingSessions(private val events: MutableList<String>) : AppSessionRepository {
-    val resetSince = mutableListOf<Long>()
     private var open = AppUsageSession(1L, "video.app", "Video", 8_000_000L, null, null, null, null, "gentle")
     override suspend fun openSession(packageName: String, appName: String, startedAt: Long, taskId: Long?, toneKey: String): AppUsageSession = open
     override suspend fun closeSession(sessionId: Long, endedAt: Long) { events += "close"; open = open.copy(endedAt = endedAt) }
@@ -139,7 +143,28 @@ private class RecordingSessions(private val events: MutableList<String>) : AppSe
     override suspend fun reminderTimesSince(since: Long): List<Long> = emptyList()
     override suspend fun markRemindedIfNeeded(sessionId: Long, remindedAt: Long) = false
     override suspend fun markUserAction(sessionId: Long, action: String) = Unit
-    override suspend fun resetReminderQuota(since: Long) { events += "quota"; resetSince += since }
+}
+
+private class RecordingDisplays(
+    private val events: MutableList<String>
+) : ReminderDisplayRepository {
+    val resetSince = mutableListOf<Long>()
+
+    override suspend fun recordDisplay(
+        attemptId: String,
+        sessionId: Long,
+        displayedAt: Long,
+        kind: ReminderDisplayKind,
+        windowStart: Long,
+        limit: Int
+    ): ReminderDisplayResult = error("not used")
+
+    override suspend fun countSince(since: Long): Int = 0
+    override suspend fun timesSince(since: Long): List<Long> = emptyList()
+    override suspend fun resetSince(since: Long) {
+        events += "quota"
+        resetSince += since
+    }
 }
 
 private class RecordingScheduler(private val events: MutableList<String>) : SessionReminderScheduler {

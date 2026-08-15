@@ -4,6 +4,7 @@ import com.example.focus_app.data.appgroup.AppGroupRepository
 import com.example.focus_app.data.repository.AppInfo
 import com.example.focus_app.data.repository.AppSessionRepository
 import com.example.focus_app.data.repository.ReminderCacheRepository
+import com.example.focus_app.data.repository.ReminderDisplayRepository
 import com.example.focus_app.data.repository.SettingsRepository
 import com.example.focus_app.domain.time.Clock
 import com.example.focus_app.domain.time.SystemClock
@@ -14,6 +15,7 @@ class UpdateGuardianStateUseCase private constructor(
     private val groups: AppGroupRepository,
     private val settings: SettingsRepository,
     private val sessions: AppSessionRepository,
+    private val displays: ReminderDisplayRepository,
     private val reminderCache: ReminderCacheRepository,
     private val coordinator: AppSessionCoordinator,
     private val quotaClock: () -> Long
@@ -23,18 +25,20 @@ class UpdateGuardianStateUseCase private constructor(
         groups: AppGroupRepository,
         settings: SettingsRepository,
         sessions: AppSessionRepository,
+        displays: ReminderDisplayRepository,
         reminderCache: ReminderCacheRepository,
         coordinator: AppSessionCoordinator
-    ) : this(groups, settings, sessions, reminderCache, coordinator, SystemClock::nowMillis)
+    ) : this(groups, settings, sessions, displays, reminderCache, coordinator, SystemClock::nowMillis)
 
     constructor(
         groups: AppGroupRepository,
         settings: SettingsRepository,
         sessions: AppSessionRepository,
+        displays: ReminderDisplayRepository,
         reminderCache: ReminderCacheRepository,
         coordinator: AppSessionCoordinator,
         clock: Clock
-    ) : this(groups, settings, sessions, reminderCache, coordinator, clock::nowMillis)
+    ) : this(groups, settings, sessions, displays, reminderCache, coordinator, clock::nowMillis)
 
     suspend fun activateGroup(groupId: String): Result<Unit> = runCatching {
         val group = groups.groups.value.firstOrNull { it.id == groupId }
@@ -44,7 +48,7 @@ class UpdateGuardianStateUseCase private constructor(
         coordinator.stopCurrentSession()
         settings.update { it.copy(targetApps = group.apps) }
         val current = settings.getSettings()
-        sessions.resetReminderQuota(quotaClock() - current.reminderWindowMinutes * 60_000L)
+        displays.resetSince(quotaClock() - current.reminderWindowMinutes * 60_000L)
         reminderCache.requestRegeneration()
         groups.activate(groupId)
     }

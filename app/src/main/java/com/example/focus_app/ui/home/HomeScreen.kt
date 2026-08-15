@@ -22,6 +22,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.example.focus_app.R
 import com.example.focus_app.domain.model.AppUsageSession
+import com.example.focus_app.domain.model.DetectionMode
 import com.example.focus_app.domain.model.FocusTask
 import com.example.focus_app.ui.tasks.scheduleLabel
 import com.example.focus_app.ui.theme.InkBlue
@@ -165,6 +166,9 @@ internal fun HomeContent(
                     reminderWindowMinutes = uiState.reminderWindowMinutes,
                     windowReminderCount = uiState.windowReminderCount,
                     windowReminderLimit = uiState.windowReminderLimit,
+                    detectionMode = uiState.detectionMode,
+                    accessibilitySystemEnabled = uiState.accessibilitySystemEnabled,
+                    accessibilityServiceBound = uiState.accessibilityServiceBound,
                     onGuardianEnabledChange = onGuardianEnabledChange,
                     onResetReminderQuota = onResetReminderQuota
                 )
@@ -226,6 +230,9 @@ private fun GuardianControlCard(
     reminderWindowMinutes: Int,
     windowReminderCount: Int,
     windowReminderLimit: Int,
+    detectionMode: DetectionMode,
+    accessibilitySystemEnabled: Boolean,
+    accessibilityServiceBound: Boolean,
     onGuardianEnabledChange: (Boolean) -> Unit,
     onResetReminderQuota: () -> Unit
 ) {
@@ -253,6 +260,20 @@ private fun GuardianControlCard(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.outline
             )
+            if (detectionMode == DetectionMode.REALTIME) {
+                Text(
+                    text = accessibilityStatusLabel(
+                        systemEnabled = accessibilitySystemEnabled,
+                        serviceBound = accessibilityServiceBound
+                    ),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (accessibilitySystemEnabled && accessibilityServiceBound) {
+                        SuccessGreen
+                    } else {
+                        WarningAmber
+                    }
+                )
+            }
             Spacer(modifier = Modifier.height(8.dp))
             Text("当前应用组：$activeGroupName", style = MaterialTheme.typography.bodyMedium)
             Spacer(modifier = Modifier.height(12.dp))
@@ -261,8 +282,19 @@ private fun GuardianControlCard(
     }
 }
 
-internal fun reminderQuotaLabel(minutes: Int, count: Int, limit: Int): String =
-    "本时段（$minutes 分钟）已提醒 $count/$limit 次"
+internal fun accessibilityStatusLabel(systemEnabled: Boolean, serviceBound: Boolean): String =
+    when {
+        !systemEnabled -> "无障碍：系统未开启"
+        serviceBound -> "无障碍：系统已开启 · 服务运行中"
+        else -> "无障碍：系统已开启 · 服务未连接"
+    }
+
+internal fun reminderQuotaLabel(minutes: Int, count: Int, limit: Int): String {
+    val safeCount = count.coerceAtLeast(0)
+    val safeLimit = limit.coerceAtLeast(0)
+    val remaining = (safeLimit - safeCount).coerceAtLeast(0)
+    return "本时间段（$minutes 分钟）已提醒 $safeCount/$safeLimit 次，剩余 $remaining 次"
+}
 
 @Composable
 private fun ReminderRecordCard(session: AppUsageSession) {

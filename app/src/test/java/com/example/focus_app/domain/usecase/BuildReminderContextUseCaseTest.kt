@@ -6,6 +6,9 @@ import com.example.focus_app.data.repository.AppInfo
 import com.example.focus_app.data.repository.AppSessionRepository
 import com.example.focus_app.data.repository.AppSettings
 import com.example.focus_app.data.repository.MoodRepository
+import com.example.focus_app.data.repository.ReminderDisplayKind
+import com.example.focus_app.data.repository.ReminderDisplayRepository
+import com.example.focus_app.data.repository.ReminderDisplayResult
 import com.example.focus_app.domain.model.AppUsageSession
 import com.example.focus_app.domain.model.FocusTask
 import com.example.focus_app.domain.time.FakeClock
@@ -23,9 +26,11 @@ class BuildReminderContextUseCaseTest {
         val zone = ZoneId.systemDefault()
         val now = LocalDate.of(2026, 8, 3).atTime(12, 0).atZone(zone)
         val sessions = ContextSessionRepository(activeExits = 4)
+        val displays = ContextDisplayRepository(count = 3)
         val useCase = BuildReminderContextUseCase(
             sessions,
             MoodRepository(EmptyMoodDao()),
+            displays,
             FakeClock(now.toInstant().toEpochMilli())
         )
 
@@ -36,11 +41,29 @@ class BuildReminderContextUseCaseTest {
         )
 
         assertEquals(4, context.activeExitsToday)
+        assertEquals(3, context.remindersInWindow)
         assertEquals(
             now.toLocalDate().atStartOfDay(zone).toInstant().toEpochMilli(),
             sessions.activeExitSince
         )
     }
+}
+
+private class ContextDisplayRepository(
+    private val count: Int
+) : ReminderDisplayRepository {
+    override suspend fun recordDisplay(
+        attemptId: String,
+        sessionId: Long,
+        displayedAt: Long,
+        kind: ReminderDisplayKind,
+        windowStart: Long,
+        limit: Int
+    ): ReminderDisplayResult = error("not used")
+
+    override suspend fun countSince(since: Long): Int = count
+    override suspend fun timesSince(since: Long): List<Long> = emptyList()
+    override suspend fun resetSince(since: Long) = Unit
 }
 
 private class ContextSessionRepository(

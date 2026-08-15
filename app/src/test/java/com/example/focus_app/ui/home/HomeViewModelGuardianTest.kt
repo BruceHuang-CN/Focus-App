@@ -15,8 +15,13 @@ import com.example.focus_app.data.repository.AppInfo
 import com.example.focus_app.data.repository.AppSessionRepository
 import com.example.focus_app.data.repository.MoodRepository
 import com.example.focus_app.data.repository.ReminderCacheRepository
+import com.example.focus_app.data.repository.ReminderDisplayKind
+import com.example.focus_app.data.repository.ReminderDisplayRepository
+import com.example.focus_app.data.repository.ReminderDisplayResult
 import com.example.focus_app.data.repository.SettingsRepository
 import com.example.focus_app.data.repository.TaskRepository
+import com.example.focus_app.data.permission.PermissionStatusProvider
+import com.example.focus_app.domain.model.DetectionMode
 import com.example.focus_app.domain.model.AppUsageSession
 import com.example.focus_app.domain.time.FakeClock
 import com.example.focus_app.domain.usecase.ResetReminderQuotaUseCase
@@ -24,6 +29,8 @@ import com.example.focus_app.domain.usecase.UpdateGuardianStateUseCase
 import com.example.focus_app.service.AppSessionContext
 import com.example.focus_app.service.AppSessionContextProvider
 import com.example.focus_app.service.AppSessionCoordinator
+import com.example.focus_app.service.AccessibilityDiagnosticsState
+import com.example.focus_app.service.AccessibilityDiagnosticsStore
 import com.example.focus_app.service.SessionReminderScheduler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -78,7 +85,7 @@ class HomeViewModelGuardianTest {
         viewModel.resetReminderQuota()
         runCurrent()
         assertFalse(fixture.settings.getSettings().guardianEnabled)
-        assertEquals(1, fixture.sessions.resetQuotaCalls)
+        assertEquals(1, fixture.displays.resetQuotaCalls)
     }
 
     @Test
@@ -92,7 +99,7 @@ class HomeViewModelGuardianTest {
         runCurrent()
 
         assertEquals(HomeEvent.ReminderQuotaReset, event.await())
-        assertEquals(1, fixture.sessions.resetQuotaCalls)
+        assertEquals(1, fixture.displays.resetQuotaCalls)
     }
 
     @Test
@@ -124,26 +131,50 @@ class HomeViewModelGuardianTest {
         assertEquals(0, viewModel.uiState.value.windowReminderCount)
     }
 
+    @Test
+    fun accessibility_system_switch_and_service_binding_are_exposed_separately() = runTest(dispatcher) {
+        val fixture = fixture(
+            accessibilitySystemEnabled = true,
+            serviceBound = false
+        )
+        val viewModel = fixture.homeViewModel()
+        runCurrent()
+
+        assertEquals(DetectionMode.REALTIME, viewModel.uiState.value.detectionMode)
+        assertEquals(true, viewModel.uiState.value.accessibilitySystemEnabled)
+        assertEquals(false, viewModel.uiState.value.accessibilityServiceBound)
+
+        fixture.diagnostics.setServiceBound(true)
+        runCurrent()
+
+        assertEquals(true, viewModel.uiState.value.accessibilityServiceBound)
+    }
+
     private fun fixture(
         guardianEnabled: Boolean = true,
         windowMinutes: Int = 60,
         windowLimit: Int = 3,
-        shownReminders: Int = 0
+        shownReminders: Int = 0,
+        accessibilitySystemEnabled: Boolean = true,
+        serviceBound: Boolean = true
     ): Fixture {
         val settings = SettingsRepository(
             HomeSettingsDao(guardianEnabled, windowMinutes, windowLimit)
         )
         val groups = AppGroupRepository(AppGroupStore(HomePreferences()), settings)
-        val sessions = HomeSessions(shownReminders)
+        val sessions = HomeSessions()
+        val displays = HomeDisplayRepository(shownReminders)
+        val permissions = HomePermissionStatusProvider(accessibilitySystemEnabled)
+        val diagnostics = HomeAccessibilityDiagnosticsStore(serviceBound)
         val coordinator = AppSessionCoordinator(sessions, object : AppSessionContextProvider {
             override suspend fun currentContext() = AppSessionContext(emptyMap(), null, "gentle")
         }, FakeClock(1_000_000L), HomeReminderScheduler())
         val cache = ReminderCacheRepository(HomeCacheDao(), FakeClock(1_000_000L))
-        return Fixture(settings, groups, sessions, MoodRepository(HomeMoodDao()), TaskRepository(HomeTaskDao(), FakeClock(1_000_000L)), UpdateGuardianStateUseCase(groups, settings, sessions, cache, coordinator, FakeClock(1_000_000L)), ResetReminderQuotaUseCase(settings, sessions, coordinator, FakeClock(1_000_000L)))
+        return Fixture(settings, groups, sessions, displays, permissions, diagnostics, MoodRepository(HomeMoodDao()), TaskRepository(HomeTaskDao(), FakeClock(1_000_000L)), UpdateGuardianStateUseCase(groups, settings, sessions, displays, cache, coordinator, FakeClock(1_000_000L)), ResetReminderQuotaUseCase(settings, displays, coordinator, FakeClock(1_000_000L)))
     }
 
-    private data class Fixture(val settings: SettingsRepository, val groups: AppGroupRepository, val sessions: HomeSessions, val moods: MoodRepository, val tasks: TaskRepository, val updateGuardianState: UpdateGuardianStateUseCase, val resetReminderQuota: ResetReminderQuotaUseCase) {
-        fun homeViewModel() = HomeViewModel(sessions, moods, tasks, settings, groups, updateGuardianState, resetReminderQuota)
+    private data class Fixture(val settings: SettingsRepository, val groups: AppGroupRepository, val sessions: HomeSessions, val displays: HomeDisplayRepository, val permissions: PermissionStatusProvider, val diagnostics: HomeAccessibilityDiagnosticsStore, val moods: MoodRepository, val tasks: TaskRepository, val updateGuardianState: UpdateGuardianStateUseCase, val resetReminderQuota: ResetReminderQuotaUseCase) {
+        fun homeViewModel() = HomeViewModel(sessions, moods, tasks, settings, displays, groups, permissions, diagnostics, updateGuardianState, resetReminderQuota)
     }
 }
 
@@ -165,20 +196,62 @@ private class HomeSettingsDao(
     override suspend fun getSettingsOnce(): SettingsEntity? = state.value
     override suspend fun clearLegacyApiKey() = Unit
 }
-private class HomeSessions(shownReminders: Int) : AppSessionRepository {
-    var resetQuotaCalls = 0
-    private var shownReminderCount = shownReminders
+private class HomeSessions : AppSessionRepository {
     override suspend fun openSession(packageName: String, appName: String, startedAt: Long, taskId: Long?, toneKey: String): AppUsageSession = error("unused")
     override suspend fun closeSession(sessionId: Long, endedAt: Long) = Unit
     override suspend fun currentOpenSession(): AppUsageSession? = null
     override suspend fun reminderTimesSince(since: Long): List<Long> = emptyList()
     override suspend fun markRemindedIfNeeded(sessionId: Long, remindedAt: Long) = false
     override suspend fun markUserAction(sessionId: Long, action: String) = Unit
-    override suspend fun countShownRemindersSince(since: Long): Int = shownReminderCount
-    override suspend fun resetReminderQuota(since: Long) {
+}
+
+private class HomeDisplayRepository(
+    private var shownReminderCount: Int
+) : ReminderDisplayRepository {
+    var resetQuotaCalls = 0
+
+    override suspend fun recordDisplay(
+        attemptId: String,
+        sessionId: Long,
+        displayedAt: Long,
+        kind: ReminderDisplayKind,
+        windowStart: Long,
+        limit: Int
+    ): ReminderDisplayResult = error("unused")
+
+    override suspend fun countSince(since: Long): Int = shownReminderCount
+    override suspend fun timesSince(since: Long): List<Long> = emptyList()
+    override suspend fun resetSince(since: Long) {
         resetQuotaCalls++
         shownReminderCount = 0
     }
+}
+
+private class HomePermissionStatusProvider(
+    private val accessibilityEnabled: Boolean
+) : PermissionStatusProvider {
+    override fun accessibilityEnabled(): Boolean = accessibilityEnabled
+    override fun usageStatsGranted(): Boolean = false
+    override fun notificationGranted(): Boolean = false
+    override fun overlayGranted(): Boolean = false
+}
+
+private class HomeAccessibilityDiagnosticsStore(
+    serviceBound: Boolean
+) : AccessibilityDiagnosticsStore {
+    private val mutableState = MutableStateFlow(
+        AccessibilityDiagnosticsState(serviceBound = serviceBound)
+    )
+    override val state = mutableState
+
+    fun setServiceBound(value: Boolean) {
+        mutableState.value = mutableState.value.copy(serviceBound = value)
+    }
+
+    override fun recordServiceConnected(nowMillis: Long) = Unit
+    override fun recordServiceDestroyed(nowMillis: Long) = Unit
+    override fun recordServiceInterrupted(nowMillis: Long) = Unit
+    override fun recordAppLaunch(packageLastUpdateTimeMillis: Long, nowMillis: Long) = Unit
 }
 private class HomeMoodDao : MoodRecordDao {
     override suspend fun insert(mood: MoodRecordEntity) = Unit

@@ -3,6 +3,9 @@ package com.example.focus_app.domain.usecase
 import com.example.focus_app.data.local.dao.SettingsDao
 import com.example.focus_app.data.local.entity.SettingsEntity
 import com.example.focus_app.data.repository.AppSessionRepository
+import com.example.focus_app.data.repository.ReminderDisplayKind
+import com.example.focus_app.data.repository.ReminderDisplayRepository
+import com.example.focus_app.data.repository.ReminderDisplayResult
 import com.example.focus_app.data.repository.SettingsRepository
 import com.example.focus_app.domain.model.AppUsageSession
 import com.example.focus_app.domain.time.FakeClock
@@ -25,7 +28,7 @@ class ResetReminderQuotaUseCaseTest {
         fixture.useCase()
 
         assertEquals(listOf("cancel", "close", "settings", "quota"), fixture.events)
-        assertEquals(listOf(4_400_000L), fixture.sessions.resetSince)
+        assertEquals(listOf(4_400_000L), fixture.displays.resetSince)
     }
 
     @Test
@@ -34,18 +37,18 @@ class ResetReminderQuotaUseCaseTest {
 
         fixture.useCase()
 
-        assertEquals(listOf(6_200_000L), fixture.sessions.resetSince)
+        assertEquals(listOf(6_200_000L), fixture.displays.resetSince)
     }
 
     @Test
-    fun reset_use_case_requires_only_settings_sessions_and_session_coordinator() {
+    fun reset_use_case_requires_only_settings_displays_and_session_coordinator() {
         val injectedConstructor = ResetReminderQuotaUseCase::class.java.constructors
             .single { it.parameterTypes.size == 3 }
 
         assertArrayEquals(
             arrayOf(
                 SettingsRepository::class.java,
-                AppSessionRepository::class.java,
+                ReminderDisplayRepository::class.java,
                 AppSessionCoordinator::class.java
             ),
             injectedConstructor.parameterTypes
@@ -55,6 +58,7 @@ class ResetReminderQuotaUseCaseTest {
     private fun fixture(reminderWindowMinutes: Int): Fixture {
         val events = mutableListOf<String>()
         val sessions = ResetRecordingSessions(events)
+        val displays = ResetRecordingDisplays(events)
         val coordinator = AppSessionCoordinator(
             repository = sessions,
             contextProvider = object : AppSessionContextProvider {
@@ -66,11 +70,12 @@ class ResetReminderQuotaUseCaseTest {
         return Fixture(
             useCase = ResetReminderQuotaUseCase(
                 SettingsRepository(ResetSettingsDao(reminderWindowMinutes, events)),
-                sessions,
+                displays,
                 coordinator,
                 FakeClock(8_000_000L)
             ),
             sessions = sessions,
+            displays = displays,
             events = events
         )
     }
@@ -78,6 +83,7 @@ class ResetReminderQuotaUseCaseTest {
     private data class Fixture(
         val useCase: ResetReminderQuotaUseCase,
         val sessions: ResetRecordingSessions,
+        val displays: ResetRecordingDisplays,
         val events: MutableList<String>
     )
 }
@@ -100,7 +106,6 @@ private class ResetSettingsDao(
 }
 
 private class ResetRecordingSessions(private val events: MutableList<String>) : AppSessionRepository {
-    val resetSince = mutableListOf<Long>()
     private var open = AppUsageSession(1L, "video.app", "Video", 8_000_000L, null, null, null, null, "gentle")
 
     override suspend fun openSession(
@@ -121,7 +126,25 @@ private class ResetRecordingSessions(private val events: MutableList<String>) : 
     override suspend fun markRemindedIfNeeded(sessionId: Long, remindedAt: Long) = false
     override suspend fun markUserAction(sessionId: Long, action: String) = Unit
 
-    override suspend fun resetReminderQuota(since: Long) {
+}
+
+private class ResetRecordingDisplays(
+    private val events: MutableList<String>
+) : ReminderDisplayRepository {
+    val resetSince = mutableListOf<Long>()
+
+    override suspend fun recordDisplay(
+        attemptId: String,
+        sessionId: Long,
+        displayedAt: Long,
+        kind: ReminderDisplayKind,
+        windowStart: Long,
+        limit: Int
+    ): ReminderDisplayResult = error("not used")
+
+    override suspend fun countSince(since: Long): Int = 0
+    override suspend fun timesSince(since: Long): List<Long> = emptyList()
+    override suspend fun resetSince(since: Long) {
         events += "quota"
         resetSince += since
     }

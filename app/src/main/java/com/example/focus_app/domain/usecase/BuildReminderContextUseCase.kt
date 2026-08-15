@@ -4,6 +4,7 @@ import com.example.focus_app.data.repository.AppInfo
 import com.example.focus_app.data.repository.AppSessionRepository
 import com.example.focus_app.data.repository.AppSettings
 import com.example.focus_app.data.repository.MoodRepository
+import com.example.focus_app.data.repository.ReminderDisplayRepository
 import com.example.focus_app.domain.model.FocusTask
 import com.example.focus_app.domain.model.ReminderContext
 import com.example.focus_app.domain.time.Clock
@@ -14,10 +15,15 @@ import javax.inject.Inject
 class BuildReminderContextUseCase(
     private val sessions: AppSessionRepository,
     private val moods: MoodRepository,
+    private val displays: ReminderDisplayRepository,
     private val clock: Clock
 ) {
     @Inject
-    constructor(sessions: AppSessionRepository, moods: MoodRepository) : this(sessions, moods, SystemClock)
+    constructor(
+        sessions: AppSessionRepository,
+        moods: MoodRepository,
+        displays: ReminderDisplayRepository
+    ) : this(sessions, moods, displays, SystemClock)
 
     suspend operator fun invoke(
         task: FocusTask,
@@ -33,7 +39,7 @@ class BuildReminderContextUseCase(
             latestMood = moods.getLatestMood()?.mood,
             appName = app.appName,
             openCountToday = sessions.countOpensSince(app.packageName, startOfToday),
-            remindersInWindow = sessions.countShownRemindersSince(windowStart),
+            remindersInWindow = displays.countSince(windowStart),
             activeExitsToday = sessions.countActiveExitsSince(startOfToday),
             tone = settings.toneKey,
             customToneInstruction = settings.customToneInstruction

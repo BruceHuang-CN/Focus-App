@@ -4,14 +4,18 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.focus_app.data.repository.AppSessionRepository
 import com.example.focus_app.data.repository.MoodRepository
+import com.example.focus_app.data.repository.ReminderDisplayRepository
 import com.example.focus_app.data.repository.TaskRepository
 import com.example.focus_app.data.repository.SettingsRepository
 import com.example.focus_app.data.appgroup.AppGroupRepository
+import com.example.focus_app.data.permission.PermissionStatusProvider
 import com.example.focus_app.domain.model.AppUsageSession
+import com.example.focus_app.domain.model.DetectionMode
 import com.example.focus_app.domain.model.FocusTask
 import com.example.focus_app.domain.task.StreakCalculator
 import com.example.focus_app.domain.usecase.ResetReminderQuotaUseCase
 import com.example.focus_app.domain.usecase.UpdateGuardianStateUseCase
+import com.example.focus_app.service.AccessibilityDiagnosticsStore
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -32,7 +36,14 @@ data class HomeUiState(
     val activeGroupName: String = "\u672a\u8bbe\u7f6e\u5e94\u7528\u7ec4",
     val reminderWindowMinutes: Int = 60,
     val windowReminderCount: Int = 0,
-    val windowReminderLimit: Int = 3
+    val windowReminderLimit: Int = 3,
+    val detectionMode: DetectionMode = DetectionMode.REALTIME,
+    val accessibilitySystemEnabled: Boolean = false,
+    val accessibilityServiceBound: Boolean = false,
+    val accessibilityLastConnectedAtMillis: Long? = null,
+    val accessibilityLastDestroyedAtMillis: Long? = null,
+    val accessibilityLastInterruptedAtMillis: Long? = null,
+    val firstLaunchAfterUpdateAtMillis: Long? = null
 )
 
 sealed interface HomeEvent {
@@ -45,7 +56,10 @@ class HomeViewModel @Inject constructor(
     private val moodRepository: MoodRepository,
     private val taskRepository: TaskRepository,
     private val settingsRepository: SettingsRepository,
+    private val reminderDisplayRepository: ReminderDisplayRepository,
     private val appGroupRepository: AppGroupRepository,
+    private val permissionStatusProvider: PermissionStatusProvider,
+    private val accessibilityDiagnosticsStore: AccessibilityDiagnosticsStore,
     private val updateGuardianStateUseCase: UpdateGuardianStateUseCase,
     private val resetReminderQuotaUseCase: ResetReminderQuotaUseCase
 ) : ViewModel() {
@@ -57,6 +71,23 @@ class HomeViewModel @Inject constructor(
     init {
         loadStats()
         observeGuardianState()
+        observeAccessibilityDiagnostics()
+    }
+
+    private fun observeAccessibilityDiagnostics() {
+        viewModelScope.launch {
+            accessibilityDiagnosticsStore.state.collect { diagnostics ->
+                _uiState.update {
+                    it.copy(
+                        accessibilityServiceBound = diagnostics.serviceBound,
+                        accessibilityLastConnectedAtMillis = diagnostics.lastConnectedAtMillis,
+                        accessibilityLastDestroyedAtMillis = diagnostics.lastDestroyedAtMillis,
+                        accessibilityLastInterruptedAtMillis = diagnostics.lastInterruptedAtMillis,
+                        firstLaunchAfterUpdateAtMillis = diagnostics.firstLaunchAfterUpdateAtMillis
+                    )
+                }
+            }
+        }
     }
 
     private fun observeGuardianState() {
@@ -94,8 +125,7 @@ class HomeViewModel @Inject constructor(
             val settings = settingsRepository.getSettings()
             val windowStart = System.currentTimeMillis() -
                 settings.reminderWindowMinutes * MINUTE_MILLIS
-            val windowReminderCount =
-                appSessionRepository.countShownRemindersSince(windowStart)
+            val windowReminderCount = reminderDisplayRepository.countSince(windowStart)
             _uiState.update {
                 it.copy(
                     openCountToday = todaySessions.size,
@@ -108,6 +138,8 @@ class HomeViewModel @Inject constructor(
                     reminderWindowMinutes = settings.reminderWindowMinutes,
                     windowReminderCount = windowReminderCount,
                     windowReminderLimit = settings.maxRemindersPerWindow,
+                    detectionMode = settings.detectionMode,
+                    accessibilitySystemEnabled = permissionStatusProvider.accessibilityEnabled(),
                     streakDays = StreakCalculator.streakDays(today) { day ->
                         val start = day.atStartOfDay(zone).toInstant().toEpochMilli()
                         taskRepository.completedCountBetween(start, start + DAY_MILLIS)

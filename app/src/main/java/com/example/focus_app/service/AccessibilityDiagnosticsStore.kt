@@ -2,41 +2,57 @@ package com.example.focus_app.service
 
 import android.content.Context
 import android.util.Log
+import dagger.Binds
+import dagger.Module
 import dagger.hilt.android.qualifiers.ApplicationContext
+import dagger.hilt.InstallIn
+import dagger.hilt.components.SingletonComponent
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
+interface AccessibilityDiagnosticsStore {
+    val state: StateFlow<AccessibilityDiagnosticsState>
+
+    fun recordServiceConnected(nowMillis: Long = System.currentTimeMillis())
+    fun recordServiceDestroyed(nowMillis: Long = System.currentTimeMillis())
+    fun recordServiceInterrupted(nowMillis: Long = System.currentTimeMillis())
+    fun recordAppLaunch(
+        packageLastUpdateTimeMillis: Long,
+        nowMillis: Long = System.currentTimeMillis()
+    )
+}
+
 @Singleton
-class AccessibilityDiagnosticsStore @Inject constructor(
+class SharedPrefsAccessibilityDiagnosticsStore @Inject constructor(
     @ApplicationContext context: Context
-) {
+) : AccessibilityDiagnosticsStore {
     private val preferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     private val mutableState = MutableStateFlow(loadPersistedState())
 
-    val state: StateFlow<AccessibilityDiagnosticsState> = mutableState.asStateFlow()
+    override val state: StateFlow<AccessibilityDiagnosticsState> = mutableState.asStateFlow()
 
     @Synchronized
-    fun recordServiceConnected(nowMillis: Long = System.currentTimeMillis()) {
+    override fun recordServiceConnected(nowMillis: Long) {
         update(AccessibilityDiagnosticsEvent.ServiceConnected(nowMillis), "service_connected")
     }
 
     @Synchronized
-    fun recordServiceDestroyed(nowMillis: Long = System.currentTimeMillis()) {
+    override fun recordServiceDestroyed(nowMillis: Long) {
         update(AccessibilityDiagnosticsEvent.ServiceDestroyed(nowMillis), "service_destroyed")
     }
 
     @Synchronized
-    fun recordServiceInterrupted(nowMillis: Long = System.currentTimeMillis()) {
+    override fun recordServiceInterrupted(nowMillis: Long) {
         update(AccessibilityDiagnosticsEvent.ServiceInterrupted(nowMillis), "service_interrupted")
     }
 
     @Synchronized
-    fun recordAppLaunch(
+    override fun recordAppLaunch(
         packageLastUpdateTimeMillis: Long,
-        nowMillis: Long = System.currentTimeMillis()
+        nowMillis: Long
     ) {
         val before = mutableState.value
         update(
@@ -93,4 +109,14 @@ class AccessibilityDiagnosticsStore @Inject constructor(
         const val KEY_PACKAGE_LAST_UPDATE = "package_last_update_at"
         const val KEY_FIRST_LAUNCH_AFTER_UPDATE = "first_launch_after_update_at"
     }
+}
+
+@Module
+@InstallIn(SingletonComponent::class)
+abstract class AccessibilityDiagnosticsStoreModule {
+    @Binds
+    @Singleton
+    abstract fun bindAccessibilityDiagnosticsStore(
+        impl: SharedPrefsAccessibilityDiagnosticsStore
+    ): AccessibilityDiagnosticsStore
 }
