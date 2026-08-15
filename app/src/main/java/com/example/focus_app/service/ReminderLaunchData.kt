@@ -1,6 +1,7 @@
 package com.example.focus_app.service
 
 import com.example.focus_app.domain.model.ReturnDestination
+import com.example.focus_app.data.repository.ReminderDisplayKind
 
 data class ReminderLaunchData(
     val sessionId: Long,
@@ -14,7 +15,9 @@ data class ReminderLaunchData(
     val windowLimit: Int = 0,
     val windowMinutes: Int = 0,
     val returnPackageName: String = "",
-    val forceReminder: Boolean = false
+    val forceReminder: Boolean = false,
+    val attemptId: String = "",
+    val displayKind: ReminderDisplayKind = ReminderDisplayKind.INITIAL
 ) {
     companion object {
         const val EXTRA_SESSION_ID = "session_id"
@@ -29,5 +32,7 @@ data class ReminderLaunchData(
         const val EXTRA_WINDOW_MINUTES = "window_minutes"
         const val EXTRA_RETURN_PACKAGE_NAME = "return_package_name"
         const val EXTRA_FORCE_REMINDER = "force_reminder"
+        const val EXTRA_ATTEMPT_ID = "attempt_id"
+        const val EXTRA_DISPLAY_KIND = "display_kind"
     }
 }

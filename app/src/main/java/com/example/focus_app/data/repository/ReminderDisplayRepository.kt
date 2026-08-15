@@ -8,7 +8,12 @@ import com.example.focus_app.data.local.entity.ReminderDisplayEventEntity
 
 enum class ReminderDisplayKind(val key: String) {
     INITIAL("initial"),
-    FOLLOW_UP("follow_up")
+    FOLLOW_UP("follow_up");
+
+    companion object {
+        fun fromKey(key: String?): ReminderDisplayKind =
+            entries.firstOrNull { it.key == key } ?: INITIAL
+    }
 }
 
 sealed interface ReminderDisplayResult {

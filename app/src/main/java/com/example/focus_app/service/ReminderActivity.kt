@@ -11,6 +11,7 @@ import androidx.activity.compose.setContent
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.example.focus_app.data.repository.AppSessionRepository
+import com.example.focus_app.data.repository.ReminderDisplayKind
 import com.example.focus_app.domain.model.ReturnDestination
 import com.example.focus_app.ui.reminder.ReminderOverlay
 import dagger.hilt.android.AndroidEntryPoint
@@ -25,8 +26,12 @@ class ReminderActivity : ComponentActivity() {
     @Inject
     lateinit var reminderPresentationRegistry: ReminderPresentationRegistry
 
+    @Inject
+    lateinit var reminderDisplayCoordinator: ReminderDisplayCoordinator
+
     private var launchData: ReminderLaunchData? = null
     private var overlayAttached = false
+    private var displayConfirmationStarted = false
     private var dismissReceiverRegistered = false
 
     private val dismissReceiver = object : BroadcastReceiver() {
@@ -74,17 +79,16 @@ class ReminderActivity : ComponentActivity() {
             windowLimit = intent.getIntExtra(ReminderLaunchData.EXTRA_WINDOW_LIMIT, 0),
             windowMinutes = intent.getIntExtra(ReminderLaunchData.EXTRA_WINDOW_MINUTES, 0),
             returnPackageName = intent.getStringExtra(ReminderLaunchData.EXTRA_RETURN_PACKAGE_NAME).orEmpty(),
-            forceReminder = intent.getBooleanExtra(ReminderLaunchData.EXTRA_FORCE_REMINDER, false)
+            forceReminder = intent.getBooleanExtra(ReminderLaunchData.EXTRA_FORCE_REMINDER, false),
+            attemptId = intent.getStringExtra(ReminderLaunchData.EXTRA_ATTEMPT_ID).orEmpty(),
+            displayKind = ReminderDisplayKind.fromKey(
+                intent.getStringExtra(ReminderLaunchData.EXTRA_DISPLAY_KIND)
+            )
         )
-
-        renderIfSessionCurrent()
     }
 
     override fun onStart() {
         super.onStart()
-        launchData?.let { data ->
-            reminderPresentationRegistry.show(data.sessionId, data.forceReminder)
-        }
         ContextCompat.registerReceiver(
             this,
             dismissReceiver,
@@ -92,7 +96,11 @@ class ReminderActivity : ComponentActivity() {
             ContextCompat.RECEIVER_NOT_EXPORTED
         )
         dismissReceiverRegistered = true
-        renderIfSessionCurrent()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        confirmAndRenderIfSessionCurrent()
     }
 
     override fun onStop() {
@@ -108,18 +116,27 @@ class ReminderActivity : ComponentActivity() {
         super.onDestroy()
     }
 
-    private fun renderIfSessionCurrent() {
+    private fun confirmAndRenderIfSessionCurrent() {
         val data = launchData ?: return
+        if (overlayAttached || displayConfirmationStarted) return
+        displayConfirmationStarted = true
         lifecycleScope.launch {
             if (!isReminderSessionCurrent(data.sessionId, sessionRepository.currentOpenSession()?.id)) {
                 finishAndRemoveTask()
                 return@launch
             }
-            if (overlayAttached) return@launch
+            val confirmed = runCatching {
+                reminderDisplayCoordinator.confirm(data)
+            }.getOrNull() ?: run {
+                finishAndRemoveTask()
+                return@launch
+            }
+            launchData = confirmed
+            reminderPresentationRegistry.show(confirmed.sessionId, confirmed.forceReminder)
             overlayAttached = true
             setContent {
                 ReminderOverlay(
-                    data = data,
+                    data = confirmed,
                     onDismiss = { finishAndRemoveTask() }
                 )
             }
