@@ -1,40 +1,69 @@
 package com.example.focus_app.ui.settings
 
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.weight
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import com.example.focus_app.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FeedbackAndSupportScreen(onBack: () -> Unit) {
+    val uriHandler = LocalUriHandler.current
+    var surveyOpenFailed by rememberSaveable { mutableStateOf(false) }
+    var selectedPaymentName by rememberSaveable {
+        mutableStateOf(SupportPaymentMethod.WECHAT.name)
+    }
+    val selectedPayment = if (selectedPaymentName == SupportPaymentMethod.ALIPAY.name) {
+        SupportPaymentMethod.ALIPAY
+    } else {
+        SupportPaymentMethod.WECHAT
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("\u53cd\u9988\u4e0e\u652f\u6301") },
+                title = { Text("反馈与支持") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "\u8fd4\u56de"
+                            contentDescription = "返回"
                         )
                     }
                 }
@@ -50,16 +79,20 @@ fun FeedbackAndSupportScreen(onBack: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
-                text = "\u4f60\u7684\u5efa\u8bae\u4f1a\u5e2e\u52a9 Focus \u53d8\u5f97\u66f4\u597d\u3002",
+                text = "你的建议会帮助 Focus 变得更好。",
                 style = MaterialTheme.typography.bodyLarge
             )
-            PlaceholderCard(
-                title = "\u63d0\u4ea4\u53cd\u9988",
-                description = "\u8bf7\u5728\u6b64\u5904\u653e\u5165\u95ee\u5377\u661f\u6216\u5fae\u4fe1\u516c\u4f17\u53f7\u7684\u4e8c\u7ef4\u7801\u3001\u94fe\u63a5\u3002\u672a\u63d0\u4f9b\u524d\u4e0d\u5c55\u793a\u4efb\u4f55\u8054\u7cfb\u65b9\u5f0f\u3002"
+            FeedbackCard(
+                surveyOpenFailed = surveyOpenFailed,
+                onOpenSurvey = {
+                    surveyOpenFailed = runCatching {
+                        uriHandler.openUri(FEEDBACK_SURVEY_URL)
+                    }.isFailure
+                }
             )
-            PlaceholderCard(
-                title = "\u652f\u6301 Focus",
-                description = "\u8bf7\u5728\u6b64\u5904\u653e\u5165\u8d5e\u52a9\u4e8c\u7ef4\u7801\u6216\u652f\u4ed8\u94fe\u63a5\u3002\u672a\u63d0\u4f9b\u6536\u6b3e\u4fe1\u606f\u524d\uff0c\u9875\u9762\u4e0d\u4f1a\u5f15\u5bfc\u4efb\u4f55\u8d5e\u52a9\u3002"
+            SupportCard(
+                selectedPayment = selectedPayment,
+                onPaymentSelected = { selectedPaymentName = it.name }
             )
             Spacer(modifier = Modifier.height(8.dp))
         }
@@ -67,16 +100,136 @@ fun FeedbackAndSupportScreen(onBack: () -> Unit) {
 }
 
 @Composable
-private fun PlaceholderCard(title: String, description: String) {
+private fun FeedbackCard(
+    surveyOpenFailed: Boolean,
+    onOpenSurvey: () -> Unit
+) {
     Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(text = title, style = MaterialTheme.typography.titleMedium)
+        Column(
+            modifier = Modifier.padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "提交反馈",
+                modifier = Modifier.fillMaxWidth(),
+                style = MaterialTheme.typography.titleMedium
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Image(
+                painter = painterResource(R.drawable.questionnaire_poster),
+                contentDescription = "Focus 用户反馈调查海报",
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .widthIn(max = 420.dp)
+                    .aspectRatio(804f / 1072f),
+                contentScale = ContentScale.Fit
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Button(
+                onClick = onOpenSurvey,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("填写问卷")
+            }
+            if (surveyOpenFailed) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "暂时无法打开链接，请确认手机已安装浏览器后重试。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SupportCard(
+    selectedPayment: SupportPaymentMethod,
+    onPaymentSelected: (SupportPaymentMethod) -> Unit
+) {
+    val content = supportPaymentContent(selectedPayment)
+
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "支持 Focus",
+                modifier = Modifier.fillMaxWidth(),
+                style = MaterialTheme.typography.titleMedium
+            )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = description,
+                text = "如果 Focus 对你有帮助，可以自愿支持后续开发与维护。",
+                modifier = Modifier.fillMaxWidth(),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                PaymentMethodButton(
+                    label = "微信",
+                    selected = selectedPayment == SupportPaymentMethod.WECHAT,
+                    onClick = { onPaymentSelected(SupportPaymentMethod.WECHAT) },
+                    modifier = Modifier.weight(1f)
+                )
+                PaymentMethodButton(
+                    label = "支付宝",
+                    selected = selectedPayment == SupportPaymentMethod.ALIPAY,
+                    onClick = { onPaymentSelected(SupportPaymentMethod.ALIPAY) },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = content.hint,
+                style = MaterialTheme.typography.titleSmall
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .widthIn(max = 420.dp)
+                    .aspectRatio(1f),
+                color = Color.White,
+                shape = MaterialTheme.shapes.medium
+            ) {
+                Image(
+                    painter = painterResource(content.qrResource),
+                    contentDescription = content.contentDescription,
+                    modifier = Modifier.padding(8.dp),
+                    contentScale = ContentScale.Fit
+                )
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+            Text(
+                text = "可使用另一台设备扫码，或截图后在对应 App 中识别。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun PaymentMethodButton(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    if (selected) {
+        Button(onClick = onClick, modifier = modifier) {
+            Text(label)
+        }
+    } else {
+        OutlinedButton(onClick = onClick, modifier = modifier) {
+            Text(label)
         }
     }
 }
