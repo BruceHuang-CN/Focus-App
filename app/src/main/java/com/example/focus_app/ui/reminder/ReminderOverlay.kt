@@ -8,8 +8,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -35,7 +33,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -51,7 +53,6 @@ fun ReminderOverlay(
     viewModel: ReminderViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-
     var exitMenuExpanded by remember { mutableStateOf(false) }
     var snoozeMenuExpanded by remember { mutableStateOf(false) }
     var customSnoozeVisible by remember { mutableStateOf(false) }
@@ -59,6 +60,10 @@ fun ReminderOverlay(
     val urgency = remember(data.windowReminderCount, data.windowLimit) {
         reminderUrgency(data.windowReminderCount, data.windowLimit)
     }
+    val escalation = remember(data.windowReminderCount, data.windowLimit) {
+        reminderEscalationCopy(data.windowReminderCount, data.windowLimit)
+    }
+    val emphasisColor = MaterialTheme.colorScheme.error
 
     LaunchedEffect(data) { viewModel.init(data) }
     LaunchedEffect(uiState.showBreathing, uiState.breathingStep) {
@@ -78,176 +83,196 @@ fun ReminderOverlay(
             shape = if (urgency.isFinalReminder) RectangleShape else MaterialTheme.shapes.large,
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
-            Column(
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                    .padding(horizontal = 20.dp, vertical = 16.dp),
+                contentAlignment = Alignment.Center
             ) {
-                if (uiState.showBreathing && uiState.breathingStep > 0) {
-                    Text("深呼吸一下", style = MaterialTheme.typography.headlineMedium, color = InkBlue)
-                    Text("${uiState.breathingStep}", fontSize = 48.sp, color = InkBlue)
-                } else {
-                    Text("先停一下", style = MaterialTheme.typography.headlineMedium, color = InkBlue)
-                    Text("你刚刚打开了 ${uiState.appName}", style = MaterialTheme.typography.labelLarge)
-                    uiState.taskTitle?.let {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    if (uiState.showBreathing && uiState.breathingStep > 0) {
+                        Text("深呼吸一下", style = MaterialTheme.typography.headlineMedium, color = InkBlue)
+                        Text("${uiState.breathingStep}", fontSize = 48.sp, color = InkBlue)
+                    } else {
                         Text(
-                            "原本要做：$it",
+                            escalation.title,
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = if (urgency.isFinalReminder) emphasisColor else InkBlue,
+                            textAlign = TextAlign.Center
+                        )
+                        Text(
+                            buildAnnotatedString {
+                                append("你刚刚打开了 ")
+                                withStyle(SpanStyle(color = emphasisColor, fontWeight = FontWeight.Bold)) {
+                                    append(uiState.appName)
+                                }
+                            },
                             style = MaterialTheme.typography.titleMedium,
                             textAlign = TextAlign.Center
                         )
-                    }
-                    Text(
-                        uiState.message,
-                        style = MaterialTheme.typography.bodyLarge,
-                        textAlign = TextAlign.Center
-                    )
-                    if (uiState.windowLimit > 0) {
-                        Text(
-                            "本窗口（${uiState.windowMinutes} 分钟）已提醒 " +
-                                "${uiState.windowReminderCount}/${uiState.windowLimit} 次",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.outline
-                        )
-                        if (urgency.isFinalReminder) {
+                        uiState.taskTitle?.let { taskTitle ->
                             Text(
-                                "这是本时间段最后一次提醒",
+                                buildAnnotatedString {
+                                    append("原本任务：")
+                                    withStyle(SpanStyle(color = emphasisColor, fontWeight = FontWeight.Bold)) {
+                                        append(taskTitle)
+                                    }
+                                },
                                 style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.error,
                                 textAlign = TextAlign.Center
                             )
                         }
-                    }
-                    uiState.customReturnError?.let { error ->
                         Text(
-                            error,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.error,
+                            uiState.message,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            lineHeight = 26.sp,
                             textAlign = TextAlign.Center
                         )
-                    }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Box(modifier = Modifier.weight(1f)) {
-                        Button(
-                            onClick = { exitMenuExpanded = true },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(containerColor = InkBlue)
-                        ) {
-                            Text("\u9000\u51fa\u76ee\u6807\u5e94\u7528")
-                            Icon(
-                                imageVector = Icons.Filled.KeyboardArrowDown,
-                                contentDescription = "\u5c55\u5f00\u9000\u51fa\u9009\u9879"
-                            )
-                            if (false) {
+                        escalation.directive?.let { directive ->
                             Text(
-                                when (uiState.returnDestination) {
-                                    ReturnDestination.FOCUS -> "不刷了，回到 Focus"
-                                    ReturnDestination.HOME -> "不刷了，回到桌面"
-                                    ReturnDestination.CUSTOM -> "不刷了，去指定应用"
-                                }
+                                directive,
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = if (urgency.isFinalReminder) {
+                                    emphasisColor
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface
+                                },
+                                textAlign = TextAlign.Center
                             )
-                            }
                         }
-                        DropdownMenu(
-                            expanded = exitMenuExpanded,
-                            onDismissRequest = { exitMenuExpanded = false }
+                        if (uiState.windowLimit > 0) {
+                            Text(
+                                "本窗口（${uiState.windowMinutes} 分钟）已提醒 " +
+                                    "${uiState.windowReminderCount}/${uiState.windowLimit} 次",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.outline
+                            )
+                        }
+                        uiState.customReturnError?.let { error ->
+                            Text(
+                                error,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = emphasisColor,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            exitDestinations(uiState.returnPackageName).forEach { destination ->
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            when (destination) {
-                                                ReturnDestination.HOME -> "\u8fd4\u56de\u684c\u9762"
-                                                ReturnDestination.FOCUS -> "\u8fd4\u56de Focus"
-                                                ReturnDestination.CUSTOM -> "\u6253\u5f00\u6307\u5b9a\u5e94\u7528"
+                            Box(modifier = Modifier.weight(1f)) {
+                                Button(
+                                    onClick = { exitMenuExpanded = true },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = ButtonDefaults.buttonColors(containerColor = InkBlue)
+                                ) {
+                                    Text("\u9000\u51fa\u76ee\u6807\u5e94\u7528")
+                                    Icon(
+                                        imageVector = Icons.Filled.KeyboardArrowDown,
+                                        contentDescription = "\u5c55\u5f00\u9000\u51fa\u9009\u9879"
+                                    )
+                                }
+                                DropdownMenu(
+                                    expanded = exitMenuExpanded,
+                                    onDismissRequest = { exitMenuExpanded = false }
+                                ) {
+                                    exitDestinations(uiState.returnPackageName).forEach { destination ->
+                                        DropdownMenuItem(
+                                            text = {
+                                                Text(
+                                                    when (destination) {
+                                                        ReturnDestination.HOME -> "\u8fd4\u56de\u684c\u9762"
+                                                        ReturnDestination.FOCUS -> "\u8fd4\u56de Focus"
+                                                        ReturnDestination.CUSTOM -> "\u6253\u5f00\u6307\u5b9a\u5e94\u7528"
+                                                    }
+                                                )
+                                            },
+                                            onClick = {
+                                                exitMenuExpanded = false
+                                                when (destination) {
+                                                    ReturnDestination.FOCUS -> viewModel.returnToFocus(data.sessionId, onDismiss)
+                                                    ReturnDestination.HOME -> viewModel.returnHome(data.sessionId, onDismiss)
+                                                    ReturnDestination.CUSTOM -> viewModel.returnToCustom(data.sessionId, onDismiss)
+                                                }
                                             }
                                         )
-                                    },
-                                    onClick = {
-                                        exitMenuExpanded = false
-                                        when (destination) {
-                                            ReturnDestination.FOCUS -> viewModel.returnToFocus(data.sessionId, onDismiss)
-                                            ReturnDestination.HOME -> viewModel.returnHome(data.sessionId, onDismiss)
-                                            ReturnDestination.CUSTOM -> viewModel.returnToCustom(data.sessionId, onDismiss)
-                                        }
                                     }
-                                )
-                            }
-                        }
-                        }
-                        Box(modifier = Modifier.weight(1f)) {
-                        OutlinedButton(
-                            onClick = { snoozeMenuExpanded = true },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("\u7a0d\u540e\u63d0\u9192")
-                            Icon(
-                                imageVector = Icons.Filled.KeyboardArrowDown,
-                                contentDescription = "\u5c55\u5f00\u7a0d\u540e\u63d0\u9192\u9009\u9879"
-                            )
-                            if (false) {
-                            Text("仍要使用")
-                            }
-                        }
-                        DropdownMenu(
-                            expanded = snoozeMenuExpanded,
-                            onDismissRequest = { snoozeMenuExpanded = false }
-                        ) {
-                            presetSnoozeMinutes.forEach { minutes ->
-                                DropdownMenuItem(
-                                    text = { Text("${minutes} \u5206\u949f\u540e\u63d0\u9192") },
-                                    onClick = {
-                                        snoozeMenuExpanded = false
-                                        viewModel.snooze(data.sessionId, minutes, onDismiss)
-                                    }
-                                )
-                            }
-                            DropdownMenuItem(
-                                text = { Text("\u81ea\u5b9a\u4e49\u5206\u949f\u6570") },
-                                onClick = {
-                                    snoozeMenuExpanded = false
-                                    customSnoozeVisible = true
                                 }
-                            )
-                        }
-                        }
-                        if (customSnoozeVisible) {
-                            AlertDialog(
-                                onDismissRequest = { customSnoozeVisible = false },
-                                title = { Text("\u81ea\u5b9a\u4e49\u7a0d\u540e\u63d0\u9192") },
-                                text = {
-                                    OutlinedTextField(
-                                        value = customSnoozeMinutes,
-                                        onValueChange = { customSnoozeMinutes = it },
-                                        label = { Text("\u8bf7\u8f93\u5165 1-60 \u5206\u949f") },
-                                        singleLine = true
+                            }
+                            Box(modifier = Modifier.weight(1f)) {
+                                OutlinedButton(
+                                    onClick = { snoozeMenuExpanded = true },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text("\u7a0d\u540e\u63d0\u9192")
+                                    Icon(
+                                        imageVector = Icons.Filled.KeyboardArrowDown,
+                                        contentDescription = "\u5c55\u5f00\u7a0d\u540e\u63d0\u9192\u9009\u9879"
                                     )
-                                },
-                                confirmButton = {
-                                    TextButton(
-                                        onClick = {
-                                            parseCustomSnoozeMinutes(customSnoozeMinutes)?.let { minutes ->
-                                                customSnoozeVisible = false
+                                }
+                                DropdownMenu(
+                                    expanded = snoozeMenuExpanded,
+                                    onDismissRequest = { snoozeMenuExpanded = false }
+                                ) {
+                                    presetSnoozeMinutes.forEach { minutes ->
+                                        DropdownMenuItem(
+                                            text = { Text("${minutes} \u5206\u949f\u540e\u63d0\u9192") },
+                                            onClick = {
+                                                snoozeMenuExpanded = false
                                                 viewModel.snooze(data.sessionId, minutes, onDismiss)
                                             }
-                                        }
-                                    ) { Text("\u786e\u5b9a") }
-                                },
-                                dismissButton = {
-                                    TextButton(onClick = { customSnoozeVisible = false }) {
-                                        Text("\u53d6\u6d88")
+                                        )
                                     }
+                                    DropdownMenuItem(
+                                        text = { Text("\u81ea\u5b9a\u4e49\u5206\u949f\u6570") },
+                                        onClick = {
+                                            snoozeMenuExpanded = false
+                                            customSnoozeVisible = true
+                                        }
+                                    )
                                 }
-                            )
+                            }
                         }
                     }
                 }
             }
         }
+    }
+
+    if (customSnoozeVisible) {
+        AlertDialog(
+            onDismissRequest = { customSnoozeVisible = false },
+            title = { Text("\u81ea\u5b9a\u4e49\u7a0d\u540e\u63d0\u9192") },
+            text = {
+                OutlinedTextField(
+                    value = customSnoozeMinutes,
+                    onValueChange = { customSnoozeMinutes = it },
+                    label = { Text("\u8bf7\u8f93\u5165 1-60 \u5206\u949f") },
+                    singleLine = true
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        parseCustomSnoozeMinutes(customSnoozeMinutes)?.let { minutes ->
+                            customSnoozeVisible = false
+                            viewModel.snooze(data.sessionId, minutes, onDismiss)
+                        }
+                    }
+                ) { Text("\u786e\u5b9a") }
+            },
+            dismissButton = {
+                TextButton(onClick = { customSnoozeVisible = false }) {
+                    Text("\u53d6\u6d88")
+                }
+            }
+        )
     }
 }

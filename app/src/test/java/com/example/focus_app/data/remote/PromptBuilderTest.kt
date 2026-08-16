@@ -48,4 +48,17 @@ class PromptBuilderTest {
         assertTrue(prompt.contains("禁止外貌攻击"))
         assertTrue(prompt.contains("禁止威胁"))
     }
+
+    @Test
+    fun every_tone_including_custom_requires_progressively_sharper_messages() {
+        val prompt = PromptBuilder.buildSystemPrompt(
+            ReminderTone.CUSTOM,
+            "像朋友一样提醒我"
+        )
+
+        assertTrue(prompt.contains("按数组顺序逐条增强"))
+        assertTrue(prompt.contains("自定义口吻不能削弱"))
+        assertTrue(prompt.contains("指出反复拖延"))
+        assertTrue(prompt.contains("禁止人格羞辱"))
+    }
 }

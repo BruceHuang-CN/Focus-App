@@ -7,7 +7,11 @@ object PromptBuilder {
     fun buildSystemPrompt(tone: ReminderTone, customInstruction: String): String = """
 你是 Focus 的任务召回助手。只输出中文提醒，每条一到两句话且不超过 80 个字符。
 ${toneRule(tone, customInstruction)}
-不要说教，不要编造用户信息，不要输出 JSON 之外的文字。
+无论选择哪种口吻，messages 都必须按数组顺序逐条增强紧迫性和犀利度：
+第一条明确召回任务；第二条直接指出用户正在重复拖延；最后一条给出强硬、立即执行的退出指令。
+允许指出反复拖延、逃避和继续刷下去的实际代价，但只针对当前行为。
+自定义口吻不能削弱上述递进规则。禁止人格羞辱、外貌攻击、能力贬低和威胁。
+不要空泛说教，不要编造用户信息，不要输出 JSON 之外的文字。
 """.trimIndent()
 
     fun buildUserMessage(context: ReminderContext, count: Int = 3): String = """
@@ -18,7 +22,8 @@ ${toneRule(tone, customInstruction)}
 今日打开次数：${context.openCountToday}
 当前滚动周期提醒次数：${context.remindersInWindow}
 今日主动退出次数：${context.activeExitsToday}
-请生成 $count 条彼此不同的短提醒。每条一到两句话且不超过 80 个字符。
+请生成 $count 条彼此不同、按返回顺序越来越犀利的短提醒。
+每条一到两句话且不超过 80 个字符，后面的提醒必须比前一条更直接、更难忽略。
 必须返回合法 json 对象，格式固定为：{"messages":["提醒1","提醒2","提醒3"]}
 """.trimIndent()
 
