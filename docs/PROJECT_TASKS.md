@@ -17,6 +17,7 @@
 - 未经构建、安装和真机测试，不得宣称后台提醒已经可靠。
 
 当前统一设计规范：`docs/superpowers/specs/2026-08-28-focus-core-intervention-design.md`（待用户书面审核）。
+当前实施计划：`docs/superpowers/plans/2026-08-28-focus-core-intervention-implementation-plan.md`（已按设计规范拆解，等待执行方式确认）。
 
 ## 当前产品目标
 
