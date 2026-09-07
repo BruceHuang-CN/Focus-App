@@ -39,14 +39,18 @@ import com.example.focus_app.domain.permission.PermissionCheckAction
 import com.example.focus_app.domain.permission.isAccessibilityDetectionReady
 import com.example.focus_app.ui.components.PresetSelector
 import com.example.focus_app.util.PermissionHelper
-import com.example.focus_app.util.loadInstalledApps
+import com.example.focus_app.util.loadInstalledAppName
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
-    onBack: () -> Unit,
+    onExitRequested: () -> Unit,
+    hasUnsavedChanges: Boolean,
+    onUnsavedChangesChanged: (Boolean) -> Unit,
     navigateToCustomReturnPicker: () -> Unit,
     navigateToAppGroups: () -> Unit,
     navigateToFeedbackAndSupport: () -> Unit,
@@ -59,6 +63,7 @@ fun SettingsScreen(
     val customReturnPackage by viewModel.customReturnPackage.collectAsState()
     val followUpInterval by viewModel.followUpInterval.collectAsState()
     val keepAliveEnabled by viewModel.keepAliveEnabled.collectAsState()
+    val randomizeReminderActions by viewModel.randomizeReminderActions.collectAsState()
     val themeSettings by viewModel.themeSettings.collectAsState()
     val appGroups by viewModel.appGroups.collectAsState()
     val activeAppGroupId by viewModel.activeAppGroupId.collectAsState()
@@ -72,8 +77,6 @@ fun SettingsScreen(
     }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-    var settingsEdited by remember { mutableStateOf(false) }
-    var showExitConfirmation by remember { mutableStateOf(false) }
     var apiKeyInput by remember { mutableStateOf("") }
     var endpointDraft by remember(s.aiProvider, s.apiEndpoint, s.aiModel) {
         mutableStateOf(s.apiEndpoint)
@@ -109,17 +112,11 @@ fun SettingsScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    val hasUnsavedChanges = settingsEdited
-
-    fun onSettingChanged(label: String) {
-        settingsEdited = true
+    fun onSettingChanged(@Suppress("UNUSED_PARAMETER") label: String) {
+        onUnsavedChangesChanged(true)
     }
 
-    fun requestExit() {
-        if (hasUnsavedChanges) showExitConfirmation = true else onBack()
-    }
-
-    BackHandler(enabled = !showExitConfirmation) { requestExit() }
+    BackHandler { onExitRequested() }
 
     fun handlePermissionAction(action: PermissionCheckAction) {
         when (action) {
@@ -149,7 +146,7 @@ fun SettingsScreen(
             TopAppBar(
                 title = { Text("设置") },
                 navigationIcon = {
-                    IconButton(onClick = ::requestExit) {
+                    IconButton(onClick = onExitRequested) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
                     }
                 }
@@ -177,7 +174,7 @@ fun SettingsScreen(
                 )
                 Button(
                     onClick = {
-                        settingsEdited = false
+                        onUnsavedChangesChanged(false)
                         scope.launch {
                             snackbarHostState.currentSnackbarData?.dismiss()
                             snackbarHostState.showSnackbar(
@@ -320,6 +317,23 @@ fun SettingsScreen(
                     onCheckedChange = { enabled ->
                         viewModel.toggleBreathingPause()
                         onSettingChanged(if (enabled) "开启呼吸停顿" else "关闭呼吸停顿")
+                    }
+                )
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("随机排列提醒按钮", style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        "每次提醒使用六种完整排列之一，同一次提醒保持不变",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                }
+                Switch(
+                    checked = randomizeReminderActions,
+                    onCheckedChange = { enabled ->
+                        viewModel.setRandomizeReminderActions(enabled)
+                        onSettingChanged(if (enabled) "开启随机按钮" else "关闭随机按钮")
                     }
                 )
             }
@@ -520,11 +534,13 @@ fun SettingsScreen(
             }
             */
             run {
-                val selectedAppName = remember(customReturnPackage) {
-                    loadInstalledApps(context)
-                        .firstOrNull { it.packageName == customReturnPackage }
-                        ?.appName
-                        ?: customReturnPackage.ifBlank { null }
+                val selectedAppName by produceState<String?>(
+                    initialValue = customReturnPackage.ifBlank { null },
+                    customReturnPackage
+                ) {
+                    value = withContext(Dispatchers.IO) {
+                        loadInstalledAppName(context.applicationContext, customReturnPackage)
+                    } ?: customReturnPackage.ifBlank { null }
                 }
                 Row(
                     modifier = Modifier
@@ -650,27 +666,6 @@ fun SettingsScreen(
         }
     }
 
-    if (showExitConfirmation) {
-        AlertDialog(
-            onDismissRequest = { showExitConfirmation = false },
-            title = { Text("保存设置？") },
-            text = { Text("你有未保存的修改。请先保存，或继续修改。") },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        settingsEdited = false
-                        showExitConfirmation = false
-                        onBack()
-                    }
-                ) { Text("保存并退出") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showExitConfirmation = false }) {
-                    Text("继续修改")
-                }
-            }
-        )
-    }
 }
 
 private fun themeModeLabel(mode: AppThemeMode): String = when (mode) {

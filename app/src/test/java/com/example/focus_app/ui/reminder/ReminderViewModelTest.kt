@@ -1,16 +1,24 @@
 package com.example.focus_app.ui.reminder
 
+import com.example.focus_app.data.reminder.ReminderActionOrderStore
 import com.example.focus_app.data.repository.AppSessionRepository
 import com.example.focus_app.domain.model.AppUsageSession
 import com.example.focus_app.domain.model.ReminderTone
 import com.example.focus_app.domain.model.ReturnDestination
+import com.example.focus_app.domain.time.FakeClock
+import com.example.focus_app.service.AppSessionContext
+import com.example.focus_app.service.AppSessionContextProvider
+import com.example.focus_app.service.AppSessionCoordinator
 import com.example.focus_app.service.ReminderLaunchData
 import com.example.focus_app.service.ReminderLauncher
 import com.example.focus_app.service.ReminderPresentationRegistry
+import com.example.focus_app.service.ReturnToFocusGrace
 import com.example.focus_app.service.SessionReminderScheduler
 import com.example.focus_app.service.CustomReturnResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -37,6 +45,13 @@ class ReminderViewModelTest {
     }
 
     @Test
+    fun action_order_setting_is_uninitialized_before_launch_data_is_applied() {
+        val fixture = fixture(randomizeActions = false)
+
+        assertEquals(null, fixture.viewModel.uiState.value.randomizeActions)
+    }
+
+    @Test
     fun init_uses_launch_data_without_starting_a_network_request() {
         val fixture = fixture()
 
@@ -50,6 +65,15 @@ class ReminderViewModelTest {
     }
 
     @Test
+    fun init_uses_persisted_random_action_setting() {
+        val fixture = fixture(randomizeActions = false)
+
+        fixture.viewModel.init(LAUNCH_DATA)
+
+        assertEquals(false, fixture.viewModel.uiState.value.randomizeActions)
+    }
+
+    @Test
     fun return_to_focus_records_the_action_then_opens_the_captured_task() = runTest(dispatcher) {
         val fixture = fixture()
         fixture.viewModel.init(LAUNCH_DATA)
@@ -58,8 +82,10 @@ class ReminderViewModelTest {
         advanceUntilIdle()
 
         assertEquals("returned_to_focus", fixture.repository.action)
+        assertEquals(LAUNCH_DATA.sessionId, fixture.repository.closedSessionId)
+        assertEquals(LAUNCH_DATA, fixture.returnGrace.startedWith)
         assertEquals(42L, fixture.launcher.focusTaskId)
-        assertEquals(listOf("saved", "focus"), fixture.events)
+        assertEquals(listOf("saved", "closed", "grace", "focus"), fixture.events)
     }
 
     @Test
@@ -89,9 +115,50 @@ class ReminderViewModelTest {
         assertTrue(snoozeUntil in (before + 300_000L)..(System.currentTimeMillis() + 300_000L))
         assertEquals(LAUNCH_DATA.sessionId, fixture.scheduler.followUpSessionId)
         assertEquals(300_000L, fixture.scheduler.followUpDelay)
+        assertEquals(listOf(LAUNCH_DATA.sessionId), fixture.launcher.dismissedSessionIds)
         assertEquals(listOf("saved", "snooze_saved", "scheduled"), fixture.events)
         assertEquals(null, fixture.launcher.focusTaskId)
         assertEquals(0, fixture.launcher.homeRequests)
+    }
+
+    @Test
+    fun intentional_use_records_distinct_action_and_reuses_follow_up_timer() = runTest(dispatcher) {
+        val fixture = fixture()
+        fixture.viewModel.init(LAUNCH_DATA)
+
+        fixture.viewModel.useIntentionally(LAUNCH_DATA.sessionId, 5)
+        advanceUntilIdle()
+
+        assertEquals("intentional_5m", fixture.repository.action)
+        assertEquals(LAUNCH_DATA.sessionId, fixture.scheduler.followUpSessionId)
+        assertEquals(300_000L, fixture.scheduler.followUpDelay)
+        assertTrue(fixture.repository.snoozeUntil != null)
+    }
+
+    @Test
+    fun rest_records_distinct_action_and_reuses_follow_up_timer() = runTest(dispatcher) {
+        val fixture = fixture()
+        fixture.viewModel.init(LAUNCH_DATA)
+
+        fixture.viewModel.takeBreak(LAUNCH_DATA.sessionId, 5)
+        advanceUntilIdle()
+
+        assertEquals("rest_5m", fixture.repository.action)
+        assertEquals(LAUNCH_DATA.sessionId, fixture.scheduler.followUpSessionId)
+        assertEquals(300_000L, fixture.scheduler.followUpDelay)
+        assertTrue(fixture.repository.snoozeUntil != null)
+    }
+
+    @Test
+    fun configured_return_dispatches_to_home() = runTest(dispatcher) {
+        val fixture = fixture()
+        fixture.viewModel.init(LAUNCH_DATA.copy(returnDestination = ReturnDestination.HOME))
+
+        fixture.viewModel.returnToConfiguredDestination(LAUNCH_DATA.sessionId)
+        advanceUntilIdle()
+
+        assertEquals("returned_home", fixture.repository.action)
+        assertEquals(1, fixture.launcher.homeRequests)
     }
 
     @Test
@@ -128,7 +195,7 @@ class ReminderViewModelTest {
     @Test
     fun failed_custom_return_keeps_the_reminder_open_and_does_not_record_an_exit() = runTest(dispatcher) {
         val fixture = fixture()
-        fixture.presentationRegistry.show(LAUNCH_DATA.sessionId)
+        fixture.presentationRegistry.show(LAUNCH_DATA)
         fixture.launcher.customLaunchSucceeds = false
         fixture.viewModel.init(
             LAUNCH_DATA.copy(
@@ -143,34 +210,57 @@ class ReminderViewModelTest {
 
         assertEquals(null, fixture.repository.action)
         assertEquals(false, completed)
-        assertEquals(true, fixture.presentationRegistry.isShowing())
+        assertEquals(true, fixture.presentationRegistry.protectsSession())
         assertEquals("指定应用不可用，请重新选择", fixture.viewModel.uiState.value.customReturnError)
     }
 
     @Test
     fun snooze_keeps_presentation_during_target_app_return_transition() = runTest(dispatcher) {
         val fixture = fixture()
-        fixture.presentationRegistry.show(LAUNCH_DATA.sessionId)
+        fixture.presentationRegistry.show(LAUNCH_DATA)
         fixture.viewModel.init(LAUNCH_DATA)
 
         fixture.viewModel.snooze(LAUNCH_DATA.sessionId, 5)
         advanceUntilIdle()
 
-        assertEquals(true, fixture.presentationRegistry.isShowing())
+        assertEquals(true, fixture.presentationRegistry.protectsSession())
     }
 
-    private fun fixture(): Fixture {
+    private fun fixture(randomizeActions: Boolean = true): Fixture {
         val events = mutableListOf<String>()
         val repository = ActionRecordingSessionRepository(events)
         val launcher = ActionRecordingLauncher(events)
         val scheduler = ActionRecordingScheduler(events)
         val presentationRegistry = ReminderPresentationRegistry(elapsedRealtime = { 0L })
+        val returnGrace = ActionRecordingReturnGrace(events)
+        val actionOrderStore = FakeReminderActionOrderStore(randomizeActions)
+        val appSessionCoordinator = AppSessionCoordinator(
+            repository = repository,
+            contextProvider = object : AppSessionContextProvider {
+                override suspend fun currentContext() = AppSessionContext(
+                    targetApps = emptyMap(),
+                    activeTaskId = null,
+                    toneKey = ReminderTone.GENTLE.key
+                )
+            },
+            clock = FakeClock(1_000L),
+            reminderScheduler = scheduler
+        )
         return Fixture(
-            ReminderViewModel(repository, launcher, scheduler, presentationRegistry),
+            ReminderViewModel(
+                sessionRepository = repository,
+                launcher = launcher,
+                scheduler = scheduler,
+                reminderPresentationRegistry = presentationRegistry,
+                appSessionCoordinator = appSessionCoordinator,
+                returnToFocusGrace = returnGrace,
+                actionOrderStore = actionOrderStore
+            ),
             repository,
             launcher,
             scheduler,
             presentationRegistry,
+            returnGrace,
             events
         )
     }
@@ -181,6 +271,7 @@ class ReminderViewModelTest {
         val launcher: ActionRecordingLauncher,
         val scheduler: ActionRecordingScheduler,
         val presentationRegistry: ReminderPresentationRegistry,
+        val returnGrace: ActionRecordingReturnGrace,
         val events: List<String>
     )
 
@@ -194,6 +285,28 @@ class ReminderViewModelTest {
             showBreathing = false,
             returnDestination = ReturnDestination.FOCUS
         )
+    }
+}
+
+private class ActionRecordingReturnGrace(
+    private val events: MutableList<String>
+) : ReturnToFocusGrace {
+    var startedWith: ReminderLaunchData? = null
+
+    override fun start(data: ReminderLaunchData) {
+        startedWith = data
+        events += "grace"
+    }
+
+    override fun showIfActive(session: AppUsageSession): Boolean = false
+}
+
+private class FakeReminderActionOrderStore(initial: Boolean) : ReminderActionOrderStore {
+    private val mutableRandomizeEnabled = MutableStateFlow(initial)
+    override val randomizeEnabled: StateFlow<Boolean> = mutableRandomizeEnabled
+
+    override fun setRandomizeEnabled(enabled: Boolean) {
+        mutableRandomizeEnabled.value = enabled
     }
 }
 
@@ -224,10 +337,13 @@ private class ActionRecordingLauncher(
     var homeRequests = 0
     var customPackage: String? = null
     var customLaunchSucceeds = true
+    val dismissedSessionIds = mutableListOf<Long>()
 
-    override fun show(data: ReminderLaunchData) = Unit
+    override fun show(data: ReminderLaunchData) = true
 
-    override fun dismiss(sessionId: Long) = Unit
+    override fun dismiss(sessionId: Long) {
+        dismissedSessionIds += sessionId
+    }
 
     override fun returnToFocus(taskId: Long?) {
         focusTaskId = taskId
@@ -255,6 +371,7 @@ private class ActionRecordingSessionRepository(
 ) : AppSessionRepository {
     var action: String? = null
     var snoozeUntil: Long? = null
+    var closedSessionId: Long? = null
 
     override suspend fun openSession(
         packageName: String,
@@ -264,8 +381,18 @@ private class ActionRecordingSessionRepository(
         toneKey: String
     ): AppUsageSession = error("Not used")
 
-    override suspend fun closeSession(sessionId: Long, endedAt: Long) = Unit
-    override suspend fun currentOpenSession(): AppUsageSession? = null
+    override suspend fun closeSession(sessionId: Long, endedAt: Long) {
+        closedSessionId = sessionId
+        events += "closed"
+    }
+    override suspend fun currentOpenSession(): AppUsageSession? = AppUsageSession(
+        id = 9L,
+        packageName = "com.ss.android.ugc.aweme",
+        appName = "Douyin",
+        startedAt = 1_000L,
+        taskId = 42L,
+        toneKey = ReminderTone.GENTLE.key
+    )
     override suspend fun reminderTimesSince(since: Long): List<Long> = emptyList()
     override suspend fun markRemindedIfNeeded(sessionId: Long, remindedAt: Long): Boolean = false
 

@@ -47,6 +47,21 @@ class FollowUpReminderExecutorTest {
     }
 
     @Test
+    fun cancels_expired_countdown_before_retry_decision() = kotlinx.coroutines.test.runTest {
+        val fixture = fixture(
+            environment = FakeEnvironment(
+                interactive = true,
+                snapshot = ForegroundSnapshot.Unknown
+            )
+        )
+
+        val decision = fixture.executor.execute(session.id)
+
+        assertEquals(FollowUpDecision.RETRY, decision)
+        assertEquals(listOf(session.id), fixture.countdownNotifier.cancelledSessionIds)
+    }
+
+    @Test
     fun returns_retry_when_device_is_locked_without_showing() = kotlinx.coroutines.test.runTest {
         val env = FakeEnvironment(
             interactive = false,
@@ -122,6 +137,7 @@ class FollowUpReminderExecutorTest {
         )
     ): Fixture {
         val launcher = RecordingLauncher()
+        val countdownNotifier = RecordingCountdownNotifier()
         val executor = FollowUpReminderExecutor(
             sessionRepository = repository,
             settingsProvider = { settings },
@@ -136,9 +152,10 @@ class FollowUpReminderExecutorTest {
             gate = FollowUpReminderGate(),
             environment = environment,
             displayRepository = FakeDisplayRepository(),
-            attemptIdProvider = { "attempt-1" }
+            attemptIdProvider = { "attempt-1" },
+            countdownNotifier = countdownNotifier
         )
-        return Fixture(executor, repository, launcher)
+        return Fixture(executor, repository, launcher, countdownNotifier)
     }
 
     private class FakeEnvironment(
@@ -167,8 +184,19 @@ class FollowUpReminderExecutorTest {
     private data class Fixture(
         val executor: FollowUpReminderExecutor,
         val repository: FakeSessionRepository,
-        val launcher: RecordingLauncher
+        val launcher: RecordingLauncher,
+        val countdownNotifier: RecordingCountdownNotifier
     )
+
+    private class RecordingCountdownNotifier : FollowUpCountdownNotifier {
+        val cancelledSessionIds = mutableListOf<Long>()
+
+        override fun show(sessionId: Long, delayMillis: Long) = Unit
+
+        override fun cancel(sessionId: Long) {
+            cancelledSessionIds += sessionId
+        }
+    }
 
     private class FakeSessionRepository(initial: AppUsageSession) : AppSessionRepository {
         private val sessions = mutableMapOf(initial.id to initial)
@@ -230,8 +258,9 @@ class FollowUpReminderExecutorTest {
     private class RecordingLauncher : ReminderLauncher {
         val shown = mutableListOf<ReminderLaunchData>()
 
-        override fun show(data: ReminderLaunchData) {
+        override fun show(data: ReminderLaunchData): Boolean {
             shown += data
+            return true
         }
 
         override fun dismiss(sessionId: Long) = Unit

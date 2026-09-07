@@ -24,3 +24,14 @@ fun loadInstalledApps(context: Context): List<InstalledApp> {
         emptyList()
     }
 }
+
+/** 只读取一个已知包名的显示名称，避免为了展示名称而扫描所有应用。 */
+fun loadInstalledAppName(context: Context, packageName: String): String? {
+    if (packageName.isBlank()) return null
+    return try {
+        val info = context.packageManager.getApplicationInfo(packageName, PackageManager.GET_META_DATA)
+        context.packageManager.getApplicationLabel(info).toString()
+    } catch (_: Exception) {
+        null
+    }
+}

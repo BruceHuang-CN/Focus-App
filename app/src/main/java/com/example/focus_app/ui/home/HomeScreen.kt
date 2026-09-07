@@ -45,10 +45,13 @@ fun HomeScreen(
 
     LaunchedEffect(viewModel) {
         viewModel.events.collect { event ->
-            if (event == HomeEvent.ReminderQuotaReset) {
-                snackbarHostState.showSnackbar(
+            when (event) {
+                HomeEvent.ReminderQuotaReset -> snackbarHostState.showSnackbar(
                     "提醒额度已重置；下次进入目标应用后会按延迟提醒"
                 )
+                is HomeEvent.ReminderMessagesRegenerated -> {
+                    snackbarHostState.showSnackbar(event.message)
+                }
             }
         }
     }
@@ -69,6 +72,7 @@ fun HomeScreen(
         onCompleteCurrentTask = viewModel::completeCurrentTask,
         onGuardianEnabledChange = viewModel::setGuardianEnabled,
         onResetReminderQuota = viewModel::resetReminderQuota,
+        onRegenerateReminderMessages = viewModel::regenerateReminderMessages,
         snackbarHostState = snackbarHostState
     )
 }
@@ -82,6 +86,7 @@ internal fun HomeContent(
     onCompleteCurrentTask: () -> Unit,
     onGuardianEnabledChange: (Boolean) -> Unit,
     onResetReminderQuota: () -> Unit,
+    onRegenerateReminderMessages: () -> Unit,
     snackbarHostState: SnackbarHostState? = null
 ) {
     val effectiveSnackbarHostState = snackbarHostState ?: remember { SnackbarHostState() }
@@ -170,7 +175,9 @@ internal fun HomeContent(
                     accessibilitySystemEnabled = uiState.accessibilitySystemEnabled,
                     accessibilityServiceBound = uiState.accessibilityServiceBound,
                     onGuardianEnabledChange = onGuardianEnabledChange,
-                    onResetReminderQuota = onResetReminderQuota
+                    onResetReminderQuota = onResetReminderQuota,
+                    onRegenerateReminderMessages = onRegenerateReminderMessages,
+                    isRegeneratingMessages = uiState.isRegeneratingMessages
                 )
             }
 
@@ -234,7 +241,9 @@ private fun GuardianControlCard(
     accessibilitySystemEnabled: Boolean,
     accessibilityServiceBound: Boolean,
     onGuardianEnabledChange: (Boolean) -> Unit,
-    onResetReminderQuota: () -> Unit
+    onResetReminderQuota: () -> Unit,
+    onRegenerateReminderMessages: () -> Unit,
+    isRegeneratingMessages: Boolean
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -277,7 +286,24 @@ private fun GuardianControlCard(
             Spacer(modifier = Modifier.height(8.dp))
             Text("当前应用组：$activeGroupName", style = MaterialTheme.typography.bodyMedium)
             Spacer(modifier = Modifier.height(12.dp))
-            OutlinedButton(onClick = onResetReminderQuota) { Text("重置提醒额度") }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedButton(
+                    onClick = onResetReminderQuota,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("重置提醒额度")
+                }
+                OutlinedButton(
+                    onClick = onRegenerateReminderMessages,
+                    enabled = !isRegeneratingMessages,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(if (isRegeneratingMessages) "生成中…" else "重新生成文案")
+                }
+            }
         }
     }
 }
@@ -341,7 +367,8 @@ private fun HomeContentPreview() {
             onManageTasks = {},
             onCompleteCurrentTask = {},
             onGuardianEnabledChange = {},
-            onResetReminderQuota = {}
+            onResetReminderQuota = {},
+            onRegenerateReminderMessages = {}
         )
     }
 }

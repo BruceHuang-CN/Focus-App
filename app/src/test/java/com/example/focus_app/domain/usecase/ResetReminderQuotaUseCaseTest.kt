@@ -27,7 +27,7 @@ class ResetReminderQuotaUseCaseTest {
 
         fixture.useCase()
 
-        assertEquals(listOf("cancel", "close", "settings", "quota"), fixture.events)
+        assertEquals(listOf("close", "cancel", "settings", "quota"), fixture.events)
         assertEquals(listOf(4_400_000L), fixture.displays.resetSince)
     }
 

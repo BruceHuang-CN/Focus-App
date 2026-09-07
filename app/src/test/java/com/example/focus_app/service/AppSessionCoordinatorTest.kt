@@ -12,6 +12,7 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -289,12 +290,41 @@ class AppSessionCoordinatorTest {
         assertEquals(listOf(sessionId), fixture.reminderScheduler.cancelledSessionIds)
     }
 
+    @Test
+    fun stop_current_session_is_persisted_before_dismiss_broadcast_can_cancel_the_caller() = runTest {
+        val repository = FakeAppSessionRepository()
+        var sessionWasClosedBeforeCancel = false
+        val scheduler = RecordingSessionReminderScheduler { sessionId ->
+                sessionWasClosedBeforeCancel = repository.sessions
+                    .single { it.id == sessionId }
+                    .endedAt != null
+        }
+        val fixture = fixture(repository = repository, reminderScheduler = scheduler)
+        fixture.coordinator.onPackageChanged(TARGET_A)
+
+        fixture.coordinator.stopCurrentSession()
+
+        assertEquals(true, sessionWasClosedBeforeCancel)
+    }
+
+    @Test
+    fun active_return_grace_shows_immediately_without_scheduling_a_regular_initial_reminder() = runTest {
+        val grace = RecordingReturnToFocusGrace(handlesSession = true)
+        val fixture = fixture(returnToFocusGrace = grace)
+
+        fixture.coordinator.onPackageChanged(TARGET_A)
+
+        assertEquals(listOf(TARGET_A), grace.shownFor.map { it.packageName })
+        assertTrue(fixture.reminderScheduler.startedSessionIds.isEmpty())
+    }
+
     private fun TestScope.fixture(
         activeTaskId: Long? = 7L,
         toneKey: String = ReminderTone.GENTLE.key,
         repository: FakeAppSessionRepository = FakeAppSessionRepository(),
         now: Long = STARTED_AT,
-        reminderScheduler: RecordingSessionReminderScheduler = RecordingSessionReminderScheduler()
+        reminderScheduler: RecordingSessionReminderScheduler = RecordingSessionReminderScheduler(),
+        returnToFocusGrace: ReturnToFocusGrace = NoOpReturnToFocusGrace
     ): Fixture {
         val clock = FakeClock(now)
         val contextProvider = FakeAppSessionContextProvider(
@@ -313,6 +343,7 @@ class AppSessionCoordinatorTest {
                 contextProvider,
                 clock,
                 reminderScheduler,
+                returnToFocusGrace = returnToFocusGrace,
                 scope = backgroundScope,
                 departureConfirmationDelayMillis = DEPARTURE_CONFIRMATION_MS
             ),
@@ -411,7 +442,9 @@ private class FakeAppSessionRepository(
     override suspend fun markUserAction(sessionId: Long, action: String) = Unit
 }
 
-private class RecordingSessionReminderScheduler : SessionReminderScheduler {
+private class RecordingSessionReminderScheduler(
+    private val onCancel: (Long) -> Unit = {}
+) : SessionReminderScheduler {
     val startedSessionIds = mutableListOf<Long>()
     val cancelledSessionIds = mutableListOf<Long>()
     val foregroundChecks = mutableListOf<suspend () -> Boolean>()
@@ -425,6 +458,20 @@ private class RecordingSessionReminderScheduler : SessionReminderScheduler {
     }
 
     override fun cancel(sessionId: Long) {
+        onCancel(sessionId)
         cancelledSessionIds += sessionId
+    }
+}
+
+private class RecordingReturnToFocusGrace(
+    private val handlesSession: Boolean
+) : ReturnToFocusGrace {
+    val shownFor = mutableListOf<AppUsageSession>()
+
+    override fun start(data: ReminderLaunchData) = Unit
+
+    override fun showIfActive(session: AppUsageSession): Boolean {
+        shownFor += session
+        return handlesSession
     }
 }

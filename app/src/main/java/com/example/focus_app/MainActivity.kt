@@ -10,6 +10,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.lifecycleScope
 import com.example.focus_app.data.repository.SettingsRepository
@@ -48,9 +50,11 @@ class MainActivity : ComponentActivity() {
     @Inject lateinit var permissionStatusProvider: PermissionStatusProvider
 
     private val systemAccessibilityEnabled = MutableStateFlow(false)
+    private var openTasksRequestId by mutableIntStateOf(0)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        consumeNavigationIntent(intent)
         systemAccessibilityEnabled.value = permissionStatusProvider.accessibilityEnabled()
         lifecycleScope.launch {
             combine(
@@ -98,7 +102,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    NavGraph()
+                    NavGraph(openTasksRequestId = openTasksRequestId)
                 }
             }
         }
@@ -107,6 +111,18 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         systemAccessibilityEnabled.value = permissionStatusProvider.accessibilityEnabled()
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        consumeNavigationIntent(intent)
+    }
+
+    private fun consumeNavigationIntent(intent: Intent) {
+        if (intent.action == ACTION_OPEN_TASKS) {
+            openTasksRequestId += 1
+        }
     }
 
     private fun startCompatibilityService() {
@@ -141,4 +157,8 @@ class MainActivity : ComponentActivity() {
         val guardianEnabled: Boolean,
         val keepAlive: Boolean
     )
+
+    companion object {
+        const val ACTION_OPEN_TASKS = "com.example.focus_app.action.OPEN_TASKS"
+    }
 }

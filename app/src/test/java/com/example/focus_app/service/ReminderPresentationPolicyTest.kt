@@ -1,14 +1,52 @@
 package com.example.focus_app.service
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ReminderPresentationPolicyTest {
     @Test
-    fun forced_reminder_requires_an_explicit_action_to_clear_pending_state() {
-        assertEquals(true, shouldKeepReminderPending(forceReminder = true, explicitAction = false))
-        assertEquals(false, shouldKeepReminderPending(forceReminder = true, explicitAction = true))
-        assertEquals(false, shouldKeepReminderPending(forceReminder = false, explicitAction = false))
+    fun single_instance_activity_restarts_display_only_for_a_new_attempt() {
+        assertTrue(isNewReminderAttempt("attempt-1", "attempt-2"))
+        assertFalse(isNewReminderAttempt("attempt-1", "attempt-1"))
+        assertFalse(isNewReminderAttempt("attempt-1", ""))
+    }
+
+    @Test
+    fun confirmation_result_only_applies_to_the_current_resumed_attempt() {
+        assertTrue(
+            shouldApplyReminderConfirmation(
+                expectedAttemptId = "attempt-2",
+                currentAttemptId = "attempt-2",
+                registryAttemptIsCurrent = true,
+                isActivityResumed = true
+            )
+        )
+        assertFalse(
+            shouldApplyReminderConfirmation(
+                expectedAttemptId = "attempt-1",
+                currentAttemptId = "attempt-2",
+                registryAttemptIsCurrent = true,
+                isActivityResumed = true
+            )
+        )
+        assertFalse(
+            shouldApplyReminderConfirmation(
+                expectedAttemptId = "attempt-2",
+                currentAttemptId = "attempt-2",
+                registryAttemptIsCurrent = true,
+                isActivityResumed = false
+            )
+        )
+        assertFalse(
+            shouldApplyReminderConfirmation(
+                expectedAttemptId = "attempt-2",
+                currentAttemptId = "attempt-2",
+                registryAttemptIsCurrent = false,
+                isActivityResumed = true
+            )
+        )
     }
 
     @Test
@@ -16,12 +54,13 @@ class ReminderPresentationPolicyTest {
         var activityStarts = 0
         var notifications = 0
 
-        presentReminder(
+        val activityRequested = presentReminder(
             canDrawOverlays = false,
             startActivity = { activityStarts++ },
             postNotification = { notifications++ }
         )
 
+        assertFalse(activityRequested)
         assertEquals(0, activityStarts)
         assertEquals(1, notifications)
     }
@@ -31,13 +70,28 @@ class ReminderPresentationPolicyTest {
         var activityStarts = 0
         var notifications = 0
 
-        presentReminder(
+        val activityRequested = presentReminder(
             canDrawOverlays = true,
             startActivity = { activityStarts++ },
             postNotification = { notifications++ }
         )
 
+        assertTrue(activityRequested)
         assertEquals(1, activityStarts)
+        assertEquals(1, notifications)
+    }
+
+    @Test
+    fun failed_activity_start_falls_back_to_notification() {
+        var notifications = 0
+
+        val activityRequested = presentReminder(
+            canDrawOverlays = true,
+            startActivity = { error("start failed") },
+            postNotification = { notifications++ }
+        )
+
+        assertFalse(activityRequested)
         assertEquals(1, notifications)
     }
 

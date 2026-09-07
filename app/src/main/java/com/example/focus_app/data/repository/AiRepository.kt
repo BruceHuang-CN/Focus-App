@@ -60,6 +60,26 @@ class AiRepository internal constructor(
         }
     }
 
+    /** 用户主动刷新文案时强制走远端，失败则保留现有缓存。 */
+    suspend fun generateRemoteBatch(
+        context: ReminderContext,
+        settings: AppSettings,
+        count: Int = 3
+    ): Result<List<String>> = try {
+        val endpoint = settings.apiEndpoint.ifBlank { settings.aiProvider.defaultEndpoint }
+        val model = settings.aiModel.ifBlank { settings.aiProvider.defaultModel }
+        DeepSeekReminderProvider(
+            api = getOrCreateApi(endpoint),
+            apiKeyStore = apiKeyStore,
+            model = model,
+            includeDeepSeekOptions = settings.aiProvider == AiProvider.DEEPSEEK
+        ).generateRemoteBatch(context, count)
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (error: Exception) {
+        Result.failure(error)
+    }
+
     /**
      * 使用当前保存的 API Key 测试与配置端点的连通性。
      * 成功时返回端点可用的模型 ID 列表；失败时返回面向用户的简洁错误。

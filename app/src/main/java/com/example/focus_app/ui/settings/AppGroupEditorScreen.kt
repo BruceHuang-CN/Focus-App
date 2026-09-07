@@ -27,6 +27,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,8 +36,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.focus_app.data.repository.AppInfo
+import com.example.focus_app.util.InstalledApp
 import com.example.focus_app.util.loadInstalledApps
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
@@ -47,7 +51,11 @@ fun AppGroupEditorScreen(
 ) {
     val group = viewModel.appGroups.value.firstOrNull { it.id == groupId }
     val context = LocalContext.current
-    val installedApps = remember { loadInstalledApps(context) }
+    val installedApps by produceState<List<InstalledApp>>(emptyList(), context) {
+        value = withContext(Dispatchers.IO) {
+            loadInstalledApps(context.applicationContext)
+        }
+    }
     var name by remember(groupId) { mutableStateOf(group?.name.orEmpty()) }
     var selectedApps by remember(groupId) { mutableStateOf(group?.apps.orEmpty()) }
     var query by remember { mutableStateOf("") }

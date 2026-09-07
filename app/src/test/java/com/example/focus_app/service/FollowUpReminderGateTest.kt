@@ -69,11 +69,11 @@ class FollowUpReminderGateTest {
     }
 
     @Test
-    fun when_quota_is_exhausted_decision_is_skip() {
+    fun explicit_follow_up_is_still_shown_when_normal_quota_is_exhausted() {
         val decision = gate.decide(
             ok().copy(remindedCountSinceWindow = 3, maxRemindersPerWindow = 3)
         )
-        assertEquals(FollowUpDecision.SKIP, decision)
+        assertEquals(FollowUpDecision.SHOW, decision)
     }
 
     @Test

@@ -14,10 +14,18 @@ class HybridFollowUpSchedulerTest {
     fun schedule_triggers_in_process_execution_after_delay_and_cancels_fallback() = runTest {
         val work = RecordingWorkScheduler()
         val alarm = RecordingAlarmScheduler()
+        val countdown = RecordingCountdownNotifier()
         val executor = RecordingExecutor { FollowUpDecision.SHOW }
-        val scheduler = HybridFollowUpScheduler(executor, work, alarm, backgroundScope)
+        val scheduler = HybridFollowUpScheduler(
+            executor = executor,
+            workScheduler = work,
+            alarmScheduler = alarm,
+            scope = backgroundScope,
+            countdownNotifier = countdown
+        )
 
         scheduler.schedule(100L, 60_000L)
+        assertEquals(listOf(100L to 60_000L), countdown.shown)
         advanceTimeBy(59_999L)
         runCurrent()
         assertEquals(0, executor.executedSessionIds.size)
@@ -30,6 +38,7 @@ class HybridFollowUpSchedulerTest {
         assertEquals(listOf(100L to 60_000L), work.scheduled)
         assertEquals(listOf(Triple(100L, 60_000L, 0)), alarm.scheduled)
         assertEquals(listOf(100L), alarm.cancelledSessionIds)
+        assertEquals(listOf(100L), countdown.cancelledSessionIds)
     }
 
     @Test
@@ -53,11 +62,13 @@ class HybridFollowUpSchedulerTest {
     fun cancel_stops_pending_in_process_execution() = runTest {
         val executor = RecordingExecutor { FollowUpDecision.SHOW }
         val alarm = RecordingAlarmScheduler()
+        val countdown = RecordingCountdownNotifier()
         val scheduler = HybridFollowUpScheduler(
-            executor,
-            RecordingWorkScheduler(),
-            alarm,
-            backgroundScope
+            executor = executor,
+            workScheduler = RecordingWorkScheduler(),
+            alarmScheduler = alarm,
+            scope = backgroundScope,
+            countdownNotifier = countdown
         )
 
         scheduler.schedule(100L, 60_000L)
@@ -67,6 +78,7 @@ class HybridFollowUpSchedulerTest {
 
         assertEquals(0, executor.executedSessionIds.size)
         assertEquals(listOf(100L), alarm.cancelledSessionIds)
+        assertEquals(listOf(100L), countdown.cancelledSessionIds)
     }
 
     @Test
@@ -118,6 +130,19 @@ class HybridFollowUpSchedulerTest {
 
         override fun schedule(sessionId: Long, delayMillis: Long, retryAttempt: Int) {
             scheduled += Triple(sessionId, delayMillis, retryAttempt)
+        }
+
+        override fun cancel(sessionId: Long) {
+            cancelledSessionIds += sessionId
+        }
+    }
+
+    private class RecordingCountdownNotifier : FollowUpCountdownNotifier {
+        val shown = mutableListOf<Pair<Long, Long>>()
+        val cancelledSessionIds = mutableListOf<Long>()
+
+        override fun show(sessionId: Long, delayMillis: Long) {
+            shown += sessionId to delayMillis
         }
 
         override fun cancel(sessionId: Long) {

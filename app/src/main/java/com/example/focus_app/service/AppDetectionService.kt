@@ -50,6 +50,7 @@ class AppDetectionService : Service() {
     @Inject lateinit var settingsRepository: SettingsRepository
     @Inject lateinit var appSessionCoordinator: AppSessionCoordinator
     @Inject lateinit var reminderPresentationRegistry: ReminderPresentationRegistry
+    @Inject lateinit var pendingReminderRedisplayer: PendingReminderRedisplayer
     @Inject lateinit var realtimeForegroundProvider: RealtimeForegroundProvider
 
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
@@ -95,6 +96,7 @@ class AppDetectionService : Service() {
         val observation = queryLatestForeground(observationCursor.queryStart(now), now)
         observationCursor.takeIfNew(observation)?.let { foreground ->
             realtimeForegroundProvider.onRealApplicationForeground(foreground.packageName)
+            pendingReminderRedisplayer.onForegroundPackage(foreground.packageName)
             appSessionCoordinator.onPackageChanged(
                 packageName = foreground.packageName,
                 foregroundVerifier = { expectedPackage ->
@@ -104,7 +106,7 @@ class AppDetectionService : Service() {
                     )?.packageName == expectedPackage
                 },
                 isReminderPresentation = isReminderPresentationForForegroundChange(
-                    reminderPresentationRegistry.isShowing()
+                    reminderPresentationRegistry.protectsSession()
                 )
             )
         }

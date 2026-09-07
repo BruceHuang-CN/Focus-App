@@ -25,6 +25,7 @@ import com.example.focus_app.domain.model.DetectionMode
 import com.example.focus_app.domain.model.AppUsageSession
 import com.example.focus_app.domain.time.FakeClock
 import com.example.focus_app.domain.usecase.ResetReminderQuotaUseCase
+import com.example.focus_app.domain.usecase.RegenerateReminderMessagesUseCase
 import com.example.focus_app.domain.usecase.UpdateGuardianStateUseCase
 import com.example.focus_app.service.AppSessionContext
 import com.example.focus_app.service.AppSessionContextProvider
@@ -170,11 +171,18 @@ class HomeViewModelGuardianTest {
             override suspend fun currentContext() = AppSessionContext(emptyMap(), null, "gentle")
         }, FakeClock(1_000_000L), HomeReminderScheduler())
         val cache = ReminderCacheRepository(HomeCacheDao(), FakeClock(1_000_000L))
-        return Fixture(settings, groups, sessions, displays, permissions, diagnostics, MoodRepository(HomeMoodDao()), TaskRepository(HomeTaskDao(), FakeClock(1_000_000L)), UpdateGuardianStateUseCase(groups, settings, sessions, displays, cache, coordinator, FakeClock(1_000_000L)), ResetReminderQuotaUseCase(settings, displays, coordinator, FakeClock(1_000_000L)))
+        val regenerator = RegenerateReminderMessagesUseCase(
+            activeTask = { null },
+            settings = settings::getSettings,
+            buildContext = { _, _, _ -> error("unused") },
+            generateRemote = { _, _ -> error("unused") },
+            replaceCache = { _, _, _, _ -> error("unused") }
+        )
+        return Fixture(settings, groups, sessions, displays, permissions, diagnostics, MoodRepository(HomeMoodDao()), TaskRepository(HomeTaskDao(), FakeClock(1_000_000L)), UpdateGuardianStateUseCase(groups, settings, sessions, displays, cache, coordinator, FakeClock(1_000_000L)), ResetReminderQuotaUseCase(settings, displays, coordinator, FakeClock(1_000_000L)), regenerator)
     }
 
-    private data class Fixture(val settings: SettingsRepository, val groups: AppGroupRepository, val sessions: HomeSessions, val displays: HomeDisplayRepository, val permissions: PermissionStatusProvider, val diagnostics: HomeAccessibilityDiagnosticsStore, val moods: MoodRepository, val tasks: TaskRepository, val updateGuardianState: UpdateGuardianStateUseCase, val resetReminderQuota: ResetReminderQuotaUseCase) {
-        fun homeViewModel() = HomeViewModel(sessions, moods, tasks, settings, displays, groups, permissions, diagnostics, updateGuardianState, resetReminderQuota)
+    private data class Fixture(val settings: SettingsRepository, val groups: AppGroupRepository, val sessions: HomeSessions, val displays: HomeDisplayRepository, val permissions: PermissionStatusProvider, val diagnostics: HomeAccessibilityDiagnosticsStore, val moods: MoodRepository, val tasks: TaskRepository, val updateGuardianState: UpdateGuardianStateUseCase, val resetReminderQuota: ResetReminderQuotaUseCase, val regenerator: RegenerateReminderMessagesUseCase) {
+        fun homeViewModel() = HomeViewModel(sessions, moods, tasks, settings, displays, groups, permissions, diagnostics, updateGuardianState, resetReminderQuota, regenerator)
     }
 }
 

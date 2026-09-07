@@ -45,6 +45,7 @@ class AppSessionCoordinator(
     private val contextProvider: AppSessionContextProvider,
     private val clock: Clock,
     private val reminderScheduler: SessionReminderScheduler,
+    private val returnToFocusGrace: ReturnToFocusGrace = NoOpReturnToFocusGrace,
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
     private val departureConfirmationDelayMillis: Long = DEFAULT_DEPARTURE_CONFIRMATION_DELAY_MS
 ) {
@@ -100,12 +101,9 @@ class AppSessionCoordinator(
     suspend fun stopCurrentSession() = eventMutex.withLock {
         cancelPendingDepartureLocked()
         val session = openSession ?: repository.currentOpenSession()
-        session?.let {
-            reminderScheduler.cancel(it.id)
-            repository.closeSession(it.id, clock.nowMillis())
+        if (session != null) {
+            closeSessionLocked(session)
         }
-        openSession = null
-        foregroundPackage = null
         initialized = true
     }
 
@@ -138,10 +136,7 @@ class AppSessionCoordinator(
                     return@withLock
                 }
 
-                reminderScheduler.cancel(session.id)
-                repository.closeSession(session.id, clock.nowMillis())
-                openSession = null
-                foregroundPackage = null
+                closeSessionLocked(session)
                 transitionToPackageLocked(
                     packageName = candidatePackage,
                     foregroundVerifier = foregroundVerifier,
@@ -177,6 +172,13 @@ class AppSessionCoordinator(
         pendingDeparture = null
     }
 
+    private suspend fun closeSessionLocked(session: AppUsageSession) {
+        repository.closeSession(session.id, clock.nowMillis())
+        openSession = null
+        foregroundPackage = null
+        reminderScheduler.cancel(session.id)
+    }
+
     private suspend fun transitionToPackageLocked(
         packageName: String?,
         foregroundVerifier: (suspend (String) -> Boolean)?,
@@ -201,9 +203,11 @@ class AppSessionCoordinator(
         )
         openSession = session
         foregroundPackage = packageName
-        reminderScheduler.onSessionStarted(session) {
-            foregroundVerifier?.invoke(session.packageName)
-                ?: (foregroundPackage == session.packageName)
+        if (!returnToFocusGrace.showIfActive(session)) {
+            reminderScheduler.onSessionStarted(session) {
+                foregroundVerifier?.invoke(session.packageName)
+                    ?: (foregroundPackage == session.packageName)
+            }
         }
     }
 

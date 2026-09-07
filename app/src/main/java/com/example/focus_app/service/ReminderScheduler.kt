@@ -88,6 +88,7 @@ class ReminderScheduler(
                 message = cachedMessage ?: localFallback(session.appName, taskTitle),
                 showBreathing = settings.enableBreathingPause,
                 returnDestination = settings.returnDestination,
+                targetPackageName = session.packageName,
                 windowReminderCount = displayRepository.countSince(since),
                 windowLimit = settings.maxRemindersPerWindow,
                 windowMinutes = settings.reminderWindowMinutes,

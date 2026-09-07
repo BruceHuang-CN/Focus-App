@@ -23,12 +23,18 @@ class DeepSeekReminderProvider(
         context: ReminderContext,
         count: Int
     ): Result<List<String>> {
-        val fallbackMessages: suspend () -> Result<List<String>> = {
-            fallback.generateBatch(context, count)
-        }
+        val remote = generateRemoteBatch(context, count)
+        return if (remote.isSuccess) remote else fallback.generateBatch(context, count)
+    }
+
+    /** 强制请求远端；用于用户主动刷新，失败时不得伪装成本地生成成功。 */
+    suspend fun generateRemoteBatch(
+        context: ReminderContext,
+        count: Int
+    ): Result<List<String>> {
         return try {
             val key = apiKeyStore.read()
-            if (key.isBlank()) return fallbackMessages()
+            if (key.isBlank()) return Result.failure(IllegalStateException("API Key 未设置"))
             val response = api.chatCompletion(
                 authorization = "Bearer $key",
                 request = ChatRequest(
@@ -42,14 +48,20 @@ class DeepSeekReminderProvider(
                     response_format = ResponseFormat("json_object")
                 )
             )
-            if (!response.isSuccessful) return fallbackMessages()
+            if (!response.isSuccessful) {
+                return Result.failure(IllegalStateException("AI 服务返回 ${response.code()}"))
+            }
             val content = response.body()?.choices?.firstOrNull()?.message?.content
             val messages = parseMessages(content, count)
-            if (messages == null) fallbackMessages() else Result.success(messages)
+            if (messages == null) {
+                Result.failure(IllegalStateException("AI 返回的文案格式无效"))
+            } else {
+                Result.success(messages)
+            }
         } catch (cancelled: CancellationException) {
             throw cancelled
-        } catch (_: Exception) {
-            fallbackMessages()
+        } catch (error: Exception) {
+            Result.failure(error)
         }
     }
 

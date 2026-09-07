@@ -11,6 +11,8 @@ import com.example.focus_app.data.repository.TaskRepository
 import com.example.focus_app.data.appgroup.AppGroup
 import com.example.focus_app.data.appgroup.AppGroupRepository
 import com.example.focus_app.data.permission.PermissionStatusProvider
+import com.example.focus_app.data.reminder.DefaultReminderActionOrderStore
+import com.example.focus_app.data.reminder.ReminderActionOrderStore
 import com.example.focus_app.data.followup.FollowUpReminderStore
 import com.example.focus_app.data.keepalive.KeepAliveStore
 import com.example.focus_app.data.returnapp.CustomReturnAppStore
@@ -51,7 +53,8 @@ class SettingsViewModel @Inject constructor(
     private val keepAliveStore: KeepAliveStore,
     private val themeStore: ThemeStore,
     private val appGroupRepository: AppGroupRepository? = null,
-    private val updateGuardianStateUseCase: UpdateGuardianStateUseCase? = null
+    private val updateGuardianStateUseCase: UpdateGuardianStateUseCase? = null,
+    private val reminderActionOrderStore: ReminderActionOrderStore = DefaultReminderActionOrderStore
 ) : ViewModel() {
     val settings: StateFlow<AppSettings> = settingsRepository.getSettingsFlow().stateIn(viewModelScope, SharingStarted.Eagerly, AppSettings())
 
@@ -68,6 +71,7 @@ class SettingsViewModel @Inject constructor(
     val followUpInterval: StateFlow<Int> = _followUpInterval.asStateFlow()
 
     val keepAliveEnabled: StateFlow<Boolean> = keepAliveStore.enabled
+    val randomizeReminderActions: StateFlow<Boolean> = reminderActionOrderStore.randomizeEnabled
     val themeSettings: StateFlow<ThemeSettings> = themeStore.settings
     val appGroups: StateFlow<List<AppGroup>> = appGroupRepository?.groups ?: MutableStateFlow(emptyList())
     val activeAppGroupId: StateFlow<String> = appGroupRepository?.activeGroupId ?: MutableStateFlow("")
@@ -132,6 +136,10 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun setForceReminder(enabled: Boolean) { update { it.copy(forceReminder = enabled) } }
+
+    fun setRandomizeReminderActions(enabled: Boolean) {
+        reminderActionOrderStore.setRandomizeEnabled(enabled)
+    }
 
     fun updateDailyShortVideoLimitMinutes(minutes: Int) {
         update { it.copy(dailyShortVideoLimitMinutes = minutes.coerceIn(1, 1_440)) }

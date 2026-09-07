@@ -40,7 +40,7 @@ class UpdateGuardianStateUseCaseTest {
 
         assertTrue(result.isSuccess)
         assertEquals(
-            listOf("cancel", "close", "settings", "quota"),
+            listOf("close", "cancel", "settings", "quota"),
             fixture.events
         )
         assertEquals(listOf(AppInfo("social.app", "Social")), fixture.settings.getSettings().targetApps)
@@ -71,7 +71,7 @@ class UpdateGuardianStateUseCaseTest {
         assertTrue(result.isSuccess)
         assertEquals(listOf(AppInfo("social.app", "Social")), fixture.groups.groups.value.single().apps)
         assertEquals(listOf(AppInfo("social.app", "Social")), fixture.settings.getSettings().targetApps)
-        assertEquals(listOf("cancel", "close", "settings", "quota"), fixture.events)
+        assertEquals(listOf("close", "cancel", "settings", "quota"), fixture.events)
         assertEquals(1L, fixture.cache.revision.value)
     }
 
@@ -93,7 +93,7 @@ class UpdateGuardianStateUseCaseTest {
 
         fixture.useCase.setGuardianEnabled(false)
 
-        assertEquals(listOf("cancel", "close", "guardian"), fixture.events)
+        assertEquals(listOf("close", "cancel", "guardian"), fixture.events)
         assertFalse(fixture.settings.getSettings().guardianEnabled)
         assertTrue(fixture.settings.getSettings().enableAccessibility)
     }

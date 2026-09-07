@@ -69,6 +69,26 @@ class DeepSeekReminderProviderTest {
         assertEquals(3, failed.distinct().size)
     }
 
+    @Test
+    fun explicit_remote_generation_reports_http_failure_without_using_local_fallback() = runTest {
+        val result = DeepSeekReminderProvider(
+            FakeOpenAiApi(responseCode = 429),
+            FakeApiKeyStore("secret")
+        ).generateRemoteBatch(context(), 3)
+
+        assertTrue(result.isFailure)
+    }
+
+    @Test
+    fun explicit_remote_generation_requires_an_api_key() = runTest {
+        val result = DeepSeekReminderProvider(
+            FakeOpenAiApi(),
+            FakeApiKeyStore()
+        ).generateRemoteBatch(context(), 3)
+
+        assertTrue(result.isFailure)
+    }
+
     @Test(expected = CancellationException::class)
     fun cancellation_is_not_converted_into_a_fallback_batch() = runTest {
         DeepSeekReminderProvider(

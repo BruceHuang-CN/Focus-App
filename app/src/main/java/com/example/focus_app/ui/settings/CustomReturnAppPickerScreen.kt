@@ -15,7 +15,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.focus_app.util.InstalledApp
 import com.example.focus_app.util.loadInstalledApps
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * 按应用名称选择「返回指定应用」的目标，无需输入包名。
@@ -27,7 +30,11 @@ fun CustomReturnAppPickerScreen(
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
-    val allApps = remember { loadInstalledApps(context) }
+    val allApps by produceState<List<InstalledApp>>(emptyList(), context) {
+        value = withContext(Dispatchers.IO) {
+            loadInstalledApps(context.applicationContext)
+        }
+    }
     val currentPackage by viewModel.customReturnPackage.collectAsState()
     var searchQuery by remember { mutableStateOf("") }
 

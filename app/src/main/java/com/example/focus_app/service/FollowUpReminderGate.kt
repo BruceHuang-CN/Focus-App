@@ -41,10 +41,6 @@ class FollowUpReminderGate @Inject constructor() {
         if (input.currentOpenSessionId != session.id) return FollowUpDecision.SKIP
         if (session.packageName !in input.targetPackages) return FollowUpDecision.SKIP
 
-        if (input.remindedCountSinceWindow >= input.maxRemindersPerWindow) {
-            return FollowUpDecision.SKIP
-        }
-
         if (!input.deviceInteractive) return FollowUpDecision.RETRY
 
         when (val foreground = input.foregroundSnapshot) {

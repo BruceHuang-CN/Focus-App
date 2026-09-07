@@ -44,6 +44,7 @@ class FocusAccessibilityService : AccessibilityService() {
     @Inject lateinit var settingsRepository: SettingsRepository
     @Inject lateinit var appSessionCoordinator: AppSessionCoordinator
     @Inject lateinit var reminderPresentationRegistry: ReminderPresentationRegistry
+    @Inject lateinit var pendingReminderRedisplayer: PendingReminderRedisplayer
     @Inject lateinit var realtimeForegroundProvider: RealtimeForegroundProvider
     @Inject lateinit var accessibilityDiagnosticsStore: AccessibilityDiagnosticsStore
 
@@ -91,11 +92,12 @@ class FocusAccessibilityService : AccessibilityService() {
             realtimeForegroundProvider.onRealApplicationForeground(pkg)
         }
         if (!isRealtimeMode) return
+        pendingReminderRedisplayer.onForegroundPackage(pkg)
         packageChanges.trySend(
             PackageChange(
                 packageName = pkg,
                 isReminderPresentation = isReminderPresentationForForegroundChange(
-                    reminderPresentationRegistry.isShowing()
+                    reminderPresentationRegistry.protectsSession()
                 )
             )
         )

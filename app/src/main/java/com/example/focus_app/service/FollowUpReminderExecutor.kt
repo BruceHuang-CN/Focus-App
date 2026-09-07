@@ -29,9 +29,11 @@ class FollowUpReminderExecutor(
     private val gate: FollowUpReminderGate,
     private val environment: FollowUpEnvironment,
     private val displayRepository: ReminderDisplayRepository,
-    private val attemptIdProvider: () -> String
+    private val attemptIdProvider: () -> String,
+    private val countdownNotifier: FollowUpCountdownNotifier = NoOpFollowUpCountdownNotifier
 ) : FollowUpExecutor {
     override suspend fun execute(sessionId: Long): FollowUpDecision {
+        countdownNotifier.cancel(sessionId)
         val settings = settingsProvider()
         val now = SystemClock.nowMillis()
         val since = now - settings.reminderWindowMinutes * 60_000L
@@ -76,6 +78,7 @@ class FollowUpReminderExecutor(
                 message = message,
                 showBreathing = settings.enableBreathingPause,
                 returnDestination = settings.returnDestination,
+                targetPackageName = session.packageName,
                 windowReminderCount = displayRepository.countSince(since),
                 windowLimit = settings.maxRemindersPerWindow,
                 windowMinutes = settings.reminderWindowMinutes,
@@ -99,7 +102,8 @@ class FollowUpReminderExecutor(
         gate: FollowUpReminderGate,
         environment: FollowUpEnvironment,
         displayRepository: ReminderDisplayRepository,
-        attemptIdGenerator: ReminderAttemptIdGenerator
+        attemptIdGenerator: ReminderAttemptIdGenerator,
+        countdownNotifier: FollowUpCountdownNotifier
     ) : this(
         sessionRepository = sessionRepository,
         settingsProvider = settingsRepository::getSettings,
@@ -118,7 +122,8 @@ class FollowUpReminderExecutor(
         gate = gate,
         environment = environment,
         displayRepository = displayRepository,
-        attemptIdProvider = attemptIdGenerator::newId
+        attemptIdProvider = attemptIdGenerator::newId,
+        countdownNotifier = countdownNotifier
     )
 }
 

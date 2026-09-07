@@ -29,14 +29,53 @@ class ReminderDisplayCoordinatorTest {
             clock = { 10_000L }
         )
 
-        assertNull(coordinator.confirm(LAUNCH_DATA))
+        assertNull(coordinator.confirm(LAUNCH_DATA.copy(displayKind = ReminderDisplayKind.INITIAL)))
+    }
+
+    @Test
+    fun explicit_follow_up_records_even_when_normal_quota_is_full() = runTest {
+        val repository = FakeReminderDisplayRepository { limit ->
+            if (limit == Int.MAX_VALUE) {
+                ReminderDisplayResult.Displayed(4)
+            } else {
+                ReminderDisplayResult.QuotaExceeded
+            }
+        }
+        val coordinator = ReminderDisplayCoordinator(repository, clock = { 10_000L })
+
+        val confirmed = coordinator.confirm(LAUNCH_DATA)
+
+        assertEquals(4, confirmed?.windowReminderCount)
+        assertEquals(listOf(Int.MAX_VALUE), repository.limits)
+    }
+
+    @Test
+    fun forced_redisplay_keeps_the_original_count_without_recording_another_touch() = runTest {
+        val repository = FakeReminderDisplayRepository(ReminderDisplayResult.Displayed(4))
+        val coordinator = ReminderDisplayCoordinator(repository, clock = { 10_000L })
+
+        val confirmed = coordinator.confirm(
+            LAUNCH_DATA.copy(
+                attemptId = "attempt-2",
+                forceReminder = true,
+                displayKind = ReminderDisplayKind.FORCED_REDISPLAY,
+                windowReminderCount = 1
+            )
+        )
+
+        assertEquals(1, confirmed?.windowReminderCount)
+        assertEquals(emptyList<String>(), repository.attemptIds)
+        assertEquals(emptyList<Int>(), repository.limits)
     }
 
     private class FakeReminderDisplayRepository(
-        private val result: ReminderDisplayResult
+        private val resultProvider: (Int) -> ReminderDisplayResult
     ) : ReminderDisplayRepository {
+        constructor(result: ReminderDisplayResult) : this({ result })
+
         val attemptIds = mutableListOf<String>()
         val windowStarts = mutableListOf<Long>()
+        val limits = mutableListOf<Int>()
 
         override suspend fun recordDisplay(
             attemptId: String,
@@ -48,7 +87,8 @@ class ReminderDisplayCoordinatorTest {
         ): ReminderDisplayResult {
             attemptIds += attemptId
             windowStarts += windowStart
-            return result
+            limits += limit
+            return resultProvider(limit)
         }
 
         override suspend fun countSince(since: Long): Int = 0

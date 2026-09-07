@@ -6,14 +6,20 @@ import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -51,6 +57,21 @@ sealed class Screen(val route: String) {
 
 private data class TabItem(val route: String, val label: String, val icon: ImageVector)
 
+private sealed interface SettingsExitRequest {
+    data object Back : SettingsExitRequest
+    data class Tab(val route: String) : SettingsExitRequest
+}
+
+private const val SETTINGS_EXIT_BACK = "__settings_exit_back__"
+
+private fun SettingsExitRequest.savedValue(): String = when (this) {
+    SettingsExitRequest.Back -> SETTINGS_EXIT_BACK
+    is SettingsExitRequest.Tab -> route
+}
+
+private fun savedSettingsExitRequest(value: String): SettingsExitRequest =
+    if (value == SETTINGS_EXIT_BACK) SettingsExitRequest.Back else SettingsExitRequest.Tab(value)
+
 private val mainTabs = listOf(
     TabItem(Screen.Home.route, "首页", Icons.Filled.Home),
     TabItem(Screen.Tasks.route, "任务", Icons.AutoMirrored.Filled.List),
@@ -58,16 +79,67 @@ private val mainTabs = listOf(
     TabItem(Screen.Settings.route, "设置", Icons.Filled.Settings)
 )
 
+internal fun mainStartDestination(
+    onboardingDone: Boolean,
+    openTasksRequested: Boolean
+): String = when {
+    !onboardingDone -> Screen.Onboarding.route
+    openTasksRequested -> Screen.Tasks.route
+    else -> Screen.Home.route
+}
+
+internal fun settingsExitNeedsConfirmation(
+    currentRoute: String?,
+    hasUnsavedChanges: Boolean
+): Boolean = currentRoute == Screen.Settings.route && hasUnsavedChanges
+
 @Composable
-fun NavGraph() {
+fun NavGraph(openTasksRequestId: Int = 0) {
     val context = LocalContext.current
     val navController = rememberNavController()
+    val onboardingDone = remember { PermissionHelper.isOnboardingDone(context) }
     val startDest = remember {
-        if (PermissionHelper.isOnboardingDone(context)) Screen.Home.route else Screen.Onboarding.route
+        mainStartDestination(
+            onboardingDone = onboardingDone,
+            openTasksRequested = openTasksRequestId > 0
+        )
     }
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
     val tabRoutes = mainTabs.map { it.route }
+    var settingsEdited by rememberSaveable { mutableStateOf(false) }
+    var pendingSettingsExit by rememberSaveable { mutableStateOf<String?>(null) }
+
+    fun navigateToMainTab(route: String) {
+        navController.navigate(route) {
+            popUpTo(navController.graph.findStartDestination().id) {
+                saveState = true
+            }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
+
+    fun performSettingsExit(request: SettingsExitRequest) {
+        when (request) {
+            SettingsExitRequest.Back -> navController.popBackStack()
+            is SettingsExitRequest.Tab -> navigateToMainTab(request.route)
+        }
+    }
+
+    fun requestSettingsExit(request: SettingsExitRequest) {
+        if (settingsExitNeedsConfirmation(currentRoute, settingsEdited)) {
+            pendingSettingsExit = request.savedValue()
+        } else {
+            performSettingsExit(request)
+        }
+    }
+
+    LaunchedEffect(openTasksRequestId) {
+        if (openTasksRequestId > 0 && onboardingDone && currentRoute != Screen.Tasks.route) {
+            requestSettingsExit(SettingsExitRequest.Tab(Screen.Tasks.route))
+        }
+    }
 
     Scaffold(
         bottomBar = {
@@ -77,12 +149,8 @@ fun NavGraph() {
                         NavigationBarItem(
                             selected = currentRoute == tab.route,
                             onClick = {
-                                navController.navigate(tab.route) {
-                                    popUpTo(navController.graph.findStartDestination().id) {
-                                        saveState = true
-                                    }
-                                    launchSingleTop = true
-                                    restoreState = true
+                                if (currentRoute != tab.route) {
+                                    requestSettingsExit(SettingsExitRequest.Tab(tab.route))
                                 }
                             },
                             icon = { Icon(tab.icon, contentDescription = tab.label) },
@@ -119,7 +187,11 @@ fun NavGraph() {
             }
             composable(Screen.Settings.route) {
                 SettingsScreen(
-                    onBack = { navController.popBackStack() },
+                    onExitRequested = {
+                        requestSettingsExit(SettingsExitRequest.Back)
+                    },
+                    hasUnsavedChanges = settingsEdited,
+                    onUnsavedChangesChanged = { settingsEdited = it },
                     navigateToCustomReturnPicker = {
                         navController.navigate(Screen.CustomReturnPicker.route)
                     },
@@ -148,6 +220,33 @@ fun NavGraph() {
                 AppGroupEditorScreen(groupId = groupId, onBack = { navController.popBackStack() })
             }
         }
+    }
+
+    pendingSettingsExit?.let { savedRequest ->
+        val request = savedSettingsExitRequest(savedRequest)
+        AlertDialog(
+            onDismissRequest = { pendingSettingsExit = null },
+            title = { Text("保存设置？") },
+            text = { Text("你有未保存的修改。请先保存，或继续修改。") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        settingsEdited = false
+                        pendingSettingsExit = null
+                        performSettingsExit(request)
+                    }
+                ) {
+                    Text(
+                        if (request is SettingsExitRequest.Tab) "保存并切换" else "保存并退出"
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingSettingsExit = null }) {
+                    Text("继续修改")
+                }
+            }
+        )
     }
 
 }

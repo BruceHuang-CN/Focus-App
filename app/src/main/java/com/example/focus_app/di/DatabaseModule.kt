@@ -28,6 +28,7 @@ import com.example.focus_app.data.security.MigratingApiKeyStore
 import com.example.focus_app.data.security.RoomLegacyApiKeySource
 import com.example.focus_app.domain.time.SystemClock
 import com.example.focus_app.service.AppSessionCoordinator
+import com.example.focus_app.service.ReturnToFocusGrace
 import com.example.focus_app.service.AndroidReminderLauncher
 import com.example.focus_app.service.ReminderLauncher
 import com.example.focus_app.service.ReminderScheduler
@@ -98,12 +99,14 @@ object DatabaseModule {
         repository: AppSessionRepository,
         settingsRepository: SettingsRepository,
         taskRepository: TaskRepository,
-        reminderScheduler: ReminderScheduler
+        reminderScheduler: ReminderScheduler,
+        returnToFocusGrace: ReturnToFocusGrace
     ): AppSessionCoordinator = AppSessionCoordinator(
         repository = repository,
         contextProvider = RepositoryAppSessionContextProvider(settingsRepository, taskRepository),
         clock = SystemClock,
-        reminderScheduler = reminderScheduler
+        reminderScheduler = reminderScheduler,
+        returnToFocusGrace = returnToFocusGrace
     )
 
     @Provides

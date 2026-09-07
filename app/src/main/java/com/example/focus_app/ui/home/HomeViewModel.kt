@@ -14,6 +14,8 @@ import com.example.focus_app.domain.model.DetectionMode
 import com.example.focus_app.domain.model.FocusTask
 import com.example.focus_app.domain.task.StreakCalculator
 import com.example.focus_app.domain.usecase.ResetReminderQuotaUseCase
+import com.example.focus_app.domain.usecase.RegenerateReminderMessagesUseCase
+import com.example.focus_app.domain.usecase.ReminderRegenerationResult
 import com.example.focus_app.domain.usecase.UpdateGuardianStateUseCase
 import com.example.focus_app.service.AccessibilityDiagnosticsStore
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -43,11 +45,13 @@ data class HomeUiState(
     val accessibilityLastConnectedAtMillis: Long? = null,
     val accessibilityLastDestroyedAtMillis: Long? = null,
     val accessibilityLastInterruptedAtMillis: Long? = null,
-    val firstLaunchAfterUpdateAtMillis: Long? = null
+    val firstLaunchAfterUpdateAtMillis: Long? = null,
+    val isRegeneratingMessages: Boolean = false
 )
 
 sealed interface HomeEvent {
     data object ReminderQuotaReset : HomeEvent
+    data class ReminderMessagesRegenerated(val message: String) : HomeEvent
 }
 
 @HiltViewModel
@@ -61,7 +65,8 @@ class HomeViewModel @Inject constructor(
     private val permissionStatusProvider: PermissionStatusProvider,
     private val accessibilityDiagnosticsStore: AccessibilityDiagnosticsStore,
     private val updateGuardianStateUseCase: UpdateGuardianStateUseCase,
-    private val resetReminderQuotaUseCase: ResetReminderQuotaUseCase
+    private val resetReminderQuotaUseCase: ResetReminderQuotaUseCase,
+    private val regenerateReminderMessagesUseCase: RegenerateReminderMessagesUseCase
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
@@ -167,6 +172,23 @@ class HomeViewModel @Inject constructor(
             loadStats()
             _events.emit(HomeEvent.ReminderQuotaReset)
         }
+    }
+
+    fun regenerateReminderMessages() {
+        if (_uiState.value.isRegeneratingMessages) return
+        _uiState.update { it.copy(isRegeneratingMessages = true) }
+        viewModelScope.launch {
+            val result = regenerateReminderMessagesUseCase()
+            _uiState.update { it.copy(isRegeneratingMessages = false) }
+            _events.emit(HomeEvent.ReminderMessagesRegenerated(result.userMessage()))
+        }
+    }
+
+    private fun ReminderRegenerationResult.userMessage(): String = when (this) {
+        is ReminderRegenerationResult.Success -> "AI 文案已更新（$targetCount 个目标应用）"
+        ReminderRegenerationResult.NoActiveTask -> "请先创建或选中当前任务"
+        ReminderRegenerationResult.NoTargetApps -> "请先设置需要监控的目标应用"
+        is ReminderRegenerationResult.Failed -> "生成失败：$reason；已保留原文案"
     }
 
     private companion object {

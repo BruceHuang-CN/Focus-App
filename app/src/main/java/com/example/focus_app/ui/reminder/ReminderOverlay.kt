@@ -3,23 +3,14 @@ package com.example.focus_app.ui.reminder
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
@@ -29,6 +20,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -41,7 +33,6 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.example.focus_app.domain.model.ReturnDestination
 import com.example.focus_app.service.ReminderLaunchData
 import com.example.focus_app.ui.theme.InkBlue
 import kotlinx.coroutines.delay
@@ -49,14 +40,15 @@ import kotlinx.coroutines.delay
 @Composable
 fun ReminderOverlay(
     data: ReminderLaunchData,
+    interactionsEnabled: Boolean = true,
     onDismiss: () -> Unit,
     viewModel: ReminderViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    var exitMenuExpanded by remember { mutableStateOf(false) }
-    var snoozeMenuExpanded by remember { mutableStateOf(false) }
-    var customSnoozeVisible by remember { mutableStateOf(false) }
-    var customSnoozeMinutes by remember { mutableStateOf("") }
+    var customTimedAction by rememberSaveable(data.attemptId) {
+        mutableStateOf<ReminderDecisionAction?>(null)
+    }
+    var customSnoozeMinutes by rememberSaveable(data.attemptId) { mutableStateOf("") }
     val urgency = remember(data.windowReminderCount, data.windowLimit) {
         reminderUrgency(data.windowReminderCount, data.windowLimit)
     }
@@ -64,6 +56,12 @@ fun ReminderOverlay(
         reminderEscalationCopy(data.windowReminderCount, data.windowLimit)
     }
     val emphasisColor = MaterialTheme.colorScheme.error
+    val actionOrderSeed = data.attemptId.ifBlank { "session-${data.sessionId}" }
+    val actionOrder = remember(actionOrderSeed, uiState.randomizeActions) {
+        uiState.randomizeActions?.let { randomize ->
+            reminderActionOrder(randomize, actionOrderSeed)
+        }.orEmpty()
+    }
 
     LaunchedEffect(data) { viewModel.init(data) }
     LaunchedEffect(uiState.showBreathing, uiState.breathingStep) {
@@ -163,93 +161,42 @@ fun ReminderOverlay(
                                 textAlign = TextAlign.Center
                             )
                         }
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            Box(modifier = Modifier.weight(1f)) {
-                                Button(
-                                    onClick = { exitMenuExpanded = true },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    colors = ButtonDefaults.buttonColors(containerColor = InkBlue)
-                                ) {
-                                    Text("\u9000\u51fa\u76ee\u6807\u5e94\u7528")
-                                    Icon(
-                                        imageVector = Icons.Filled.KeyboardArrowDown,
-                                        contentDescription = "\u5c55\u5f00\u9000\u51fa\u9009\u9879"
-                                    )
-                                }
-                                DropdownMenu(
-                                    expanded = exitMenuExpanded,
-                                    onDismissRequest = { exitMenuExpanded = false }
-                                ) {
-                                    exitDestinations(uiState.returnPackageName).forEach { destination ->
-                                        DropdownMenuItem(
-                                            text = {
-                                                Text(
-                                                    when (destination) {
-                                                        ReturnDestination.HOME -> "\u8fd4\u56de\u684c\u9762"
-                                                        ReturnDestination.FOCUS -> "\u8fd4\u56de Focus"
-                                                        ReturnDestination.CUSTOM -> "\u6253\u5f00\u6307\u5b9a\u5e94\u7528"
-                                                    }
-                                                )
-                                            },
-                                            onClick = {
-                                                exitMenuExpanded = false
-                                                when (destination) {
-                                                    ReturnDestination.FOCUS -> viewModel.returnToFocus(data.sessionId, onDismiss)
-                                                    ReturnDestination.HOME -> viewModel.returnHome(data.sessionId, onDismiss)
-                                                    ReturnDestination.CUSTOM -> viewModel.returnToCustom(data.sessionId, onDismiss)
-                                                }
-                                            }
-                                        )
-                                    }
-                                }
-                            }
-                            Box(modifier = Modifier.weight(1f)) {
-                                OutlinedButton(
-                                    onClick = { snoozeMenuExpanded = true },
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Text("\u7a0d\u540e\u63d0\u9192")
-                                    Icon(
-                                        imageVector = Icons.Filled.KeyboardArrowDown,
-                                        contentDescription = "\u5c55\u5f00\u7a0d\u540e\u63d0\u9192\u9009\u9879"
-                                    )
-                                }
-                                DropdownMenu(
-                                    expanded = snoozeMenuExpanded,
-                                    onDismissRequest = { snoozeMenuExpanded = false }
-                                ) {
-                                    presetSnoozeMinutes.forEach { minutes ->
-                                        DropdownMenuItem(
-                                            text = { Text("${minutes} \u5206\u949f\u540e\u63d0\u9192") },
-                                            onClick = {
-                                                snoozeMenuExpanded = false
-                                                viewModel.snooze(data.sessionId, minutes, onDismiss)
-                                            }
-                                        )
-                                    }
-                                    DropdownMenuItem(
-                                        text = { Text("\u81ea\u5b9a\u4e49\u5206\u949f\u6570") },
-                                        onClick = {
-                                            snoozeMenuExpanded = false
-                                            customSnoozeVisible = true
-                                        }
-                                    )
-                                }
-                            }
-                        }
+                        ReminderDecisionButtons(
+                            actions = actionOrder,
+                            enabled = interactionsEnabled,
+                            onReturnClick = {
+                                viewModel.returnToFocus(data.sessionId, onDismiss)
+                            },
+                            onTimedDecision = { action, minutes ->
+                                applyTimedDecision(
+                                    viewModel = viewModel,
+                                    action = action,
+                                    sessionId = data.sessionId,
+                                    minutes = minutes,
+                                    onDismiss = onDismiss
+                                )
+                            },
+                            onCustomTimedAction = { action -> customTimedAction = action },
+                            modifier = Modifier.fillMaxWidth()
+                        )
                     }
                 }
             }
         }
     }
 
-    if (customSnoozeVisible) {
+    customTimedAction?.let { action ->
         AlertDialog(
-            onDismissRequest = { customSnoozeVisible = false },
-            title = { Text("\u81ea\u5b9a\u4e49\u7a0d\u540e\u63d0\u9192") },
+            onDismissRequest = { customTimedAction = null },
+            title = {
+                Text(
+                    if (action == ReminderDecisionAction.INTENTIONAL) {
+                        "有目的使用多久"
+                    } else {
+                        "休息多久"
+                    }
+                )
+            },
             text = {
                 OutlinedTextField(
                     value = customSnoozeMinutes,
@@ -262,17 +209,39 @@ fun ReminderOverlay(
                 TextButton(
                     onClick = {
                         parseCustomSnoozeMinutes(customSnoozeMinutes)?.let { minutes ->
-                            customSnoozeVisible = false
-                            viewModel.snooze(data.sessionId, minutes, onDismiss)
+                            customTimedAction = null
+                            applyTimedDecision(
+                                viewModel = viewModel,
+                                action = action,
+                                sessionId = data.sessionId,
+                                minutes = minutes,
+                                onDismiss = onDismiss
+                            )
                         }
                     }
                 ) { Text("\u786e\u5b9a") }
             },
             dismissButton = {
-                TextButton(onClick = { customSnoozeVisible = false }) {
+                TextButton(onClick = { customTimedAction = null }) {
                     Text("\u53d6\u6d88")
                 }
             }
         )
+    }
+}
+
+private fun applyTimedDecision(
+    viewModel: ReminderViewModel,
+    action: ReminderDecisionAction,
+    sessionId: Long,
+    minutes: Int,
+    onDismiss: () -> Unit
+) {
+    when (action) {
+        ReminderDecisionAction.INTENTIONAL ->
+            viewModel.useIntentionally(sessionId, minutes, onDismiss)
+        ReminderDecisionAction.REST ->
+            viewModel.takeBreak(sessionId, minutes, onDismiss)
+        ReminderDecisionAction.RETURN -> Unit
     }
 }

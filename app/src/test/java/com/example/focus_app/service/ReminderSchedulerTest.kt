@@ -288,9 +288,10 @@ private class RecordingReminderLauncher(
     val dismissedSessionIds = mutableListOf<Long>()
     var remindedAtWhenShown: Long? = null
 
-    override fun show(data: ReminderLaunchData) {
+    override fun show(data: ReminderLaunchData): Boolean {
         remindedAtWhenShown = repository.session(data.sessionId)?.remindedAt
         shown += data
+        return true
     }
 
     override fun returnToFocus(taskId: Long?) = Unit

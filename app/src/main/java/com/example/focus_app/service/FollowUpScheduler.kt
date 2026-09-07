@@ -29,17 +29,32 @@ object NoOpFollowUpScheduler : FollowUpScheduler {
  * 同时保留 WorkManager 持久任务作为进程被回收后的兜底，避免提醒彻底丢失。
  */
 @Singleton
-class HybridFollowUpScheduler @Inject constructor(
+class HybridFollowUpScheduler @Inject internal constructor(
     private val executor: FollowUpExecutor,
     private val workScheduler: FollowUpReminderWorkScheduler,
     private val alarmScheduler: FollowUpAlarmScheduler,
+    private val countdownNotifier: FollowUpCountdownNotifier,
     private val scope: CoroutineScope
 ) : FollowUpScheduler {
     private val jobs = ConcurrentHashMap<Long, Job>()
 
+    internal constructor(
+        executor: FollowUpExecutor,
+        workScheduler: FollowUpReminderWorkScheduler,
+        alarmScheduler: FollowUpAlarmScheduler,
+        scope: CoroutineScope
+    ) : this(
+        executor = executor,
+        workScheduler = workScheduler,
+        alarmScheduler = alarmScheduler,
+        countdownNotifier = NoOpFollowUpCountdownNotifier,
+        scope = scope
+    )
+
     override fun schedule(sessionId: Long, delayMillis: Long) {
         val safeDelayMillis = delayMillis.coerceAtLeast(0L)
         cancelInProcess(sessionId)
+        countdownNotifier.show(sessionId, safeDelayMillis)
         scheduleOnce(sessionId, safeDelayMillis, attempts = 0)
         workScheduler.schedule(sessionId, safeDelayMillis)
         alarmScheduler.schedule(sessionId, safeDelayMillis, retryAttempt = 0)
@@ -49,11 +64,13 @@ class HybridFollowUpScheduler @Inject constructor(
         cancelInProcess(sessionId)
         workScheduler.cancel(sessionId)
         alarmScheduler.cancel(sessionId)
+        countdownNotifier.cancel(sessionId)
     }
 
     private fun scheduleOnce(sessionId: Long, delayMillis: Long, attempts: Int) {
         val job = scope.launch {
             delay(delayMillis)
+            countdownNotifier.cancel(sessionId)
             workScheduler.cancel(sessionId)
             alarmScheduler.cancel(sessionId)
             when (executor.execute(sessionId)) {

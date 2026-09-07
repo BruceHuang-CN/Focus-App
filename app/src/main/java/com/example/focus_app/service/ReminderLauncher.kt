@@ -16,7 +16,8 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 interface ReminderLauncher {
-    fun show(data: ReminderLaunchData)
+    /** 返回是否已经请求启动提醒 Activity；false 表示仅发布了通知。 */
+    fun show(data: ReminderLaunchData): Boolean
     fun dismiss(sessionId: Long)
     fun returnToFocus(taskId: Long?)
     fun returnHome()
@@ -35,15 +36,19 @@ class AndroidReminderLauncher @Inject constructor(
     @ApplicationContext private val context: Context,
     private val reminderPresentationRegistry: ReminderPresentationRegistry
 ) : ReminderLauncher {
-    override fun show(data: ReminderLaunchData) {
-        presentReminder(
+    override fun show(data: ReminderLaunchData): Boolean {
+        val activityRequested = presentReminder(
             canDrawOverlays = Settings.canDrawOverlays(context),
             onBeforeStartActivity = {
-                reminderPresentationRegistry.show(data.sessionId, data.forceReminder)
+                reminderPresentationRegistry.markLaunchRequested(data)
             },
             startActivity = { context.startActivity(reminderIntent(data)) },
             postNotification = { postReminderNotification(data) }
         )
+        if (!activityRequested) {
+            reminderPresentationRegistry.restorePending(data.sessionId, data.attemptId)
+        }
+        return activityRequested
     }
 
     override fun dismiss(sessionId: Long) {
@@ -58,6 +63,7 @@ class AndroidReminderLauncher @Inject constructor(
     override fun returnToFocus(taskId: Long?) {
         context.startActivity(
             Intent(context, MainActivity::class.java).apply {
+                action = MainActivity.ACTION_OPEN_TASKS
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
                 taskId?.let { putExtra(ACTIVE_TASK_ID, it) }
             }
@@ -98,6 +104,7 @@ class AndroidReminderLauncher @Inject constructor(
             putExtra(ReminderLaunchData.EXTRA_MESSAGE, data.message)
             putExtra(ReminderLaunchData.EXTRA_SHOW_BREATHING, data.showBreathing)
             putExtra(ReminderLaunchData.EXTRA_RETURN_DESTINATION, data.returnDestination.key)
+            putExtra(ReminderLaunchData.EXTRA_TARGET_PACKAGE_NAME, data.targetPackageName)
             putExtra(ReminderLaunchData.EXTRA_WINDOW_REMINDER_COUNT, data.windowReminderCount)
             putExtra(ReminderLaunchData.EXTRA_WINDOW_LIMIT, data.windowLimit)
             putExtra(ReminderLaunchData.EXTRA_WINDOW_MINUTES, data.windowMinutes)

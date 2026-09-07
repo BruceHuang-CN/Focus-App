@@ -7,33 +7,28 @@ import org.junit.Test
 
 class ReminderUrgencyTest {
     @Test
-    fun reminder_surface_grows_after_each_consumed_quota() {
-        val first = reminderUrgency(windowReminderCount = 1, windowLimit = 5)
-        val second = reminderUrgency(windowReminderCount = 2, windowLimit = 5)
-        val fourth = reminderUrgency(windowReminderCount = 4, windowLimit = 5)
+    fun every_available_reminder_fills_the_screen() {
+        listOf(1, 2, 4).forEach { count ->
+            val urgency = reminderUrgency(windowReminderCount = count, windowLimit = 5)
 
-        assertTrue(second.widthFraction > first.widthFraction)
-        assertTrue(second.heightFraction > first.heightFraction)
-        assertTrue(fourth.widthFraction > second.widthFraction)
-        assertTrue(fourth.heightFraction > second.heightFraction)
-        assertFalse(fourth.isFinalReminder)
+            assertEquals(1f, urgency.widthFraction, 0.0001f)
+            assertEquals(1f, urgency.heightFraction, 0.0001f)
+        }
     }
 
     @Test
-    fun final_available_reminder_fills_the_screen() {
+    fun final_reminder_still_has_final_flag() {
         val urgency = reminderUrgency(windowReminderCount = 5, windowLimit = 5)
 
-        assertEquals(1f, urgency.widthFraction, 0.0001f)
-        assertEquals(1f, urgency.heightFraction, 0.0001f)
         assertTrue(urgency.isFinalReminder)
     }
 
     @Test
-    fun invalid_or_missing_quota_uses_the_smallest_safe_surface() {
+    fun missing_quota_is_still_full_screen_without_final_flag() {
         val urgency = reminderUrgency(windowReminderCount = 0, windowLimit = 0)
 
-        assertEquals(0.82f, urgency.widthFraction, 0.0001f)
-        assertEquals(0.50f, urgency.heightFraction, 0.0001f)
+        assertEquals(1f, urgency.widthFraction, 0.0001f)
+        assertEquals(1f, urgency.heightFraction, 0.0001f)
         assertFalse(urgency.isFinalReminder)
     }
 }

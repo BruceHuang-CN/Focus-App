@@ -5,12 +5,20 @@ internal fun presentReminder(
     onBeforeStartActivity: () -> Unit = {},
     startActivity: () -> Unit,
     postNotification: () -> Unit
-) {
-    if (canDrawOverlays) {
-        onBeforeStartActivity()
-        startActivity()
+): Boolean {
+    val activityRequested = if (canDrawOverlays) {
+        try {
+            onBeforeStartActivity()
+            startActivity()
+            true
+        } catch (_: RuntimeException) {
+            false
+        }
+    } else {
+        false
     }
     postNotification()
+    return activityRequested
 }
 
 internal fun isReminderSessionCurrent(sessionId: Long, currentSessionId: Long?): Boolean =
@@ -19,5 +27,16 @@ internal fun isReminderSessionCurrent(sessionId: Long, currentSessionId: Long?):
 internal fun isReminderPresentationForForegroundChange(hasPendingReminder: Boolean): Boolean =
     hasPendingReminder
 
-internal fun shouldKeepReminderPending(forceReminder: Boolean, explicitAction: Boolean): Boolean =
-    forceReminder && !explicitAction
+internal fun isNewReminderAttempt(currentAttemptId: String?, incomingAttemptId: String): Boolean =
+    incomingAttemptId.isNotBlank() && incomingAttemptId != currentAttemptId
+
+internal fun shouldApplyReminderConfirmation(
+    expectedAttemptId: String,
+    currentAttemptId: String?,
+    registryAttemptIsCurrent: Boolean,
+    isActivityResumed: Boolean
+): Boolean =
+    expectedAttemptId.isNotBlank() &&
+        expectedAttemptId == currentAttemptId &&
+        registryAttemptIsCurrent &&
+        isActivityResumed
