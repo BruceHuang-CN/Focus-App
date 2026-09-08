@@ -21,6 +21,14 @@
 - 不新建按钮组件：继续用 Button/OutlinedButton，仅显式传 colors/border/shape/height；决策页配色全部为文件内固定常量（延续呼吸页已验证的固定色板模式，不碰 4 套主题系统）。
 - 本地 `:app:compileDebugKotlin` 与 `:app:compileDebugUnitTestKotlin` 编译通过；运行时观感（卡片圆角、红绿对比、箭头、下拉流程、最终提醒全屏红强调）待用户在 Android Studio 真机/模拟器验收。代码仅提交本地，**未推送 GitHub**。
 
+### 当前任务状态小结（截至 2026-09-08）
+
+- 分支 `codex/ui-optimization`（基于 `codex/focus-intervention-v2`），GitHub 分支已建立；本地领先远程 2 个提交，**均未推送**，待用户验证后再推：
+  - `e387c57` 深呼吸页动画重构（粒子渐现→聚集→成球脉动→渐隐，5 秒与倒计时同步；首轮 3 处编译错误已修复并本地验证通过）。
+  - `0bbe4fe` 决策页改版（浅绿背景+白卡片、应用名/任务名红色标注、回到任务绿底白字、有目的使用/休息一下白底绿字+下拉箭头；只动样式层，排序/下拉/禁用逻辑与现有测试零改动）。
+- 待办：用户在 Android Studio 编译、运行 `BreathingTimelineTest` 与既有测试、真机验收呼吸页动画节奏与决策页观感、两页 Crossfade 过渡；通过后推送 GitHub。
+- 后续可选（未开始）：首页/统计/设置等页面的视觉统一（FOCUS_INTERVENTION_V2_STATUS.md P1 的其余项）。
+
 ---
 
 ## 2026-09-07（深呼吸界面动画重构，UI 优化分支起步）
