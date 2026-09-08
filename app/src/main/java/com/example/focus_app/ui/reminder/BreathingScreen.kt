@@ -6,6 +6,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -38,11 +39,11 @@ import kotlin.math.pow
 import kotlin.math.sin
 import kotlin.random.Random
 
-// 呼吸页专属固定绿色系（设计稿配色），不随应用主题切换。
+// 呼吸/决策页共用的固定绿色系（设计稿配色），不随应用主题切换。
 private val BreathingBgTop = Color(0xFFF4F9F5)
 private val BreathingBgBottom = Color(0xFFE7F2EA)
-private val BreathingDeep = Color(0xFF0E7C5E)
-private val BreathingOrbCore = Color(0xFF2FA36B)
+internal val BreathingDeep = Color(0xFF0E7C5E)
+internal val BreathingOrbCore = Color(0xFF2FA36B)
 private val BreathingOrbCoreLight = Color(0xFF4CC57F)
 private val BreathingSubtitle = Color(0xFF7C8B81)
 private val BreathingQuoteText = Color(0xFF55685C)
@@ -95,13 +96,14 @@ internal fun particleGatherProgress(t: Float, stagger: Float): Float {
 }
 
 /**
- * 深呼吸页：浅绿背景 + 小球从周围随机出现并向中心聚集，
- * 融合成大球轻脉动，最后整体渐隐。倒计时数字由外部 [step] 驱动。
+ * 呼吸页与决策页共用的浅绿渐变背景（含角落装饰弧面）。
+ * 单一实现，两页观感一致，改色只动这里。
  */
 @Composable
-fun BreathingScreen(step: Int, modifier: Modifier = Modifier) {
-    // 中途旋转/重建组合时按当前 step 恢复动画相位，不重播；只在首次组合时算一次。
-    val startFraction = remember { ((5 - step) / 5f).coerceIn(0f, 1f) }
+internal fun ReminderGreenBackdrop(
+    modifier: Modifier = Modifier,
+    content: @Composable BoxScope.() -> Unit
+) {
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -110,6 +112,19 @@ fun BreathingScreen(step: Int, modifier: Modifier = Modifier) {
         Canvas(Modifier.fillMaxSize()) {
             drawBackdropDecorations()
         }
+        content()
+    }
+}
+
+/**
+ * 深呼吸页：浅绿背景 + 小球从周围随机出现并向中心聚集，
+ * 融合成大球轻脉动，最后整体渐隐。倒计时数字由外部 [step] 驱动。
+ */
+@Composable
+fun BreathingScreen(step: Int, modifier: Modifier = Modifier) {
+    // 中途旋转/重建组合时按当前 step 恢复动画相位，不重播；只在首次组合时算一次。
+    val startFraction = remember { ((5 - step) / 5f).coerceIn(0f, 1f) }
+    ReminderGreenBackdrop(modifier = modifier) {
         Column(
             modifier = Modifier
                 .fillMaxSize()

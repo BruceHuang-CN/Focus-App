@@ -4,10 +4,14 @@ import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
@@ -25,6 +29,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -35,8 +40,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.focus_app.service.ReminderLaunchData
-import com.example.focus_app.ui.theme.InkBlue
 import kotlinx.coroutines.delay
+
+// 决策页固定配色（与呼吸页绿色系同源），不随应用主题切换。
+private val ReminderHighlightRed = Color(0xFFE53935)
+private val DecisionInk = Color(0xFF17342A)
+private val DecisionBody = Color(0xFF5B6B60)
+private val DecisionFaint = Color(0xFF8A9A8F)
+private val DecisionCardWhite = Color(0xFFFFFFFF)
 
 @Composable
 fun ReminderOverlay(
@@ -56,7 +67,6 @@ fun ReminderOverlay(
     val escalation = remember(data.windowReminderCount, data.windowLimit) {
         reminderEscalationCopy(data.windowReminderCount, data.windowLimit)
     }
-    val emphasisColor = MaterialTheme.colorScheme.error
     val actionOrderSeed = data.attemptId.ifBlank { "session-${data.sessionId}" }
     val actionOrder = remember(actionOrderSeed, uiState.randomizeActions) {
         uiState.randomizeActions?.let { randomize ->
@@ -82,107 +92,137 @@ fun ReminderOverlay(
             if (breathing) {
                 BreathingScreen(step = uiState.breathingStep, modifier = Modifier.fillMaxSize())
             } else {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth(urgency.widthFraction)
-                        .fillMaxHeight(urgency.heightFraction),
-                    shape = if (urgency.isFinalReminder) RectangleShape else MaterialTheme.shapes.large,
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-                ) {
-                    Box(
+                ReminderGreenBackdrop(modifier = Modifier.fillMaxSize()) {
+                    Card(
                         modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 20.dp, vertical = 16.dp),
-                        contentAlignment = Alignment.Center
+                            .fillMaxWidth(urgency.widthFraction)
+                            .fillMaxHeight(urgency.heightFraction)
+                            .then(
+                                if (urgency.isFinalReminder) {
+                                    Modifier
+                                } else {
+                                    Modifier.padding(24.dp)
+                                }
+                            ),
+                        shape = if (urgency.isFinalReminder) RectangleShape else RoundedCornerShape(28.dp),
+                        colors = CardDefaults.cardColors(containerColor = DecisionCardWhite)
                     ) {
-                        Column(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 24.dp, vertical = 28.dp),
+                            contentAlignment = Alignment.Center
                         ) {
-                            Text(
-                                escalation.title,
-                                style = MaterialTheme.typography.headlineSmall,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = if (urgency.isFinalReminder) emphasisColor else InkBlue,
-                                textAlign = TextAlign.Center
-                            )
-                            Text(
-                                buildAnnotatedString {
-                                    append("你刚刚打开了 ")
-                                    withStyle(SpanStyle(color = emphasisColor, fontWeight = FontWeight.Bold)) {
-                                        append(uiState.appName)
-                                    }
-                                },
-                                style = MaterialTheme.typography.titleMedium,
-                                textAlign = TextAlign.Center
-                            )
-                            uiState.taskTitle?.let { taskTitle ->
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Text(
+                                    escalation.title,
+                                    style = MaterialTheme.typography.headlineSmall,
+                                    fontSize = 28.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = if (urgency.isFinalReminder) ReminderHighlightRed else DecisionInk,
+                                    textAlign = TextAlign.Center
+                                )
                                 Text(
                                     buildAnnotatedString {
-                                        append("原本任务：")
-                                        withStyle(SpanStyle(color = emphasisColor, fontWeight = FontWeight.Bold)) {
-                                            append(taskTitle)
+                                        append("你刚刚打开了 ")
+                                        withStyle(
+                                            SpanStyle(color = ReminderHighlightRed, fontWeight = FontWeight.Bold)
+                                        ) {
+                                            append(uiState.appName)
                                         }
                                     },
                                     style = MaterialTheme.typography.titleMedium,
+                                    color = DecisionBody,
                                     textAlign = TextAlign.Center
                                 )
-                            }
-                            Text(
-                                uiState.message,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                lineHeight = 26.sp,
-                                textAlign = TextAlign.Center
-                            )
-                            escalation.directive?.let { directive ->
-                                Text(
-                                    directive,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (urgency.isFinalReminder) {
-                                        emphasisColor
-                                    } else {
-                                        MaterialTheme.colorScheme.onSurface
-                                    },
-                                    textAlign = TextAlign.Center
-                                )
-                            }
-                            if (uiState.windowLimit > 0) {
-                                Text(
-                                    "本窗口（${uiState.windowMinutes} 分钟）已提醒 " +
-                                        "${uiState.windowReminderCount}/${uiState.windowLimit} 次",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.outline
-                                )
-                            }
-                            uiState.customReturnError?.let { error ->
-                                Text(
-                                    error,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = emphasisColor,
-                                    textAlign = TextAlign.Center
-                                )
-                            }
-                            ReminderDecisionButtons(
-                                actions = actionOrder,
-                                enabled = interactionsEnabled,
-                                onReturnClick = {
-                                    viewModel.returnToFocus(data.sessionId, onDismiss)
-                                },
-                                onTimedDecision = { action, minutes ->
-                                    applyTimedDecision(
-                                        viewModel = viewModel,
-                                        action = action,
-                                        sessionId = data.sessionId,
-                                        minutes = minutes,
-                                        onDismiss = onDismiss
+                                uiState.taskTitle?.let { taskTitle ->
+                                    Text(
+                                        buildAnnotatedString {
+                                            append("原本任务：")
+                                            withStyle(
+                                                SpanStyle(color = ReminderHighlightRed, fontWeight = FontWeight.Bold)
+                                            ) {
+                                                append(taskTitle)
+                                            }
+                                        },
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = DecisionBody,
+                                        textAlign = TextAlign.Center
                                     )
-                                },
-                                onCustomTimedAction = { action -> customTimedAction = action },
-                                modifier = Modifier.fillMaxWidth()
-                            )
+                                }
+                                Text(
+                                    uiState.message,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    lineHeight = 26.sp,
+                                    color = DecisionBody,
+                                    textAlign = TextAlign.Center
+                                )
+                                escalation.directive?.let { directive ->
+                                    Text(
+                                        directive,
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (urgency.isFinalReminder) ReminderHighlightRed else DecisionBody,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = "“",
+                                        fontSize = 20.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = DecisionFaint
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(text = "此刻，就是最好的开始。", fontSize = 14.sp, color = DecisionFaint)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        text = "”",
+                                        fontSize = 20.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = DecisionFaint
+                                    )
+                                }
+                                ReminderDecisionButtons(
+                                    actions = actionOrder,
+                                    enabled = interactionsEnabled,
+                                    onReturnClick = {
+                                        viewModel.returnToFocus(data.sessionId, onDismiss)
+                                    },
+                                    onTimedDecision = { action, minutes ->
+                                        applyTimedDecision(
+                                            viewModel = viewModel,
+                                            action = action,
+                                            sessionId = data.sessionId,
+                                            minutes = minutes,
+                                            onDismiss = onDismiss
+                                        )
+                                    },
+                                    onCustomTimedAction = { action -> customTimedAction = action },
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                                if (uiState.windowLimit > 0) {
+                                    Text(
+                                        "本窗口（${uiState.windowMinutes} 分钟）已提醒 " +
+                                            "${uiState.windowReminderCount}/${uiState.windowLimit} 次",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = DecisionFaint
+                                    )
+                                }
+                                uiState.customReturnError?.let { error ->
+                                    Text(
+                                        error,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = ReminderHighlightRed,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
+                            }
                         }
                     }
                 }

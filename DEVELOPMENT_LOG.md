@@ -5,6 +5,25 @@
 
 ---
 
+## 2026-09-08（提醒决策页改版：白卡片 + 红色标注 + 三按钮配色）
+
+### 本次完成情况
+
+- 决策页（呼吸结束后淡入的操作页）按设计稿改版：整页改为与呼吸页同源的浅绿渐变背景，内容包进白色圆角卡片（非最终提醒四周留 24dp 边距、28dp 圆角；额度用尽的最终提醒仍为 RectangleShape 全屏，紧急度语义不变）。
+- 应用名（「你刚刚打开了 xx」）与任务名（「原本任务：xx」）红色粗体标注（固定 #E53935）；标题墨绿加粗，正文灰绿，窗口计数弱化灰。此前该页因 ReminderActivity 未套应用主题而透出 Material 默认紫色调，本次随固定色板一并修正。
+- 三个按钮配色按用户要求重排：**回到任务** = 深绿实底白字；**有目的使用 / 休息一下** = 白底深绿字 + 绿色描边胶囊，右侧新增下拉箭头（Icons.Filled.ArrowDropDown，icons-core 随 material3 自带，零新依赖），提示可选时长。按钮最低高度 52dp。
+- 新增引言行「此刻，就是最好的开始。」置于按钮上方；窗口计数移到按钮下方，与设计稿顺序一致。
+- 按用户确认：不加叶子图标、不加跳过提醒按钮。
+
+### 稳定性设计与验证
+
+- **只动样式层，零逻辑改动**：随机排序、下拉状态机（expandedAction）、禁用门控、ViewModel 回调、escalation/urgency 计算全部原样；现有测试只断言文案与行为、不断言颜色，样式改动零测试风险（ReminderDecisionButtonsTest 无需修改）。
+- 呼吸页背景渐变+角落装饰圆提取为共用组件 `ReminderGreenBackdrop`，呼吸页与决策页单一实现（改色只动一处）；BreathingOrbCore/BreathingDeep 由 private 改 internal 供按钮复用。
+- 不新建按钮组件：继续用 Button/OutlinedButton，仅显式传 colors/border/shape/height；决策页配色全部为文件内固定常量（延续呼吸页已验证的固定色板模式，不碰 4 套主题系统）。
+- 本地 `:app:compileDebugKotlin` 与 `:app:compileDebugUnitTestKotlin` 编译通过；运行时观感（卡片圆角、红绿对比、箭头、下拉流程、最终提醒全屏红强调）待用户在 Android Studio 真机/模拟器验收。代码仅提交本地，**未推送 GitHub**。
+
+---
+
 ## 2026-09-07（深呼吸界面动画重构，UI 优化分支起步）
 
 ### 本次完成情况
