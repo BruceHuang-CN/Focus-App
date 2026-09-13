@@ -1,448 +1,396 @@
 package com.example.focus_app.ui.settings
 
+import com.example.focus_app.R
+
 import android.Manifest
 import android.content.Intent
 import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import com.example.focus_app.domain.model.AppThemeColor
-import com.example.focus_app.domain.model.AppThemeMode
-import com.example.focus_app.domain.model.AiProvider
-import com.example.focus_app.domain.model.DetectionMode
-import com.example.focus_app.domain.model.ReminderTone
-import com.example.focus_app.domain.model.ReturnDestination
-import com.example.focus_app.domain.permission.PermissionCheckAction
-import com.example.focus_app.domain.permission.isAccessibilityDetectionReady
-import com.example.focus_app.ui.components.PresetSelector
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.focus_app.domain.model.*
+import com.example.focus_app.domain.permission.*
 import com.example.focus_app.util.PermissionHelper
 import com.example.focus_app.util.loadInstalledAppName
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(
-    onExitRequested: () -> Unit,
-    hasUnsavedChanges: Boolean,
-    onUnsavedChangesChanged: (Boolean) -> Unit,
-    navigateToCustomReturnPicker: () -> Unit,
-    navigateToAppGroups: () -> Unit,
-    navigateToFeedbackAndSupport: () -> Unit,
-    viewModel: SettingsViewModel = hiltViewModel()
-) {
-    val s by viewModel.settings.collectAsState()
-    val connectionState by viewModel.aiConnection.collectAsState()
-    val tonePreview by viewModel.tonePreview.collectAsState()
-    val permissionItems by viewModel.permissionStatus.collectAsState()
-    val customReturnPackage by viewModel.customReturnPackage.collectAsState()
-    val followUpInterval by viewModel.followUpInterval.collectAsState()
-    val keepAliveEnabled by viewModel.keepAliveEnabled.collectAsState()
-    val randomizeReminderActions by viewModel.randomizeReminderActions.collectAsState()
-    val themeSettings by viewModel.themeSettings.collectAsState()
-    val appGroups by viewModel.appGroups.collectAsState()
-    val activeAppGroupId by viewModel.activeAppGroupId.collectAsState()
-    val activeAppGroup = appGroups.firstOrNull { it.id == activeAppGroupId }
+fun SettingsScreen(onExitRequested: () -> Unit, hasUnsavedChanges: Boolean,
+    onUnsavedChangesChanged: (Boolean) -> Unit, navigateToCustomReturnPicker: () -> Unit,
+    navigateToAppGroups: () -> Unit, navigateToFeedbackAndSupport: () -> Unit,
+    navigateToTutorial: () -> Unit = {},
+    viewModel: SettingsViewModel = hiltViewModel()) {
+    val setupContext = androidx.compose.ui.platform.LocalContext.current
     val context = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
-    var overlayGranted by remember { mutableStateOf(PermissionHelper.hasOverlayPermission(context)) }
-    var batteryOptimizationIgnored by remember { mutableStateOf(PermissionHelper.isIgnoringBatteryOptimizations(context)) }
-    var systemAccessibilityEnabled by remember {
-        mutableStateOf(PermissionHelper.isAccessibilityServiceEnabled(context))
-    }
-    val snackbarHostState = remember { SnackbarHostState() }
-    val scope = rememberCoroutineScope()
-    var apiKeyInput by remember { mutableStateOf("") }
-    var endpointDraft by remember(s.aiProvider, s.apiEndpoint, s.aiModel) {
-        mutableStateOf(s.apiEndpoint)
-    }
-    var modelDraft by remember(s.aiProvider, s.apiEndpoint, s.aiModel) {
-        mutableStateOf(s.aiModel)
-    }
-    var customToneDraft by remember(s.customToneInstruction) {
-        mutableStateOf(s.customToneInstruction)
-    }
-    val notificationPermissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { /* 授权结果由系统设置页兜底处理 */ }
-    LaunchedEffect(Unit) {
+    val owner = LocalLifecycleOwner.current
+    var page by rememberSaveable { mutableStateOf("main") }
+    var editor by rememberSaveable { mutableStateOf<String?>(null) }
+    var battery by remember { mutableStateOf(PermissionHelper.isIgnoringBatteryOptimizations(context)) }
+    val snackbar = remember { SnackbarHostState() }
+    val listState = rememberLazyListState()
+    val notifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { viewModel.refreshPermissions() }
+    LaunchedEffect(viewModel) {
         viewModel.notificationPermissionRequests.collect {
-            if (PermissionHelper.needsNotificationPermission(context)) {
-                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-            }
+            if (PermissionHelper.needsNotificationPermission(context)) notifications.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
-
-    // 从系统设置返回时刷新真实权限状态，不覆盖用户在应用内的开关选择。
-    DisposableEffect(lifecycleOwner) {
+    LaunchedEffect(viewModel, snackbar, setupContext) { viewModel.settingsMessages.collect { snackbar.showSnackbar(it.resolve(setupContext)) } }
+    // Old global dirty flag belonged to the removed "save all" button. Editors now own drafts.
+    LaunchedEffect(page) { if (page == "main") onUnsavedChangesChanged(false) }
+    DisposableEffect(owner, viewModel) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                overlayGranted = PermissionHelper.hasOverlayPermission(context)
-                batteryOptimizationIgnored = PermissionHelper.isIgnoringBatteryOptimizations(context)
-                systemAccessibilityEnabled = PermissionHelper.isAccessibilityServiceEnabled(context)
+                battery = PermissionHelper.isIgnoringBatteryOptimizations(context)
                 viewModel.refreshPermissions()
             }
         }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+        owner.lifecycle.addObserver(observer)
+        onDispose { owner.lifecycle.removeObserver(observer) }
     }
-
-    fun onSettingChanged(@Suppress("UNUSED_PARAMETER") label: String) {
-        onUnsavedChangesChanged(true)
-    }
-
-    BackHandler { onExitRequested() }
-
-    fun handlePermissionAction(action: PermissionCheckAction) {
+    fun permissionAction(action: PermissionCheckAction) {
         when (action) {
-            PermissionCheckAction.OPEN_ACCESSIBILITY ->
-                context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-            PermissionCheckAction.OPEN_USAGE_STATS ->
-                PermissionHelper.openUsageStatsSettings(context)
-            PermissionCheckAction.OPEN_OVERLAY ->
-                PermissionHelper.openOverlaySettings(context)
-            PermissionCheckAction.REQUEST_NOTIFICATION ->
-                PermissionHelper.openNotificationSettings(context)
-            PermissionCheckAction.OPEN_TARGET_APPS -> navigateToAppGroups()
+            PermissionCheckAction.OPEN_ACCESSIBILITY -> context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
             PermissionCheckAction.ENABLE_ACCESSIBILITY -> {
-                if (!s.enableAccessibility) {
-                    viewModel.setAccessibilityEnabled(true)
-                    onSettingChanged("开启无障碍检测")
-                }
+                viewModel.setAccessibilityEnabled(true)
                 context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
             }
+            PermissionCheckAction.OPEN_USAGE_STATS -> PermissionHelper.openUsageStatsSettings(context)
+            PermissionCheckAction.OPEN_OVERLAY -> PermissionHelper.openOverlaySettings(context)
+            PermissionCheckAction.REQUEST_NOTIFICATION -> PermissionHelper.openNotificationSettings(context)
+            PermissionCheckAction.OPEN_TARGET_APPS -> navigateToAppGroups()
             PermissionCheckAction.NONE -> Unit
         }
     }
-
-    Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        topBar = {
-            TopAppBar(
-                title = { Text("设置") },
-                navigationIcon = {
-                    IconButton(onClick = onExitRequested) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+    BackHandler { if (page != "main") page = "main" else onExitRequested() }
+    Scaffold(containerColor = MaterialTheme.colorScheme.background, snackbarHost = { SnackbarHost(snackbar) }) { padding ->
+        if (page == "ai") {
+            AiSettingsPage(viewModel, Modifier.padding(padding), onBack = { page = "main" }, onDirtyChanged = onUnsavedChangesChanged)
+        } else {
+            LazyColumn(Modifier.fillMaxSize().padding(padding), state = listState, contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                item(key = "header", contentType = "header") {
+                    Column {
+                        IconButton(onClick = onExitRequested) { Icon(Icons.AutoMirrored.Filled.ArrowBack, setupContext.getString(R.string.setup_text_164)) }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(setupContext.getString(R.string.setup_text_190), Modifier.weight(1f), fontSize = 40.sp, fontWeight = FontWeight.ExtraBold)
+                            SettingsSaveBadge(viewModel)
+                        }
+                        Text(setupContext.getString(R.string.setup_text_191), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-            )
+                item(key = "guardian", contentType = "section") { GuardianSettings(viewModel) }
+                item(key = "permissions", contentType = "section") {
+                    PermissionSettings(viewModel, battery, onDetails = { editor = "permissions" },
+                        onPermission = ::permissionAction,
+                        onBattery = { PermissionHelper.requestIgnoreBatteryOptimizations(context) })
+                }
+                item(key = "theme", contentType = "section") { ThemeSettingsSection(viewModel) }
+                item(key = "preferences", contentType = "section") { ReminderPreferenceSettings(viewModel) { editor = it } }
+                item(key = "apps", contentType = "section") { AppSettingsSection(viewModel, navigateToAppGroups, navigateToCustomReturnPicker) }
+                item(key = "ai", contentType = "section") { AiSettingsSummary(viewModel, { page = "ai" }, { editor = "manage" }) }
+                item(key = "tutorial", contentType = "section") {
+                    ForestSettingsSection(setupContext.getString(R.string.setup_text_211), icon = Icons.Default.Info) {
+                        SettingsEntry(Icons.Default.Info, setupContext.getString(R.string.setup_text_212), onClick = navigateToTutorial)
+                    }
+                }
+                item(key = "support", contentType = "section") {
+                    ForestSettingsSection(setupContext.getString(R.string.setup_text_173), icon = Icons.Default.Info) {
+                        SettingsEntry(Icons.Default.Email, setupContext.getString(R.string.setup_text_213), onClick = navigateToFeedbackAndSupport)
+                    }
+                }
+                item(key = "bottom") { Spacer(Modifier.height(16.dp)) }
+            }
         }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .padding(padding)
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            // ── 保存状态（半手动保存）──
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    if (hasUnsavedChanges) "有未保存的修改" else "所有设置已保存",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = if (hasUnsavedChanges) {
-                        MaterialTheme.colorScheme.error
-                    } else {
-                        MaterialTheme.colorScheme.outline
-                    },
-                    modifier = Modifier.weight(1f)
-                )
-                Button(
-                    onClick = {
-                        onUnsavedChangesChanged(false)
-                        scope.launch {
-                            snackbarHostState.currentSnackbarData?.dismiss()
-                            snackbarHostState.showSnackbar(
-                                "设置已保存",
-                                duration = SnackbarDuration.Short
-                            )
+    }
+    editor?.let { selected ->
+        ModalBottomSheet(onDismissRequest = { editor = null }) {
+            Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).imePadding()
+                .padding(start = 20.dp, end = 20.dp, bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                when (selected) {
+                    "permissions" -> {
+                        val settings by viewModel.settings.collectAsStateWithLifecycle()
+                        val items by viewModel.permissionStatus.collectAsStateWithLifecycle()
+                        Text(setupContext.getString(R.string.setup_text_214), style = MaterialTheme.typography.headlineSmall)
+                        Text(setupContext.getString(R.string.setup_text_215), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        PermissionCheckCard(settings.detectionMode, items, ::permissionAction)
+                        SettingsToggle(Icons.Default.CheckCircle, setupContext.getString(R.string.setup_text_216), settings.enableAccessibility,
+                            setupContext.getString(R.string.setup_text_217), viewModel::setAccessibilityEnabled)
+                        val keepAlive by viewModel.keepAliveEnabled.collectAsStateWithLifecycle()
+                        SettingsToggle(Icons.Default.Lock, setupContext.getString(R.string.setup_text_218), keepAlive, setupContext.getString(R.string.setup_text_219), viewModel::setKeepAliveEnabled)
+                        BackgroundProtectionCard(battery) { PermissionHelper.requestIgnoreBatteryOptimizations(context) }
+                    }
+                    "manage" -> {
+                        val regenerating by viewModel.regenerating.collectAsStateWithLifecycle()
+                        Text(setupContext.getString(R.string.setup_text_220), style = MaterialTheme.typography.headlineSmall)
+                        Text(setupContext.getString(R.string.setup_text_221))
+                        Button(onClick = viewModel::resetReminderQuota, modifier = Modifier.fillMaxWidth()) { Text(setupContext.getString(R.string.setup_text_222)) }
+                        OutlinedButton(onClick = viewModel::regenerateMessages, enabled = !regenerating, modifier = Modifier.fillMaxWidth()) {
+                            Text(if (regenerating) setupContext.getString(R.string.setup_text_223) else setupContext.getString(R.string.setup_text_224))
                         }
                     }
-                ) { Text("保存设置") }
-            }
-
-            // ── 检测状态（权限检查窗口）──
-            PermissionCheckCard(
-                mode = s.detectionMode,
-                items = permissionItems,
-                onAction = ::handlePermissionAction
-            )
-            BackgroundProtectionCard(
-                batteryOptimizationIgnored = batteryOptimizationIgnored,
-                onOpenSystemSettings = { PermissionHelper.requestIgnoreBatteryOptimizations(context) }
-            )
-
-
-            // ── 外观主题 ──
-            SectionTitle("外观主题")
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
-                    Text("界面模式", style = MaterialTheme.typography.titleMedium)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        AppThemeMode.entries.forEach { mode ->
-                            FilterChip(
-                                selected = themeSettings.mode == mode,
-                                onClick = {
-                                    viewModel.setThemeMode(mode)
-                                    onSettingChanged("界面模式")
-                                },
-                                label = { Text(themeModeLabel(mode)) }
-                            )
-                        }
-                    }
-                    Text("主题配色", style = MaterialTheme.typography.titleMedium)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        AppThemeColor.entries.forEach { color ->
-                            ThemeColorSwatch(
-                                color = color,
-                                selected = themeSettings.color == color,
-                                onClick = {
-                                    viewModel.setThemeColor(color)
-                                    onSettingChanged("主题配色")
-                                },
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                    }
+                    else -> NumberSettingsEditor(selected, viewModel) { editor = null }
                 }
             }
+        }
+    }
+}
 
-            // ── 目标应用 ──
-            SectionTitle("目标应用")
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { navigateToAppGroups() }
-                    .padding(vertical = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    if (s.targetApps.isEmpty()) "未选择任何 App（检测不会触发）"
-                    else "已选择 ${s.targetApps.size} 个 App",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = if (s.targetApps.isEmpty()) {
-                        MaterialTheme.colorScheme.error
-                    } else {
-                        MaterialTheme.colorScheme.onSurface
-                    }
-                )
-                Text("→", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.outline)
-            }
-            Divider()
+@Composable private fun SettingsSaveBadge(vm: SettingsViewModel) {
+    val setupContext = androidx.compose.ui.platform.LocalContext.current
+    val status by vm.saveStatus.collectAsStateWithLifecycle()
+    Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surface) {
+        Row(Modifier.padding(horizontal = 14.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Icon(if (status == R.string.setup_text_225) Icons.Default.Warning else Icons.Default.CheckCircle, null, Modifier.size(18.dp),
+                tint = if (status == R.string.setup_text_225) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)
+            Text(setupContext.getString(status), style = MaterialTheme.typography.labelLarge)
+        }
+    }
+}
+@Composable private fun GuardianSettings(vm: SettingsViewModel) {
+    val setupContext = androidx.compose.ui.platform.LocalContext.current
+    val settings by vm.settings.collectAsStateWithLifecycle()
+    ForestSettingsSection(setupContext.getString(R.string.setup_text_192), icon = Icons.Default.Notifications, subtitle = setupContext.getString(R.string.setup_text_193)) {
+        SettingsToggle(Icons.Default.Lock, setupContext.getString(R.string.setup_text_194), settings.guardianEnabled, setupContext.getString(R.string.setup_text_226), vm::setGuardianEnabled)
+        SettingsToggle(Icons.Default.Warning, setupContext.getString(R.string.setup_text_196), settings.forceReminder, setupContext.getString(R.string.setup_text_197), vm::setForceReminder)
+        SettingsToggle(Icons.Default.Favorite, setupContext.getString(R.string.setup_text_198), settings.enableBreathingPause, setupContext.getString(R.string.setup_text_227), vm::setBreathingPause)
+    }
+}
+@Composable private fun ReminderPreferenceSettings(vm: SettingsViewModel, onEdit: (String) -> Unit) {
+    val setupContext = androidx.compose.ui.platform.LocalContext.current
+    val settings by vm.settings.collectAsStateWithLifecycle()
+    val random by vm.randomizeReminderActions.collectAsStateWithLifecycle()
+    ForestSettingsSection(setupContext.getString(R.string.setup_text_199), icon = Icons.Default.Settings, subtitle = setupContext.getString(R.string.setup_text_228)) {
+        SettingsEntry(Icons.Default.DateRange, setupContext.getString(R.string.setup_text_200), setupContext.getString(R.string.setup_text_229, settings.reminderDelaySeconds)) { onEdit("delay") }
+        SettingsEntry(Icons.Default.Notifications, setupContext.getString(R.string.setup_text_202), setupContext.getString(R.string.setup_text_230, settings.reminderWindowMinutes)) { onEdit("window") }
+        SettingsEntry(Icons.Default.List, setupContext.getString(R.string.setup_text_204), setupContext.getString(R.string.setup_text_231, settings.maxRemindersPerWindow)) { onEdit("quota") }
+        SettingsToggle(Icons.Default.Refresh, setupContext.getString(R.string.setup_text_232), random, onCheckedChange = vm::setRandomizeReminderActions)
+    }
+}
+@OptIn(ExperimentalLayoutApi::class)
+@Composable private fun NumberSettingsEditor(kind: String, vm: SettingsViewModel, onDone: () -> Unit) {
+    val setupContext = androidx.compose.ui.platform.LocalContext.current
+    val settings by vm.settings.collectAsStateWithLifecycle()
+    val initial = when (kind) { "delay" -> settings.reminderDelaySeconds; "window" -> settings.reminderWindowMinutes; else -> settings.maxRemindersPerWindow }
+    var input by rememberSaveable(kind) { mutableStateOf(initial.toString()) }
+    val range = when (kind) { "delay" -> 1..300; "window" -> 5..1440; else -> 1..20 }
+    val presets = when (kind) { "delay" -> listOf(3,10,30); "window" -> listOf(30,60,120); else -> listOf(1,3,5) }
+    val title = when (kind) { "delay" -> setupContext.getString(R.string.setup_text_200); "window" -> setupContext.getString(R.string.setup_text_202); else -> setupContext.getString(R.string.setup_text_204) }
+    val unit = when (kind) { "delay" -> setupContext.getString(R.string.setup_text_233); "window" -> setupContext.getString(R.string.setup_text_234); else -> setupContext.getString(R.string.setup_text_235) }
+    val value = input.toIntOrNull()
+    val valid = value != null && value in range
+    Text(title, style = MaterialTheme.typography.headlineSmall)
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        presets.forEach { preset -> FilterChip(selected = value == preset, onClick = { input = preset.toString() }, label = { Text("$preset $unit") }) }
+    }
+    OutlinedTextField(value = input, onValueChange = { input = it.filter(Char::isDigit).take(4) },
+        label = { Text(setupContext.getString(R.string.setup_text_236)) }, suffix = { Text(unit) }, singleLine = true,
+        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+        supportingText = { Text(setupContext.getString(R.string.setup_text_237, range.first, range.last, unit)) }, isError = !valid, modifier = Modifier.fillMaxWidth())
+    Button(onClick = {
+        val confirmed = input.toIntOrNull()?.takeIf { it in range } ?: return@Button
+        when (kind) { "delay" -> vm.updateReminderDelaySeconds(confirmed); "window" -> vm.updateReminderWindowMinutes(confirmed); else -> vm.updateMaxRemindersPerWindow(confirmed) }
+        onDone()
+    }, enabled = valid, modifier = Modifier.fillMaxWidth()) { Text(setupContext.getString(R.string.setup_text_238)) }
 
-            // ── 提醒时间 ──
-            SectionTitle("应用组管理")
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { navigateToAppGroups() }
-                    .padding(vertical = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    activeAppGroup?.let { "${it.name} · ${it.apps.size} 个 App" } ?: "管理应用组",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                Text("→", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.outline)
-            }
-            Divider()
+}
 
-            SectionTitle("提醒时间")
-            Text("提醒延迟", style = MaterialTheme.typography.titleMedium)
-            PresetSelector(
-                presets = listOf(3, 10, 30),
-                customRange = 1..300,
-                value = s.reminderDelaySeconds,
-                formatPreset = { "${it} 秒" },
-                onValueChange = {
-                    viewModel.updateReminderDelaySeconds(it)
-                    onSettingChanged("提醒延迟 ${it} 秒")
+@Composable private fun ThemeSettingsSection(vm: SettingsViewModel) {
+    val setupContext = androidx.compose.ui.platform.LocalContext.current
+    val theme by vm.themeSettings.collectAsStateWithLifecycle()
+    ForestSettingsSection(setupContext.getString(R.string.setup_text_239), icon = Icons.Default.Face, subtitle = setupContext.getString(R.string.setup_text_240)) {
+        com.example.focus_app.ui.components.LanguageSelector()
+        Row(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainerLow, CircleShape).padding(3.dp)) {
+            AppThemeMode.entries.forEach { mode ->
+                Surface(onClick = { vm.setThemeMode(mode) }, modifier = Modifier.weight(1f), shape = CircleShape,
+                    color = if (theme.mode == mode) MaterialTheme.colorScheme.primary else Color.Transparent,
+                    contentColor = if (theme.mode == mode) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant) {
+                    Box(Modifier.heightIn(min = 48.dp).padding(6.dp), contentAlignment = Alignment.Center) { Text(themeModeLabel(mode), style = MaterialTheme.typography.labelLarge) }
                 }
-            )
-            Text("统计窗口", style = MaterialTheme.typography.titleMedium)
-            PresetSelector(
-                presets = listOf(30, 60, 120),
-                customRange = 5..1_440,
-                value = s.reminderWindowMinutes,
-                formatPreset = { "${it} 分钟" },
-                onValueChange = {
-                    viewModel.updateReminderWindowMinutes(it)
-                    onSettingChanged("统计窗口 ${it} 分钟")
-                }
-            )
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("提醒前呼吸停顿", style = MaterialTheme.typography.bodyMedium)
-                    Text(
-                        "弹窗先引导深呼吸，再显示操作按钮",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.outline
-                    )
-                }
-                Switch(
-                    checked = s.enableBreathingPause,
-                    onCheckedChange = { enabled ->
-                        viewModel.toggleBreathingPause()
-                        onSettingChanged(if (enabled) "开启呼吸停顿" else "关闭呼吸停顿")
-                    }
-                )
             }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("随机排列提醒按钮", style = MaterialTheme.typography.bodyMedium)
-                    Text(
-                        "每次提醒使用六种完整排列之一，同一次提醒保持不变",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.outline
-                    )
-                }
-                Switch(
-                    checked = randomizeReminderActions,
-                    onCheckedChange = { enabled ->
-                        viewModel.setRandomizeReminderActions(enabled)
-                        onSettingChanged(if (enabled) "开启随机按钮" else "关闭随机按钮")
-                    }
-                )
+        }
+        HorizontalDivider(Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+            AppThemeColor.entries.forEach { color -> ThemeColorSwatch(color, theme.color == color, { vm.setThemeColor(color) }, Modifier.weight(1f)) }
+        }
+    }
+}
+@Composable private fun PermissionSettings(vm: SettingsViewModel, battery: Boolean, onDetails: () -> Unit,
+    onPermission: (PermissionCheckAction) -> Unit, onBattery: () -> Unit) {
+    val setupContext = androidx.compose.ui.platform.LocalContext.current
+    val items by vm.permissionStatus.collectAsStateWithLifecycle()
+    val overlay = items.firstOrNull { it.id == "overlay" }?.status == PermissionCheckStatus.OK
+    val accessibility = listOf("accessibility", "app_switch").all { id -> items.any { it.id == id && it.status == PermissionCheckStatus.OK } }
+    ForestSettingsSection(setupContext.getString(R.string.setup_text_182), icon = Icons.Default.CheckCircle, subtitle = setupContext.getString(R.string.setup_text_241)) {
+        val fontScale = LocalDensity.current.fontScale
+        BoxWithConstraints {
+            val compact = maxWidth >= 300.dp && fontScale <= 1.15f
+            if (compact) Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                PermissionTile(setupContext.getString(R.string.setup_text_073), overlay, Modifier.weight(1f)) { onPermission(PermissionCheckAction.OPEN_OVERLAY) }
+                PermissionTile(setupContext.getString(R.string.setup_text_242), accessibility, Modifier.weight(1f)) { onPermission(PermissionCheckAction.ENABLE_ACCESSIBILITY) }
+                PermissionTile(setupContext.getString(R.string.setup_text_077), battery, Modifier.weight(1f), onBattery)
+            } else Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                PermissionTile(setupContext.getString(R.string.setup_text_073), overlay, Modifier.fillMaxWidth()) { onPermission(PermissionCheckAction.OPEN_OVERLAY) }
+                PermissionTile(setupContext.getString(R.string.setup_text_242), accessibility, Modifier.fillMaxWidth()) { onPermission(PermissionCheckAction.ENABLE_ACCESSIBILITY) }
+                PermissionTile(setupContext.getString(R.string.setup_text_077), battery, Modifier.fillMaxWidth(), onBattery)
             }
-            /* Legacy follow-up interval label retained temporarily. The overlay now owns this choice.
-            Text("再次提醒间隔（点“仍要使用”后）", style = MaterialTheme.typography.titleMedium)
-            */
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("\u5f3a\u5236\u63d0\u9192", style = MaterialTheme.typography.bodyMedium)
-                    Text(
-                        "\u5f00\u542f\u540e\uff0c\u8fd4\u56de\u952e\u3001Home \u952e\u6216\u4e34\u65f6\u7cfb\u7edf\u7a97\u53e3\u4e0d\u4f1a\u89c6\u4e3a\u5df2\u5904\u7406\uff1b\u8bf7\u5728\u5f39\u7a97\u4e2d\u660e\u786e\u9009\u62e9\u3002",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.outline
-                    )
-                }
-                Switch(
-                    checked = s.forceReminder,
-                    onCheckedChange = { enabled ->
-                        viewModel.setForceReminder(enabled)
-                        onSettingChanged(
-                            if (enabled) "\u5f00\u542f\u5f3a\u5236\u63d0\u9192" else "\u5173\u95ed\u5f3a\u5236\u63d0\u9192"
-                        )
-                    }
-                )
+        }
+        SettingsEntry(Icons.Default.Settings, setupContext.getString(R.string.setup_text_243),
+            subtitle = if (items.isEmpty()) setupContext.getString(R.string.setup_text_244) else setupContext.getString(R.string.setup_text_245, items.count { it.status == PermissionCheckStatus.MISSING }), onClick = onDetails)
+    }
+}
+@Composable private fun PermissionTile(title: String, granted: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    val setupContext = androidx.compose.ui.platform.LocalContext.current
+    Surface(onClick = onClick, modifier = modifier, shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(title, style = MaterialTheme.typography.labelLarge)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                Box(Modifier.size(7.dp).background(if (granted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error, CircleShape))
+                Text(if (granted) setupContext.getString(R.string.setup_text_083) else setupContext.getString(R.string.setup_text_246), style = MaterialTheme.typography.labelMedium)
             }
-            /* Legacy follow-up interval selector retained temporarily.
-            PresetSelector(
-                presets = listOf(1, 5, 10, 15, 30),
-                customRange = 1..60,
-                value = followUpInterval,
-                formatPreset = { "${it} 分钟" },
-                onValueChange = {
-                    viewModel.updateFollowUpInterval(it)
-                    onSettingChanged("再次提醒间隔 ${it} 分钟")
-                }
-            )
-            Divider()
-            */
+        }
+    }
+}
+@Composable private fun AppSettingsSection(vm: SettingsViewModel, onApps: () -> Unit, onReturn: () -> Unit) {
+    val setupContext = androidx.compose.ui.platform.LocalContext.current
+    val settings by vm.settings.collectAsStateWithLifecycle()
+    val groups by vm.appGroups.collectAsStateWithLifecycle()
+    val activeId by vm.activeAppGroupId.collectAsStateWithLifecycle()
+    val returnPackage by vm.customReturnPackage.collectAsStateWithLifecycle()
+    val context = LocalContext.current.applicationContext
+    val returnName by produceState<String?>(null, returnPackage) {
+        value = null
+        value = withContext(Dispatchers.IO) { loadInstalledAppName(context, returnPackage) }
+    }
+    ForestSettingsSection(setupContext.getString(R.string.setup_text_247), icon = Icons.Default.Phone) {
+        SettingsEntry(Icons.Default.Phone, setupContext.getString(R.string.setup_text_248), setupContext.getString(R.string.setup_text_249, settings.targetApps.size), onClick = onApps)
+        SettingsEntry(Icons.Default.List, setupContext.getString(R.string.setup_text_250), subtitle = groups.firstOrNull { it.id == activeId }?.name ?: setupContext.getString(R.string.setup_text_251), onClick = onApps)
+        SettingsEntry(Icons.Default.Home, setupContext.getString(R.string.setup_text_252), subtitle = returnName ?: returnPackage.ifBlank { setupContext.getString(R.string.setup_text_253) }, onClick = onReturn)
+    }
+}
+@Composable private fun AiSettingsSummary(vm: SettingsViewModel, onConfigure: () -> Unit, onManage: () -> Unit) {
+    val setupContext = androidx.compose.ui.platform.LocalContext.current
+    val settings by vm.settings.collectAsStateWithLifecycle()
+    val connection by vm.aiConnection.collectAsStateWithLifecycle()
+    val status = when (connection) { is AiConnectionUiState.Success -> setupContext.getString(R.string.setup_text_254); is AiConnectionUiState.Error -> setupContext.getString(R.string.setup_text_255); AiConnectionUiState.Loading -> setupContext.getString(R.string.setup_text_256); else -> setupContext.getString(R.string.setup_text_207) }
+    ForestSettingsSection(setupContext.getString(R.string.setup_text_002), icon = Icons.Default.Star, subtitle = setupContext.getString(R.string.setup_text_257)) {
+        SettingsEntry(Icons.Default.Settings, setupContext.getString(R.string.setup_text_206), status, providerLabel(settings.aiProvider), onClick = onConfigure)
+        SettingsEntry(Icons.Default.Face, setupContext.getString(R.string.setup_text_208), toneLabel(settings.toneKey), onClick = onConfigure)
+        SettingsEntry(Icons.Default.Refresh, setupContext.getString(R.string.setup_text_210), onClick = onManage)
+    }
+}
 
-            // ── 提醒次数 ──
-            SectionTitle("提醒次数")
-            Text("窗口内提醒次数", style = MaterialTheme.typography.titleMedium)
-            PresetSelector(
-                presets = listOf(1, 3, 5),
-                customRange = 1..20,
-                value = s.maxRemindersPerWindow,
-                formatPreset = { "${it} 次" },
-                onValueChange = {
-                    viewModel.updateMaxRemindersPerWindow(it)
-                    onSettingChanged("窗口内 ${it} 次")
-                }
-            )
-            Divider()
+@OptIn(ExperimentalLayoutApi::class)
+@Composable private fun AiSettingsPage(viewModel: SettingsViewModel, modifier: Modifier, onBack: () -> Unit, onDirtyChanged: (Boolean) -> Unit) {
+    val setupContext = androidx.compose.ui.platform.LocalContext.current
+    val s by viewModel.settings.collectAsStateWithLifecycle()
+    val connectionState by viewModel.aiConnection.collectAsStateWithLifecycle()
+    val tonePreviewTask by viewModel.tonePreviewTask.collectAsStateWithLifecycle()
+    var apiKeyInput by remember { mutableStateOf("") }
+    var endpointDraft by rememberSaveable(s.aiProvider, s.apiEndpoint) { mutableStateOf(s.apiEndpoint) }
+    var modelDraft by rememberSaveable(s.aiProvider, s.aiModel) { mutableStateOf(s.aiModel) }
+    var customToneDraft by rememberSaveable(s.customToneInstruction) { mutableStateOf(s.customToneInstruction) }
+    var discard by remember { mutableStateOf(false) }
+    val dirty = endpointDraft != s.apiEndpoint || modelDraft != s.aiModel || apiKeyInput.isNotBlank() || customToneDraft != s.customToneInstruction
+    LaunchedEffect(dirty) { onDirtyChanged(dirty) }
+    DisposableEffect(Unit) { onDispose { onDirtyChanged(false) } }
+    fun requestBack() { if (dirty) discard = true else onBack() }
 
-            // ── AI 服务 ──
-            SectionTitle("AI 服务")
+    BackHandler { requestBack() }
+    Column(modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = ::requestBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, setupContext.getString(R.string.setup_text_258)) }
+            Text(setupContext.getString(R.string.setup_text_259), Modifier.weight(1f), style = MaterialTheme.typography.headlineSmall)
+            if (dirty) Text(setupContext.getString(R.string.setup_text_260), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) else SettingsSaveBadge(viewModel)
+        }
+        ForestSettingsSection(setupContext.getString(R.string.setup_text_261), icon = Icons.Default.Star) {
             AiProvider.entries.forEach { p ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     RadioButton(
                         selected = s.aiProvider == p,
                         onClick = {
                             viewModel.updateAiProvider(p)
-                            onSettingChanged("AI: ${p.displayName}")
+
                         }
                     )
-                    Text(p.displayName)
+                    Text(providerLabel(p))
                 }
             }
+            if (s.aiProvider == AiProvider.DEEPSEEK) com.example.focus_app.ui.components.DeepSeekSetupGuide()
             OutlinedTextField(
                 value = endpointDraft,
                 onValueChange = { endpointDraft = it },
-                label = { Text("API 端点") },
+                label = { Text(setupContext.getString(R.string.setup_text_262)) },
                 modifier = Modifier.fillMaxWidth()
             )
             OutlinedTextField(
                 value = modelDraft,
                 onValueChange = { modelDraft = it },
-                label = { Text("模型名") },
+                label = { Text(setupContext.getString(R.string.setup_text_263)) },
                 modifier = Modifier.fillMaxWidth()
             )
             Button(
                 onClick = {
                     viewModel.updateAiConnection(endpointDraft, modelDraft)
-                    onSettingChanged("AI 连接设置")
+
                 },
                 enabled = endpointDraft.isNotBlank() && modelDraft.isNotBlank()
-            ) { Text("保存连接设置") }
+            ) { Text(setupContext.getString(R.string.setup_text_265)) }
             OutlinedTextField(
                 value = apiKeyInput,
                 onValueChange = { apiKeyInput = it },
-                label = { Text("API Key（保存后不会再次显示）") },
+                label = { Text(setupContext.getString(R.string.setup_text_266)) },
+                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth()
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
                     onClick = {
-                        viewModel.updateApiKey(apiKeyInput)
-                        apiKeyInput = ""
-                        onSettingChanged("API Key")
+                        viewModel.updateApiKey(apiKeyInput) { apiKeyInput = "" }
+
                     },
                     enabled = apiKeyInput.isNotBlank()
-                ) { Text("保存 Key") }
+                ) { Text(setupContext.getString(R.string.setup_text_267)) }
                 TextButton(
                     onClick = {
                         viewModel.clearApiKey()
                         apiKeyInput = ""
-                        onSettingChanged("已清除 API Key")
+
                     }
-                ) { Text("清除") }
+                ) { Text(setupContext.getString(R.string.setup_text_269)) }
             }
             OutlinedButton(
                 onClick = { viewModel.testAiConnection() },
@@ -452,30 +400,30 @@ fun SettingsScreen(
                 if (connectionState is AiConnectionUiState.Loading) {
                     CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("正在测试连接…")
+                    Text(setupContext.getString(R.string.setup_text_270))
                 } else {
-                    Text("测试 DeepSeek 连接")
+                    Text(setupContext.getString(R.string.setup_text_271))
                 }
             }
             when (val state = connectionState) {
                 AiConnectionUiState.Idle, AiConnectionUiState.Loading -> Unit
                 is AiConnectionUiState.Success -> Text(
-                    "连接成功：${state.modelIds.take(3).joinToString("、")}" +
-                        if (state.modelIds.size > 3) " 等 ${state.modelIds.size} 个模型" else "",
+                    setupContext.getString(R.string.setup_text_272, state.modelIds.take(3).joinToString(setupContext.getString(R.string.setup_list_separator))) +
+                        if (state.modelIds.size > 3) setupContext.getString(R.string.setup_text_273, state.modelIds.size) else "",
                     color = MaterialTheme.colorScheme.primary,
                     style = MaterialTheme.typography.bodySmall
                 )
                 is AiConnectionUiState.Error -> Text(
-                    state.message,
+                    state.localizedMessage?.resolve(setupContext) ?: state.message,
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodySmall
                 )
             }
-            Divider()
+
 
             // ── 口吻 ──
-            SectionTitle("口吻")
-            Row(
+
+            FlowRow(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
@@ -484,7 +432,7 @@ fun SettingsScreen(
                         selected = s.toneKey == tone,
                         onClick = {
                             viewModel.updateReminderTone(tone)
-                            onSettingChanged("口吻: ${toneLabel(tone)}")
+
                         },
                         label = { Text(toneLabel(tone)) }
                     )
@@ -494,202 +442,63 @@ fun SettingsScreen(
                 OutlinedTextField(
                     value = customToneDraft,
                     onValueChange = { customToneDraft = it },
-                    label = { Text("自定义口吻要求") },
+                    label = { Text(setupContext.getString(R.string.setup_text_275)) },
                     modifier = Modifier.fillMaxWidth()
                 )
                 Button(
                     onClick = {
                         viewModel.updateCustomToneInstruction(customToneDraft)
-                        onSettingChanged("自定义口吻")
+
                     },
                     enabled = customToneDraft.isNotBlank()
-                ) { Text("保存口吻要求") }
+                ) { Text(setupContext.getString(R.string.setup_text_277)) }
             }
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(12.dp)) {
-                    Text("口吻预览", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+                    Text(setupContext.getString(R.string.setup_text_278), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        tonePreview.ifBlank { "设置口吻后这里会显示示例提醒" },
+                        com.example.focus_app.domain.reminder.ReminderTonePreview.sampleMessage(
+                            setupContext, s.toneKey, s.customToneInstruction, tonePreviewTask),
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }
             }
-            Divider()
 
-            /* Legacy return destination radio UI retained temporarily. The overlay now owns this choice.
-            // ── 返回行为 ──
-            SectionTitle("返回行为")
-            ReturnDestination.entries.forEach { destination ->
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    RadioButton(
-                        selected = s.returnDestination == destination,
-                        onClick = {
-                            viewModel.updateReturnDestination(destination)
-                            onSettingChanged("返回行为: ${returnLabel(destination)}")
-                        }
-                    )
-                    Text(returnLabel(destination))
-                }
-            }
-            */
-            run {
-                val selectedAppName by produceState<String?>(
-                    initialValue = customReturnPackage.ifBlank { null },
-                    customReturnPackage
-                ) {
-                    value = withContext(Dispatchers.IO) {
-                        loadInstalledAppName(context.applicationContext, customReturnPackage)
-                    } ?: customReturnPackage.ifBlank { null }
-                }
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { navigateToCustomReturnPicker() }
-                        .padding(vertical = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("返回指定应用", style = MaterialTheme.typography.bodyMedium)
-                        Text(
-                            selectedAppName ?: "点击选择应用",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if (selectedAppName == null) {
-                                MaterialTheme.colorScheme.error
-                            } else {
-                                MaterialTheme.colorScheme.outline
-                            }
-                        )
-                    }
-                    Text("→", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.outline)
-                }
-            }
-            Divider()
 
-            // ── 检测方式 ──
-            SectionTitle("检测方式")
-            DetectionMode.entries.forEach { mode ->
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    RadioButton(
-                        selected = s.detectionMode == mode,
-                        onClick = {
-                            viewModel.updateDetectionMode(mode)
-                            onSettingChanged("检测方式: ${detectionLabel(mode)}")
-                            if (mode == DetectionMode.REALTIME &&
-                                !PermissionHelper.isAccessibilityServiceEnabled(context)
-                            ) {
-                                context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-                            }
-                        }
-                    )
-                    Column {
-                        Text(detectionLabel(mode))
-                        Text(
-                            detectionHint(mode),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.outline,
-                            fontSize = 12.sp
-                        )
-                    }
-                }
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("启用无障碍检测", modifier = Modifier.weight(1f))
-                Switch(
-                    checked = isAccessibilityDetectionReady(
-                        userEnabled = s.enableAccessibility,
-                        systemEnabled = systemAccessibilityEnabled
-                    ),
-                    onCheckedChange = { enabled ->
-                        viewModel.setAccessibilityEnabled(enabled)
-                        onSettingChanged(if (enabled) "开启无障碍检测" else "关闭无障碍检测")
-                        if (enabled && !systemAccessibilityEnabled) {
-                            context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-                        }
-                    }
-                )
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("显示在其他应用上层（弹窗提醒）", modifier = Modifier.weight(1f))
-                if (overlayGranted) {
-                    Text("已授予", color = MaterialTheme.colorScheme.primary)
-                } else {
-                    TextButton(onClick = { PermissionHelper.openOverlaySettings(context) }) {
-                        Text("去开启")
-                    }
-                }
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("常驻守护（防止后台被回收）", style = MaterialTheme.typography.bodyMedium)
-                    Text(
-                        "实时模式会显示一条低优先级常驻通知",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.outline
-                    )
-                }
-                Switch(
-                    checked = keepAliveEnabled,
-                    onCheckedChange = { enabled ->
-                        viewModel.setKeepAliveEnabled(enabled)
-                        onSettingChanged(if (enabled) "开启常驻守护" else "关闭常驻守护")
-                    }
-                )
-            }
-
-            Spacer(modifier = Modifier.height(32.dp))
-            Divider()
-            SectionTitle("\u53cd\u9988\u4e0e\u652f\u6301")
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { navigateToFeedbackAndSupport() }
-                    .padding(vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        "\u95ee\u5377\u661f\u3001\u516c\u4f17\u53f7\u4e0e\u8d5e\u52a9\u5165\u53e3",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    Text(
-                        "\u4e8c\u7ef4\u7801\u6216\u94fe\u63a5\u7531\u4f60\u540e\u7eed\u63d0\u4f9b",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.outline
-                    )
-                }
-                Text("\u2192", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.outline)
-            }
 
         }
     }
-
+    if (discard) AlertDialog(onDismissRequest = { discard = false }, title = { Text(setupContext.getString(R.string.setup_text_279)) },
+        text = { Text(setupContext.getString(R.string.setup_text_280)) },
+        confirmButton = { TextButton(onClick = onBack) { Text(setupContext.getString(R.string.setup_text_281)) } },
+        dismissButton = { TextButton(onClick = { discard = false }) { Text(setupContext.getString(R.string.setup_text_282)) } })
 }
 
-private fun themeModeLabel(mode: AppThemeMode): String = when (mode) {
-    AppThemeMode.SYSTEM -> "跟随系统"
-    AppThemeMode.DAY -> "日间"
-    AppThemeMode.NIGHT -> "夜间"
+@Composable
+internal fun themeModeLabel(mode: AppThemeMode): String = when (mode) {
+    AppThemeMode.SYSTEM -> androidx.compose.ui.res.stringResource(R.string.setup_text_283)
+    AppThemeMode.DAY -> androidx.compose.ui.res.stringResource(R.string.setup_text_284)
+    AppThemeMode.NIGHT -> androidx.compose.ui.res.stringResource(R.string.setup_text_285)
 }
 
-private fun themeColorLabel(color: AppThemeColor): String = when (color) {
-    AppThemeColor.MINT -> "薄荷青"
-    AppThemeColor.BLUE -> "宁静蓝"
-    AppThemeColor.ORANGE -> "暖阳橙"
-    AppThemeColor.GRAPHITE -> "石墨"
+@Composable
+internal fun themeColorLabel(color: AppThemeColor): String = when (color) {
+    AppThemeColor.MINT -> androidx.compose.ui.res.stringResource(R.string.setup_text_286)
+    AppThemeColor.BLUE -> androidx.compose.ui.res.stringResource(R.string.setup_text_287)
+    AppThemeColor.ORANGE -> androidx.compose.ui.res.stringResource(R.string.setup_text_288)
+    AppThemeColor.GRAPHITE -> androidx.compose.ui.res.stringResource(R.string.setup_text_289)
 }
 
-private val themeGradient: Map<AppThemeColor, List<Color>> = mapOf(
-    AppThemeColor.MINT to listOf(Color(0xFF0B6B57), Color(0xFF2BB673)),
+internal val themeGradient: Map<AppThemeColor, List<Color>> = mapOf(
+    AppThemeColor.MINT to listOf(Color(0xFF205C35), Color(0xFF42694D)),
     AppThemeColor.BLUE to listOf(Color(0xFF16304F), Color(0xFF2E5EAA)),
     AppThemeColor.ORANGE to listOf(Color(0xFFC85A12), Color(0xFFF5A623)),
     AppThemeColor.GRAPHITE to listOf(Color(0xFF1F242B), Color(0xFF2F80ED))
 )
 
 @Composable
-private fun ThemeColorSwatch(
+internal fun ThemeColorSwatch(
     color: AppThemeColor,
     selected: Boolean,
     onClick: () -> Unit,
@@ -697,7 +506,7 @@ private fun ThemeColorSwatch(
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = modifier
+        modifier = modifier.selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
     ) {
         Box(
             modifier = Modifier
@@ -709,11 +518,10 @@ private fun ThemeColorSwatch(
                     color = if (selected) {
                         MaterialTheme.colorScheme.primary
                     } else {
-                        MaterialTheme.colorScheme.outline
+                        MaterialTheme.colorScheme.onSurfaceVariant
                     },
                     shape = CircleShape
                 )
-                .clickable(onClick = onClick)
         )
         Spacer(modifier = Modifier.height(6.dp))
         Text(themeColorLabel(color), style = MaterialTheme.typography.labelSmall)
@@ -721,70 +529,54 @@ private fun ThemeColorSwatch(
 }
 
 @Composable
-private fun BackgroundProtectionCard(
+internal fun BackgroundProtectionCard(
     batteryOptimizationIgnored: Boolean,
     onOpenSystemSettings: () -> Unit
 ) {
+    val setupContext = androidx.compose.ui.platform.LocalContext.current
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text("\u540e\u53f0\u4fdd\u62a4", style = MaterialTheme.typography.titleMedium)
+            Text(setupContext.getString(R.string.setup_text_077), style = MaterialTheme.typography.titleMedium)
             Text(
                 if (batteryOptimizationIgnored) {
-                    "\u5df2\u5141\u8bb8\u7cfb\u7edf\u5ffd\u7565\u7535\u6c60\u4f18\u5316\uff1b\u7a0d\u540e\u63d0\u9192\u5728\u666e\u901a\u540e\u53f0\u56de\u6536\u540e\u4ecd\u53ef\u7ee7\u7eed\u6267\u884c\u3002"
+                    setupContext.getString(R.string.setup_text_290)
                 } else {
-                    "\u672a\u5141\u8bb8\u5ffd\u7565\u7535\u6c60\u4f18\u5316\uff1b\u7cfb\u7edf\u53ef\u80fd\u5ef6\u540e\u6216\u53d6\u6d88\u540e\u53f0\u7684\u7a0d\u540e\u63d0\u9192\u3002"
+                    setupContext.getString(R.string.setup_text_291)
                 },
                 style = MaterialTheme.typography.bodyMedium
             )
             if (!batteryOptimizationIgnored) {
-                TextButton(onClick = onOpenSystemSettings) { Text("\u5141\u8bb8\u540e\u53f0\u4fdd\u62a4") }
+                TextButton(onClick = onOpenSystemSettings) { Text(setupContext.getString(R.string.setup_text_292)) }
             }
             Text(
-                "\u7cfb\u7edf\u201c\u5f3a\u884c\u505c\u6b62\u201d\u4f1a\u5173\u95ed\u540e\u53f0\u4efb\u52a1\uff1b\u8fd9\u662f Android \u7684\u5b89\u5168\u9650\u5236\uff0c\u91cd\u65b0\u6253\u5f00 Focus \u540e\u624d\u4f1a\u6062\u590d\u3002",
+                setupContext.getString(R.string.setup_text_293),
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.outline
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text(
-                PermissionHelper.backgroundProtectionHint(),
+                PermissionHelper.backgroundProtectionHint(setupContext),
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.outline
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
 }
 
 @Composable
-private fun SectionTitle(title: String) {
-    Text(
-        title,
-        style = MaterialTheme.typography.titleMedium,
-        color = MaterialTheme.colorScheme.primary,
-        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
-    )
+internal fun toneLabel(tone: ReminderTone): String = when (tone) {
+    ReminderTone.GENTLE -> androidx.compose.ui.res.stringResource(R.string.setup_text_209)
+    ReminderTone.DIRECT -> androidx.compose.ui.res.stringResource(R.string.setup_text_294)
+    ReminderTone.SARCASTIC -> androidx.compose.ui.res.stringResource(R.string.setup_text_295)
+    ReminderTone.CUSTOM -> androidx.compose.ui.res.stringResource(R.string.setup_text_296)
 }
 
-private fun toneLabel(tone: ReminderTone): String = when (tone) {
-    ReminderTone.GENTLE -> "温和"
-    ReminderTone.DIRECT -> "直接"
-    ReminderTone.SARCASTIC -> "毒舌"
-    ReminderTone.CUSTOM -> "自定义"
-}
-
-private fun returnLabel(destination: ReturnDestination): String = when (destination) {
-    ReturnDestination.FOCUS -> "不刷了，返回 Focus"
-    ReturnDestination.HOME -> "不刷了，返回桌面"
-    ReturnDestination.CUSTOM -> "不刷了，返回指定应用"
-}
-
-private fun detectionLabel(mode: DetectionMode): String = when (mode) {
-    DetectionMode.REALTIME -> "实时模式（无障碍，推荐）"
-    DetectionMode.COMPATIBILITY -> "兼容模式（使用情况访问）"
-}
-
-private fun detectionHint(mode: DetectionMode): String = when (mode) {
-    DetectionMode.REALTIME -> "低耗电，实时响应；需要开启无障碍服务"
-    DetectionMode.COMPATIBILITY -> "更省电的兼容方式；需要使用情况访问权限与通知权限"
+@Composable
+internal fun providerLabel(provider: AiProvider): String = when (provider) {
+    AiProvider.DEEPSEEK -> "DeepSeek"
+    AiProvider.OPENAI -> "OpenAI"
+    AiProvider.QWEN -> androidx.compose.ui.res.stringResource(R.string.setup_provider_qwen)
+    AiProvider.CUSTOM -> androidx.compose.ui.res.stringResource(R.string.setup_provider_custom)
 }

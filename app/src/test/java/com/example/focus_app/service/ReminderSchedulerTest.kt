@@ -21,6 +21,49 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class ReminderSchedulerTest {
     @Test
+    fun guardian_on_allows_taskless_session_after_normal_delay() = runTest {
+        val fixture = fixture(taskId = null)
+        fixture.scheduler.onSessionStarted(fixture.session) { true }
+        advanceTimeBy(9_999L); runCurrent()
+        assertEquals(0, fixture.launcher.shown.size)
+        advanceTimeBy(2L); runCurrent()
+        assertEquals(1, fixture.launcher.shown.size)
+        assertEquals(null, fixture.launcher.shown.single().taskId)
+    }
+
+    @Test
+    fun guardian_disabled_during_delay_prevents_taskless_reminder() = runTest {
+        var enabled = true
+        val fixture = fixture(taskId = null, settingsTransform = { it.copy(guardianEnabled = enabled) })
+        fixture.scheduler.onSessionStarted(fixture.session) { true }
+        runCurrent()
+        enabled = false
+        advanceTimeBy(10_001L); runCurrent()
+        assertEquals(0, fixture.launcher.shown.size)
+        assertEquals(0, fixture.repository.remindedCount)
+    }
+
+    @Test
+    fun removed_target_during_delay_prevents_reminder() = runTest {
+        var watched = true
+        val fixture = fixture(taskId = null, settingsTransform = { if (watched) it else it.copy(targetApps = emptyList()) })
+        fixture.scheduler.onSessionStarted(fixture.session) { true }
+        runCurrent()
+        watched = false
+        advanceTimeBy(10_001L); runCurrent()
+        assertEquals(0, fixture.launcher.shown.size)
+        assertEquals(0, fixture.repository.remindedCount)
+    }
+
+    @Test
+    fun guardian_off_at_open_does_not_schedule_a_reminder() = runTest {
+        val fixture = fixture(taskId = null, settingsTransform = { it.copy(guardianEnabled = false) })
+        fixture.scheduler.onSessionStarted(fixture.session) { true }
+        advanceTimeBy(10_001L); runCurrent()
+        assertEquals(0, fixture.launcher.shown.size)
+    }
+
+    @Test
     fun trigger_time_verifier_false_does_not_mark_or_show() = runTest {
         val fixture = fixture()
         var verificationCount = 0
@@ -175,14 +218,16 @@ class ReminderSchedulerTest {
 
     private fun kotlinx.coroutines.test.TestScope.fixture(
         previousReminderTimes: List<Long> = emptyList(),
-        closeImmediatelyBeforeReminderMark: Boolean = false
+        closeImmediatelyBeforeReminderMark: Boolean = false,
+        taskId: Long? = 7L,
+        settingsTransform: (AppSettings) -> AppSettings = { it }
     ): Fixture {
         val session = AppUsageSession(
             id = 12L,
             packageName = "com.ss.android.ugc.aweme",
             appName = "Douyin",
             startedAt = NOW,
-            taskId = 7L,
+            taskId = taskId,
             toneKey = ReminderTone.DIRECT.key
         )
         val repository = FakeReminderSessionRepository(
@@ -207,7 +252,7 @@ class ReminderSchedulerTest {
             launcher = launcher,
             clock = FakeClock(NOW),
             scope = backgroundScope,
-            settingsProvider = { settings },
+            settingsProvider = { settingsTransform(settings) },
             displayRepository = displayRepository,
             attemptIdProvider = { "attempt-1" },
             launchDataProvider = { usageSession, currentSettings ->

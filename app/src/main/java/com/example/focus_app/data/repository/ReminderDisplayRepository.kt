@@ -50,12 +50,14 @@ class RoomReminderDisplayRepository(
         windowStart: Long,
         limit: Int
     ): ReminderDisplayResult = database.withTransaction {
+        database.reminderAnalyticsDao().ensureHistory(com.example.focus_app.data.local.entity.ReminderHistoryStateEntity(
+            completeHistoryFrom = displayedAt))
         if (displayDao.byAttemptId(attemptId) != null) {
             return@withTransaction ReminderDisplayResult.Displayed(
-                displayDao.countSince(windowStart)
+                database.reminderAnalyticsDao().quotaCount(windowStart)
             )
         }
-        if (limit <= 0 || displayDao.countSince(windowStart) >= limit) {
+        if (limit <= 0 || database.reminderAnalyticsDao().quotaCount(windowStart) >= limit) {
             return@withTransaction ReminderDisplayResult.QuotaExceeded
         }
         val inserted = displayDao.insert(
@@ -68,18 +70,22 @@ class RoomReminderDisplayRepository(
         )
         if (inserted == -1L) {
             return@withTransaction ReminderDisplayResult.Displayed(
-                displayDao.countSince(windowStart)
+                database.reminderAnalyticsDao().quotaCount(windowStart)
             )
         }
         sessionDao.updateRemindedAt(sessionId, displayedAt)
-        ReminderDisplayResult.Displayed(displayDao.countSince(windowStart))
+        ReminderDisplayResult.Displayed(database.reminderAnalyticsDao().quotaCount(windowStart))
     }
 
-    override suspend fun countSince(since: Long): Int = displayDao.countSince(since)
+    override suspend fun countSince(since: Long): Int = database.reminderAnalyticsDao().quotaCount(since)
 
-    override suspend fun timesSince(since: Long): List<Long> = displayDao.timesSince(since)
+    override suspend fun timesSince(since: Long): List<Long> = database.reminderAnalyticsDao().quotaTimes(since)
 
     override suspend fun resetSince(since: Long) {
-        displayDao.deleteSince(since)
+        database.withTransaction {
+            database.reminderAnalyticsDao().ensureHistory(com.example.focus_app.data.local.entity.ReminderHistoryStateEntity(
+                completeHistoryFrom = System.currentTimeMillis()))
+            database.reminderAnalyticsDao().resetQuota()
+        }
     }
 }

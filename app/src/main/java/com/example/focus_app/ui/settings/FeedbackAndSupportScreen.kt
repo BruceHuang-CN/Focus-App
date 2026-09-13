@@ -43,6 +43,7 @@ import com.example.focus_app.R
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FeedbackAndSupportScreen(onBack: () -> Unit) {
+    val setupContext = androidx.compose.ui.platform.LocalContext.current
     val uriHandler = LocalUriHandler.current
     var surveyOpenFailed by rememberSaveable { mutableStateOf(false) }
     var selectedPaymentName by rememberSaveable {
@@ -57,12 +58,12 @@ fun FeedbackAndSupportScreen(onBack: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("反馈与支持") },
+                title = { Text(setupContext.getString(R.string.setup_text_173)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "返回"
+                            contentDescription = setupContext.getString(R.string.setup_text_164)
                         )
                     }
                 }
@@ -78,7 +79,7 @@ fun FeedbackAndSupportScreen(onBack: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
-                text = "你的建议会帮助 Focus 变得更好。",
+                text = setupContext.getString(R.string.setup_text_174),
                 style = MaterialTheme.typography.bodyLarge
             )
             FeedbackCard(
@@ -103,20 +104,21 @@ private fun FeedbackCard(
     surveyOpenFailed: Boolean,
     onOpenSurvey: () -> Unit
 ) {
+    val setupContext = androidx.compose.ui.platform.LocalContext.current
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = "提交反馈",
+                text = setupContext.getString(R.string.setup_text_175),
                 modifier = Modifier.fillMaxWidth(),
                 style = MaterialTheme.typography.titleMedium
             )
             Spacer(modifier = Modifier.height(12.dp))
             Image(
                 painter = painterResource(R.drawable.questionnaire_poster),
-                contentDescription = "Focus 用户反馈调查海报",
+                contentDescription = setupContext.getString(R.string.setup_text_176),
                 modifier = Modifier
                     .fillMaxWidth()
                     .widthIn(max = 420.dp)
@@ -128,12 +130,12 @@ private fun FeedbackCard(
                 onClick = onOpenSurvey,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("填写问卷")
+                Text(setupContext.getString(R.string.setup_text_177))
             }
             if (surveyOpenFailed) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "暂时无法打开链接，请确认手机已安装浏览器后重试。",
+                    text = setupContext.getString(R.string.setup_text_178),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error
                 )
@@ -147,6 +149,7 @@ private fun SupportCard(
     selectedPayment: SupportPaymentMethod,
     onPaymentSelected: (SupportPaymentMethod) -> Unit
 ) {
+    val setupContext = androidx.compose.ui.platform.LocalContext.current
     val content = supportPaymentContent(selectedPayment)
 
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -155,13 +158,13 @@ private fun SupportCard(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = "支持 Focus",
+                text = setupContext.getString(R.string.setup_text_179),
                 modifier = Modifier.fillMaxWidth(),
                 style = MaterialTheme.typography.titleMedium
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "如果 Focus 对你有帮助，可以自愿支持后续开发与维护。",
+                text = setupContext.getString(R.string.setup_text_180),
                 modifier = Modifier.fillMaxWidth(),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -172,13 +175,13 @@ private fun SupportCard(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 PaymentMethodButton(
-                    label = "微信",
+                    label = setupContext.getString(R.string.setup_text_167),
                     selected = selectedPayment == SupportPaymentMethod.WECHAT,
                     onClick = { onPaymentSelected(SupportPaymentMethod.WECHAT) },
                     modifier = Modifier.weight(1f)
                 )
                 PaymentMethodButton(
-                    label = "支付宝",
+                    label = setupContext.getString(R.string.setup_text_170),
                     selected = selectedPayment == SupportPaymentMethod.ALIPAY,
                     onClick = { onPaymentSelected(SupportPaymentMethod.ALIPAY) },
                     modifier = Modifier.weight(1f)
@@ -186,7 +189,7 @@ private fun SupportCard(
             }
             Spacer(modifier = Modifier.height(16.dp))
             Text(
-                text = content.hint,
+                text = setupContext.getString(content.hint),
                 style = MaterialTheme.typography.titleSmall
             )
             Spacer(modifier = Modifier.height(10.dp))
@@ -200,14 +203,14 @@ private fun SupportCard(
             ) {
                 Image(
                     painter = painterResource(content.qrResource),
-                    contentDescription = content.contentDescription,
+                    contentDescription = setupContext.getString(content.contentDescription),
                     modifier = Modifier.padding(8.dp),
                     contentScale = ContentScale.Fit
                 )
             }
             Spacer(modifier = Modifier.height(10.dp))
             Text(
-                text = "可使用另一台设备扫码，或截图后在对应 App 中识别。",
+                text = setupContext.getString(R.string.setup_text_181),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

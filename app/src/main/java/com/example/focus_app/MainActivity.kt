@@ -3,7 +3,7 @@ package com.example.focus_app
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
-import androidx.activity.ComponentActivity
+import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
@@ -43,7 +43,9 @@ internal fun shouldRunRealtimeKeepAlive(
         keepAlive
 
 @AndroidEntryPoint
-class MainActivity : ComponentActivity() {
+class MainActivity : AppCompatActivity() {
+    @Inject lateinit var returnNavigationGuard: com.example.focus_app.service.ReturnNavigationGuard
+    @Inject lateinit var realtimeForegroundProvider: com.example.focus_app.service.RealtimeForegroundProvider
     @Inject lateinit var settingsRepository: SettingsRepository
     @Inject lateinit var keepAliveStore: KeepAliveStore
     @Inject lateinit var themeStore: ThemeStore
@@ -110,7 +112,19 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        returnNavigationGuard.onMainResumed(this)
+        realtimeForegroundProvider.onRealApplicationForeground(packageName)
         systemAccessibilityEnabled.value = permissionStatusProvider.accessibilityEnabled()
+    }
+
+    override fun onPause() {
+        returnNavigationGuard.onMainPaused(this)
+        super.onPause()
+    }
+
+    override fun onDestroy() {
+        returnNavigationGuard.onMainPaused(this)
+        super.onDestroy()
     }
 
     override fun onNewIntent(intent: Intent) {

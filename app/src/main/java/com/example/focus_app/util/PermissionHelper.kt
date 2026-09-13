@@ -17,6 +17,15 @@ import androidx.core.content.ContextCompat
 import com.example.focus_app.service.FocusAccessibilityService
 
 object PermissionHelper {
+    fun backgroundProtectionHint(context: Context): String {
+        val id = when (Build.MANUFACTURER.lowercase()) {
+            "xiaomi", "redmi" -> com.example.focus_app.R.string.background_xiaomi
+            "huawei", "honor" -> com.example.focus_app.R.string.background_huawei
+            "oppo", "realme", "vivo", "iqoo" -> com.example.focus_app.R.string.background_oppo
+            else -> com.example.focus_app.R.string.background_other
+        }
+        return com.example.focus_app.data.language.AppLanguage.context(context).getString(id)
+    }
     private const val PREFS_NAME = "focus_prefs"
     private const val KEY_ONBOARDING_DONE = "onboarding_done"
 

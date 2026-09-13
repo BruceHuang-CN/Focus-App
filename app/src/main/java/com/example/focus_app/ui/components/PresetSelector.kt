@@ -1,5 +1,6 @@
 package com.example.focus_app.ui.components
 
+import com.example.focus_app.R
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -35,6 +36,7 @@ fun PresetSelector(
     onValueChange: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val textContext = androidx.compose.ui.platform.LocalContext.current
     val isCustom = value !in presets
     var showCustom by remember { mutableStateOf(isCustom) }
     var customText by remember(value) { mutableStateOf(if (isCustom) value.toString() else "") }
@@ -57,7 +59,7 @@ fun PresetSelector(
             FilterChip(
                 selected = isCustom,
                 onClick = { showCustom = true },
-                label = { Text("自定义") }
+                label = { Text(textContext.getString(R.string.core_custom)) }
             )
         }
         if (showCustom) {
@@ -69,7 +71,7 @@ fun PresetSelector(
                         onValueChange(parsed.coerceIn(customRange))
                     }
                 },
-                label = { Text("自定义数值") },
+                label = { Text(textContext.getString(R.string.core_custom_value)) },
                 suffix = { Text(formatPreset(value)) },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),

@@ -1,5 +1,7 @@
 package com.example.focus_app.ui.settings
 
+import com.example.focus_app.R
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -14,8 +16,8 @@ import com.example.focus_app.domain.model.DetectionMode
 import com.example.focus_app.domain.permission.PermissionCheckAction
 import com.example.focus_app.domain.permission.PermissionCheckItem
 import com.example.focus_app.domain.permission.PermissionCheckStatus
-import com.example.focus_app.ui.theme.ErrorRed
-import com.example.focus_app.ui.theme.SuccessGreen
+import com.example.focus_app.domain.permission.localizedLabel
+import com.example.focus_app.domain.permission.localizedDetail
 
 /**
  * 设置页顶部的「检测状态」窗口：折叠时显示当前模式与未就绪项数量，
@@ -28,6 +30,7 @@ fun PermissionCheckCard(
     onAction: (PermissionCheckAction) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val setupContext = androidx.compose.ui.platform.LocalContext.current
     var expanded by remember { mutableStateOf(false) }
     val missing = items.count { it.status == PermissionCheckStatus.MISSING }
     Card(modifier = modifier.fillMaxWidth()) {
@@ -39,20 +42,20 @@ fun PermissionCheckCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("检测状态", style = MaterialTheme.typography.titleMedium)
+                    Text(setupContext.getString(R.string.setup_text_182), style = MaterialTheme.typography.titleMedium)
                     Text(
                         if (missing == 0) {
-                            "${detectionModeLabel(mode)} · 一切就绪"
+                            setupContext.getString(R.string.setup_text_183, detectionModeLabel(mode))
                         } else {
-                            "${detectionModeLabel(mode)} · $missing 项未就绪"
+                            setupContext.getString(R.string.setup_text_184, detectionModeLabel(mode), missing)
                         },
                         style = MaterialTheme.typography.bodySmall,
-                        color = if (missing == 0) SuccessGreen else ErrorRed
+                        color = if (missing == 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
                     )
                 }
                 Icon(
                     imageVector = if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
-                    contentDescription = if (expanded) "收起" else "展开"
+                    contentDescription = if (expanded) setupContext.getString(R.string.setup_text_185) else setupContext.getString(R.string.setup_text_186)
                 )
             }
             if (expanded) {
@@ -68,6 +71,7 @@ private fun PermissionCheckRow(
     item: PermissionCheckItem,
     onAction: (PermissionCheckAction) -> Unit
 ) {
+    val setupContext = androidx.compose.ui.platform.LocalContext.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -76,14 +80,14 @@ private fun PermissionCheckRow(
     ) {
         Text(
             text = if (item.status == PermissionCheckStatus.OK) "✓" else "✗",
-            color = if (item.status == PermissionCheckStatus.OK) SuccessGreen else ErrorRed,
+            color = if (item.status == PermissionCheckStatus.OK) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
             style = MaterialTheme.typography.titleMedium
         )
         Spacer(modifier = Modifier.width(8.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(item.label, style = MaterialTheme.typography.bodyMedium)
+            Text(item.localizedLabel(setupContext), style = MaterialTheme.typography.bodyMedium)
             Text(
-                item.detail,
+                item.localizedDetail(setupContext),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.outline
             )
@@ -91,12 +95,13 @@ private fun PermissionCheckRow(
         if (item.status == PermissionCheckStatus.MISSING &&
             item.action != PermissionCheckAction.NONE
         ) {
-            TextButton(onClick = { onAction(item.action) }) { Text("去开启") }
+            TextButton(onClick = { onAction(item.action) }) { Text(setupContext.getString(R.string.setup_text_187)) }
         }
     }
 }
 
+@Composable
 internal fun detectionModeLabel(mode: DetectionMode): String = when (mode) {
-    DetectionMode.REALTIME -> "实时模式"
-    DetectionMode.COMPATIBILITY -> "兼容模式"
+    DetectionMode.REALTIME -> androidx.compose.ui.res.stringResource(R.string.setup_text_188)
+    DetectionMode.COMPATIBILITY -> androidx.compose.ui.res.stringResource(R.string.setup_text_189)
 }

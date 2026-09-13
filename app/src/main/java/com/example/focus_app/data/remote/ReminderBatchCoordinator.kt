@@ -1,5 +1,8 @@
 package com.example.focus_app.data.remote
 
+import android.content.Context
+import com.example.focus_app.data.language.AppLanguage
+import dagger.hilt.android.qualifiers.ApplicationContext
 import com.example.focus_app.data.repository.AiRepository
 import com.example.focus_app.data.repository.AppInfo
 import com.example.focus_app.data.repository.AppSettings
@@ -37,7 +40,9 @@ class ReminderBatchCoordinator(
     private val generate: suspend (ReminderContext, AppSettings) -> Result<List<String>>,
     private val cache: suspend (Long, String, String, List<String>) -> Unit,
     private val cacheReady: suspend (Long, String, String) -> Boolean = { _, _, _ -> false },
-    private val periodToken: (FocusTask) -> Long = { MANUAL_ACTIVATION_PERIOD_TOKEN }
+    private val periodToken: (FocusTask) -> Long = { MANUAL_ACTIVATION_PERIOD_TOKEN },
+    private val currentLanguage: () -> String = { "zh-CN" },
+    private val languageChanges: Flow<String> = flowOf("zh-CN")
 ) {
     @Inject
     constructor(
@@ -46,7 +51,8 @@ class ReminderBatchCoordinator(
         moodRepository: MoodRepository,
         contextBuilder: BuildReminderContextUseCase,
         aiRepository: AiRepository,
-        cacheRepository: ReminderCacheRepository
+        cacheRepository: ReminderCacheRepository,
+        @ApplicationContext applicationContext: Context
     ) : this(
         activeTasks = taskRepository.observeActiveEvents(),
         settings = settingsRepository.getSettingsFlow(),
@@ -55,11 +61,15 @@ class ReminderBatchCoordinator(
         moodRevisions = moodRepository.observeLatestMood().map { mood -> mood?.id },
         buildContext = contextBuilder::invoke,
         generate = { context, currentSettings ->
-            aiRepository.generateBatch(context, currentSettings, BATCH_SIZE)
+            aiRepository.generateBatch(context, currentSettings, BATCH_SIZE, context.languageTag)
         },
-        cache = cacheRepository::replace,
-        cacheReady = cacheRepository::isReady,
-        periodToken = { task -> activationPeriodToken(task, SystemClock.now()) }
+        cache = { taskId, packageName, bucket, messages ->
+            cacheRepository.replace(taskId, packageName, bucket, messages, "zh-CN")
+        },
+        cacheReady = { taskId, packageName, bucket -> cacheRepository.isReady(taskId, packageName, bucket, "zh-CN") },
+        periodToken = { task -> activationPeriodToken(task, SystemClock.now()) },
+        currentLanguage = { AppLanguage.tag(applicationContext) },
+        languageChanges = AppLanguage.current
     )
 
     fun start(scope: CoroutineScope): Job = scope.launch {
@@ -67,8 +77,9 @@ class ReminderBatchCoordinator(
         val versionedTasks = activeTasks.map { task ->
             ActiveEmission(task, task?.let(periodToken))
         }.distinctUntilChanged()
-        combine(versionedTasks, settings, apiKeyRevisions, cacheRevisions, moodRevisions) {
-                active, currentSettings, apiKeyRevision, cacheRevision, moodRevision ->
+        val moodAndLanguage = combine(moodRevisions, languageChanges) { mood, language -> mood to language }
+        combine(versionedTasks, settings, apiKeyRevisions, cacheRevisions, moodAndLanguage) {
+                active, currentSettings, apiKeyRevision, cacheRevision, moodLanguage ->
             val task = active.task
             if (task == null || currentSettings.targetApps.isEmpty()) {
                 null
@@ -90,7 +101,8 @@ class ReminderBatchCoordinator(
                         reminderWindowMinutes = currentSettings.reminderWindowMinutes,
                         apiKeyRevision = apiKeyRevision,
                         cacheRevision = cacheRevision,
-                        moodRevision = moodRevision
+                        moodRevision = moodLanguage.first,
+                        languageTag = currentLanguage()
                     ),
                     task = task,
                     settings = currentSettings,
@@ -108,7 +120,7 @@ class ReminderBatchCoordinator(
                         !cacheReady(
                             activation.task.id,
                             app.packageName,
-                            activation.settings.toneKey.key
+                            ReminderCacheRepository.languageToneKey(activation.settings.toneKey.key, activation.key.languageTag)
                         )
                     }
                 } else {
@@ -122,13 +134,13 @@ class ReminderBatchCoordinator(
 
     private suspend fun generateAndCache(activation: BatchActivation, app: AppInfo) {
         try {
-            val context = buildContext(activation.task, app, activation.settings)
+            val context = buildContext(activation.task, app, activation.settings).copy(languageTag = activation.key.languageTag)
             val messages = generate(context, activation.settings).getOrNull() ?: return
             if (messages.size == BATCH_SIZE) {
                 cache(
                     activation.task.id,
                     app.packageName,
-                    activation.settings.toneKey.key,
+                    ReminderCacheRepository.languageToneKey(activation.settings.toneKey.key, activation.key.languageTag),
                     messages
                 )
             }
@@ -161,7 +173,8 @@ class ReminderBatchCoordinator(
         val reminderWindowMinutes: Int,
         val apiKeyRevision: Long,
         val cacheRevision: Long,
-        val moodRevision: Long?
+        val moodRevision: Long?,
+        val languageTag: String
     )
 
     private companion object {

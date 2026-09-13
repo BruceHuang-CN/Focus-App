@@ -9,5 +9,6 @@ data class ReminderContext(
     val remindersInWindow: Int,
     val activeExitsToday: Int,
     val tone: ReminderTone,
-    val customToneInstruction: String = ""
+    val customToneInstruction: String = "",
+    val languageTag: String = "zh-CN"
 )

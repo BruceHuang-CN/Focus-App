@@ -17,15 +17,9 @@ class ReminderDisplayCoordinator(
         if (data.attemptId.isBlank() || data.windowLimit <= 0 || data.windowMinutes <= 0) {
             return null
         }
-        if (
-            data.forceReminder &&
-            data.displayKind == ReminderDisplayKind.FORCED_REDISPLAY
-        ) {
-            return data
-        }
         val now = clock()
         val since = now - data.windowMinutes * 60_000L
-        val displayLimit = if (data.displayKind == ReminderDisplayKind.FOLLOW_UP) {
+        val displayLimit = if (data.displayKind == ReminderDisplayKind.FOLLOW_UP || data.displayKind == ReminderDisplayKind.FORCED_REDISPLAY) {
             Int.MAX_VALUE
         } else {
             data.windowLimit

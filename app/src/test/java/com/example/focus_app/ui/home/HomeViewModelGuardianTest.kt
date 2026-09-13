@@ -74,7 +74,7 @@ class HomeViewModelGuardianTest {
     fun missing_active_group_uses_unconfigured_group_name() = runTest(dispatcher) {
         val viewModel = fixture().homeViewModel()
         runCurrent()
-        assertEquals("\u672a\u8bbe\u7f6e\u5e94\u7528\u7ec4", viewModel.uiState.value.activeGroupName)
+        assertEquals("", viewModel.uiState.value.activeGroupName)
     }
 
     @Test

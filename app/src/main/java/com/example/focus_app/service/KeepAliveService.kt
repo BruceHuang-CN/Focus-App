@@ -10,6 +10,8 @@ import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import com.example.focus_app.MainActivity
+import com.example.focus_app.R
+import com.example.focus_app.data.language.localizedText
 
 /**
  * 实时模式下的低打扰前台服务：仅用于保活进程，不做任何轮询。
@@ -21,7 +23,15 @@ class KeepAliveService : Service() {
         startForeground(NOTIFICATION_ID, buildNotification())
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = START_STICKY
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        startForeground(NOTIFICATION_ID, buildNotification())
+        return START_STICKY
+    }
+
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        startForeground(NOTIFICATION_ID, buildNotification())
+    }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -31,10 +41,10 @@ class KeepAliveService : Service() {
             manager.createNotificationChannel(
                 NotificationChannel(
                     CHANNEL_ID,
-                    "Focus 常驻守护",
+                    localizedText(R.string.service_keepalive_channel),
                     NotificationManager.IMPORTANCE_MIN
                 ).apply {
-                    description = "保持 Focus 进程存活以持续提醒，可在设置中关闭"
+                    description = localizedText(R.string.service_keepalive_description)
                     setShowBadge(false)
                 }
             )
@@ -46,8 +56,8 @@ class KeepAliveService : Service() {
         )
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Focus 正在守护专注")
-            .setContentText("打开目标应用时提醒你回到任务")
+            .setContentTitle(localizedText(R.string.service_keepalive_title))
+            .setContentText(localizedText(R.string.service_keepalive_text))
             .setSmallIcon(android.R.drawable.ic_menu_view)
             .setPriority(NotificationCompat.PRIORITY_MIN)
             .setOngoing(true)

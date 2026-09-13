@@ -34,13 +34,13 @@ class DeepSeekReminderProvider(
     ): Result<List<String>> {
         return try {
             val key = apiKeyStore.read()
-            if (key.isBlank()) return Result.failure(IllegalStateException("API Key 未设置"))
+            if (key.isBlank()) return Result.failure(IllegalStateException(AiFailure.MISSING_KEY.message(context.languageTag)))
             val response = api.chatCompletion(
                 authorization = "Bearer $key",
                 request = ChatRequest(
                     model = model.ifBlank { DEFAULT_MODEL },
                     messages = listOf(
-                        Message("system", PromptBuilder.buildSystemPrompt(context.tone, context.customToneInstruction)),
+                        Message("system", PromptBuilder.buildSystemPrompt(context.tone, context.customToneInstruction, context.languageTag)),
                         Message("user", PromptBuilder.buildUserMessage(context, count))
                     ),
                     max_tokens = 500,
@@ -49,19 +49,19 @@ class DeepSeekReminderProvider(
                 )
             )
             if (!response.isSuccessful) {
-                return Result.failure(IllegalStateException("AI 服务返回 ${response.code()}"))
+                return Result.failure(IllegalStateException(AiFailure.fromHttp(response.code()).message(context.languageTag)))
             }
             val content = response.body()?.choices?.firstOrNull()?.message?.content
             val messages = parseMessages(content, count)
             if (messages == null) {
-                Result.failure(IllegalStateException("AI 返回的文案格式无效"))
+                Result.failure(IllegalStateException(AiFailure.INVALID_RESPONSE.message(context.languageTag)))
             } else {
                 Result.success(messages)
             }
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Exception) {
-            Result.failure(error)
+            Result.failure(IllegalStateException(AiFailure.fromException(error).message(context.languageTag)))
         }
     }
 

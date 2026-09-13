@@ -24,12 +24,15 @@ data class AppSessionContext(
 
 interface AppSessionContextProvider {
     suspend fun currentContext(): AppSessionContext
+    suspend fun isSessionEligible(session: AppUsageSession): Boolean = true
 }
 
 class RepositoryAppSessionContextProvider(
     private val settingsRepository: SettingsRepository,
     private val taskRepository: TaskRepository
 ) : AppSessionContextProvider {
+    override suspend fun isSessionEligible(session: AppUsageSession) = taskRepository.isSessionEligible(session)
+
     override suspend fun currentContext(): AppSessionContext {
         val settings = settingsRepository.getSettings()
         return AppSessionContext(
@@ -74,6 +77,8 @@ class AppSessionCoordinator(
         val session = openSession
         if (session != null) {
             if (isReminderPresentation || packageName == session.packageName) {
+                if (!isReminderPresentation && foregroundVerifier != null &&
+                    !verifyForeground(foregroundVerifier, session.packageName)) return@withLock
                 cancelPendingDepartureLocked()
                 foregroundPackage = session.packageName
                 return@withLock
@@ -96,6 +101,44 @@ class AppSessionCoordinator(
         cancelPendingDepartureLocked()
         if (packageName == foregroundPackage) return@withLock
         transitionToPackageLocked(packageName, foregroundVerifier, now)
+    }
+
+    /** Rebind reminder context without ending or splitting actual application usage. */
+    suspend fun refreshTaskContext(foregroundVerifier: suspend (String) -> Boolean) = eventMutex.withLock {
+        val remembered = openSession ?: return@withLock
+        val session = repository.sessionById(remembered.id) ?: remembered
+        if (session.endedAt != null) return@withLock
+        val context = contextProvider.currentContext()
+        val eligible = contextProvider.isSessionEligible(session)
+        if (context.activeTaskId == session.taskId && (session.taskId == null || eligible)) return@withLock
+        reminderScheduler.cancel(session.id)
+        val now = clock.nowMillis()
+        repository.bindTask(session.id, context.activeTaskId, now)
+        val rebound = session.copy(taskId = context.activeTaskId, taskContextStartedAt = now,
+            remindedAt = session.remindedAt, snoozeUntil = session.snoozeUntil)
+        openSession = rebound
+        val snoozeUntil = session.snoozeUntil
+        if (snoozeUntil != null) {
+            reminderScheduler.scheduleFollowUp(session.id, (snoozeUntil - now).coerceAtLeast(0L))
+        } else {
+            reminderScheduler.onSessionStarted(rebound) { foregroundVerifier(session.packageName) }
+        }
+    }
+
+    suspend fun reconcileGuardian(enabled: Boolean, targets: Set<String>, observedPackage: String?,
+        foregroundVerifier: suspend (String) -> Boolean) = eventMutex.withLock {
+        val session = openSession ?: repository.currentOpenSession()
+        if (session != null && (!enabled || session.packageName !in targets)) {
+            cancelPendingDepartureLocked()
+            closeSessionLocked(session)
+            initialized = true
+        }
+        val hasAllowedSession = session != null && session.packageName in targets
+        if (enabled && !hasAllowedSession && observedPackage != null && observedPackage in targets &&
+            foregroundVerifier(observedPackage)) {
+            transitionToPackageLocked(observedPackage, foregroundVerifier, clock.nowMillis())
+            initialized = true
+        }
     }
 
     suspend fun stopCurrentSession() = eventMutex.withLock {
@@ -194,6 +237,8 @@ class AppSessionCoordinator(
             foregroundPackage = packageName
             return
         }
+        // Database/context lookups may suspend; a queued window event is not current foreground proof.
+        if (foregroundVerifier != null && !verifyForeground(foregroundVerifier, packageName)) return
         val session = repository.openSession(
             packageName = packageName,
             appName = appName,
@@ -203,7 +248,12 @@ class AppSessionCoordinator(
         )
         openSession = session
         foregroundPackage = packageName
-        if (!returnToFocusGrace.showIfActive(session)) {
+        val eligible = contextProvider.isSessionEligible(session)
+        if (foregroundVerifier != null && !verifyForeground(foregroundVerifier, packageName)) {
+            closeSessionLocked(session)
+            return
+        }
+        if (!eligible || !returnToFocusGrace.showIfActive(session)) {
             reminderScheduler.onSessionStarted(session) {
                 foregroundVerifier?.invoke(session.packageName)
                     ?: (foregroundPackage == session.packageName)

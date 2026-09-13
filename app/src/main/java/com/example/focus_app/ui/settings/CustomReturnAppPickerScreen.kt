@@ -1,5 +1,7 @@
 package com.example.focus_app.ui.settings
 
+import com.example.focus_app.R
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -29,6 +31,7 @@ fun CustomReturnAppPickerScreen(
     onBack: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
+    val setupContext = androidx.compose.ui.platform.LocalContext.current
     val context = LocalContext.current
     val allApps by produceState<List<InstalledApp>>(emptyList(), context) {
         value = withContext(Dispatchers.IO) {
@@ -52,15 +55,15 @@ fun CustomReturnAppPickerScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("选择返回应用") },
+                title = { Text(setupContext.getString(R.string.setup_text_163)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = setupContext.getString(R.string.setup_text_164))
                     }
                 },
                 actions = {
                     TextButton(onClick = onBack) {
-                        Text("\u5b8c\u6210")
+                        Text(setupContext.getString(R.string.setup_text_165))
                     }
                 },
             )
@@ -70,7 +73,7 @@ fun CustomReturnAppPickerScreen(
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
-                placeholder = { Text("搜索应用名称...") },
+                placeholder = { Text(setupContext.getString(R.string.setup_text_166)) },
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                 singleLine = true
             )

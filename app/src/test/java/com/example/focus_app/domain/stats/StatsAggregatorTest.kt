@@ -129,6 +129,18 @@ class StatsAggregatorTest {
         assertEquals(20, hour10.apps.first().durationMinutes)
     }
 
+
+    @Test
+    fun yesterday_opened_session_contributes_today_duration_without_a_second_open() {
+        val today = epoch(2026, 8, 4, 0, 0)
+        val crossing = session(id = 90, startedAt = today - 30 * 60_000L, endedAt = today + 30 * 60_000L)
+        val stats = StatsAggregator.aggregate(listOf(crossing), today, today + DAY_MILLIS, zone)
+        assertEquals(0, stats.openCount)
+        assertEquals(30, stats.totalDurationMinutes)
+        assertEquals(0, stats.hourly[0].openCount)
+        assertEquals(30, stats.hourly[0].durationMinutes)
+    }
+
     private fun session(
         id: Long,
         packageName: String = "com.example.app",

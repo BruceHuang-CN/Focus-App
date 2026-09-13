@@ -1,5 +1,6 @@
 package com.example.focus_app.data.local.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -19,7 +20,8 @@ data class AppUsageSessionEntity(
     val remindedAt: Long? = null,
     val userAction: String? = null,
     val toneKey: String,
-    val snoozeUntil: Long? = null
+    val snoozeUntil: Long? = null,
+    @ColumnInfo(defaultValue = "0") val taskContextStartedAt: Long = 0
 )
 
 fun AppUsageSessionEntity.toDomain() = AppUsageSession(
@@ -32,7 +34,8 @@ fun AppUsageSessionEntity.toDomain() = AppUsageSession(
     remindedAt = remindedAt,
     userAction = userAction,
     toneKey = toneKey,
-    snoozeUntil = snoozeUntil
+    snoozeUntil = snoozeUntil,
+    taskContextStartedAt = taskContextStartedAt
 )
 
 fun AppUsageSession.toEntity() = AppUsageSessionEntity(
@@ -45,5 +48,6 @@ fun AppUsageSession.toEntity() = AppUsageSessionEntity(
     remindedAt = remindedAt,
     userAction = userAction,
     toneKey = toneKey,
-    snoozeUntil = snoozeUntil
+    snoozeUntil = snoozeUntil,
+    taskContextStartedAt = taskContextStartedAt
 )

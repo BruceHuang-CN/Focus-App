@@ -1,6 +1,10 @@
 package com.example.focus_app.service
 
 import android.os.SystemClock
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
+import com.example.focus_app.R
+import com.example.focus_app.data.language.localizedText
 import com.example.focus_app.data.repository.ReminderDisplayKind
 import com.example.focus_app.domain.model.AppUsageSession
 import dagger.Binds
@@ -26,7 +30,8 @@ object NoOpReturnToFocusGrace : ReturnToFocusGrace {
 class ReturnToFocusGraceHandler internal constructor(
     private val launcher: ReminderLauncher,
     private val attemptIdProvider: () -> String,
-    private val elapsedRealtimeProvider: () -> Long
+    private val elapsedRealtimeProvider: () -> Long,
+    private val formatViolation: (String) -> String = ::returnToFocusViolationMessage
 ) : ReturnToFocusGrace {
     private data class PendingReturn(
         val template: ReminderLaunchData,
@@ -39,11 +44,17 @@ class ReturnToFocusGraceHandler internal constructor(
     @Inject
     constructor(
         launcher: ReminderLauncher,
-        attemptIdGenerator: ReminderAttemptIdGenerator
+        attemptIdGenerator: ReminderAttemptIdGenerator,
+        @ApplicationContext context: Context
     ) : this(
         launcher = launcher,
         attemptIdProvider = attemptIdGenerator::newId,
-        elapsedRealtimeProvider = SystemClock::elapsedRealtime
+        elapsedRealtimeProvider = SystemClock::elapsedRealtime,
+        formatViolation = { original ->
+            val hook = context.localizedText(R.string.service_return_hook)
+            if (original.startsWith(hook)) original
+            else if (original.isBlank()) hook else "$hook\n${original.trim()}"
+        }
     )
 
     override fun start(data: ReminderLaunchData) {
@@ -63,6 +74,10 @@ class ReturnToFocusGraceHandler internal constructor(
                 return false
             }
             if (session.packageName != current.template.targetPackageName) return false
+            if (session.taskId != current.template.taskId) {
+                pendingReturn = null
+                return false
+            }
             pendingReturn = null
             current
         }
@@ -71,8 +86,9 @@ class ReturnToFocusGraceHandler internal constructor(
             pending.template.copy(
                 sessionId = session.id,
                 taskId = session.taskId,
+                taskContextStartedAt = session.reminderContextStart(),
                 appName = session.appName,
-                message = returnToFocusViolationMessage(pending.template.message),
+                message = formatViolation(pending.template.message),
                 targetPackageName = session.packageName,
                 forceReminder = true,
                 attemptId = attemptIdProvider(),

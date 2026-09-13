@@ -1,5 +1,9 @@
 package com.example.focus_app.data.repository
 
+import android.content.Context
+import com.example.focus_app.data.language.AppLanguage
+import com.example.focus_app.data.remote.AiFailure
+import dagger.hilt.android.qualifiers.ApplicationContext
 import com.example.focus_app.data.remote.DeepSeekReminderProvider
 import com.example.focus_app.data.remote.LocalReminderProvider
 import com.example.focus_app.data.remote.OpenAiApi
@@ -25,10 +29,12 @@ sealed interface ConnectionTestResult {
 @Singleton
 class AiRepository internal constructor(
     private val apiKeyStore: ApiKeyStore,
-    private val apiFactory: (String) -> OpenAiApi
+    private val currentLanguage: () -> String = { "zh-CN" },
+    private val apiFactory: (String) -> OpenAiApi = RetrofitOpenAiApiFactory()
 ) {
     @Inject
-    constructor(apiKeyStore: ApiKeyStore) : this(apiKeyStore, RetrofitOpenAiApiFactory())
+    constructor(apiKeyStore: ApiKeyStore, @ApplicationContext context: Context) :
+        this(apiKeyStore, { AppLanguage.tag(context) }, RetrofitOpenAiApiFactory())
 
     @Volatile
     private var cachedEndpoint: String? = null
@@ -39,7 +45,8 @@ class AiRepository internal constructor(
     suspend fun generateBatch(
         context: ReminderContext,
         settings: AppSettings,
-        count: Int = 3
+        count: Int = 3,
+        languageTag: String = currentLanguage()
     ): Result<List<String>> {
         val fallback = LocalReminderProvider()
         return try {
@@ -52,11 +59,11 @@ class AiRepository internal constructor(
                 fallback = fallback,
                 includeDeepSeekOptions = settings.aiProvider == AiProvider.DEEPSEEK
             )
-            provider.generateBatch(context, count)
+            provider.generateBatch(context.copy(languageTag = languageTag), count)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Exception) {
-            fallback.generateBatch(context, count)
+            fallback.generateBatch(context.copy(languageTag = languageTag), count)
         }
     }
 
@@ -64,7 +71,8 @@ class AiRepository internal constructor(
     suspend fun generateRemoteBatch(
         context: ReminderContext,
         settings: AppSettings,
-        count: Int = 3
+        count: Int = 3,
+        languageTag: String = currentLanguage()
     ): Result<List<String>> = try {
         val endpoint = settings.apiEndpoint.ifBlank { settings.aiProvider.defaultEndpoint }
         val model = settings.aiModel.ifBlank { settings.aiProvider.defaultModel }
@@ -73,41 +81,39 @@ class AiRepository internal constructor(
             apiKeyStore = apiKeyStore,
             model = model,
             includeDeepSeekOptions = settings.aiProvider == AiProvider.DEEPSEEK
-        ).generateRemoteBatch(context, count)
+        ).generateRemoteBatch(context.copy(languageTag = languageTag), count)
     } catch (cancelled: CancellationException) {
         throw cancelled
     } catch (error: Exception) {
-        Result.failure(error)
+        Result.failure(IllegalStateException(AiFailure.fromException(error).message(languageTag)))
     }
 
     /**
      * 使用当前保存的 API Key 测试与配置端点的连通性。
      * 成功时返回端点可用的模型 ID 列表；失败时返回面向用户的简洁错误。
      */
-    suspend fun testConnection(settings: AppSettings): ConnectionTestResult {
+    suspend fun testConnection(settings: AppSettings, languageTag: String = currentLanguage()): ConnectionTestResult {
         val key = apiKeyStore.read()
-        if (key.isBlank()) return ConnectionTestResult.Error("请先保存 API Key")
+        if (key.isBlank()) return ConnectionTestResult.Error(AiFailure.MISSING_KEY.message(languageTag))
 
         val endpoint = settings.apiEndpoint.ifBlank { settings.aiProvider.defaultEndpoint }
-        val api = getOrCreateApi(endpoint)
         return try {
+            val api = getOrCreateApi(endpoint)
             val response = api.listModels("Bearer $key")
             if (response.isSuccessful) {
                 val ids = response.body()?.data?.map { it.id }.orEmpty()
                 if (ids.isEmpty()) {
-                    ConnectionTestResult.Error("接口未返回模型列表，请检查端点")
+                    ConnectionTestResult.Error(AiFailure.INVALID_RESPONSE.message(languageTag))
                 } else {
                     ConnectionTestResult.Success(ids)
                 }
             } else {
-                ConnectionTestResult.Error(mapHttpError(response.code()))
+                ConnectionTestResult.Error(AiFailure.fromHttp(response.code()).message(languageTag))
             }
         } catch (cancelled: CancellationException) {
             throw cancelled
-        } catch (_: IOException) {
-            ConnectionTestResult.Error("网络连接失败，请检查网络或端点")
         } catch (e: Exception) {
-            ConnectionTestResult.Error("请求失败：${e.message ?: "未知错误"}")
+            ConnectionTestResult.Error(AiFailure.fromException(e).message(languageTag))
         }
     }
 
@@ -129,13 +135,6 @@ class AiRepository internal constructor(
         }
     }
 
-    private fun mapHttpError(code: Int): String = when (code) {
-        401, 403 -> "API Key 无效或无权限"
-        404 -> "模型列表接口不可用，请检查 API 端点"
-        429 -> "请求过于频繁，请稍后再试"
-        in 500..599 -> "服务端错误（$code）"
-        else -> "请求失败（$code）"
-    }
 }
 
 private class RetrofitOpenAiApiFactory : (String) -> OpenAiApi {

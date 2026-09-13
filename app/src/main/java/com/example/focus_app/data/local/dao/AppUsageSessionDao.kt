@@ -8,6 +8,15 @@ import com.example.focus_app.data.local.entity.AppUsageSessionEntity
 
 @Dao
 interface AppUsageSessionDao {
+    @Query("UPDATE app_usage_sessions SET remindedAt = :at WHERE id = :id AND endedAt IS NULL AND taskContextStartedAt = :contextStart AND (remindedAt IS NULL OR remindedAt < taskContextStartedAt)")
+    suspend fun markReminderForContext(id: Long, contextStart: Long, at: Long): Int
+
+    @Query("UPDATE app_usage_sessions SET snoozeUntil = NULL WHERE id = :id AND endedAt IS NULL AND taskContextStartedAt = :contextStart AND snoozeUntil = :expectedUntil AND snoozeUntil <= :now")
+    suspend fun claimSnoozeForContext(id: Long, contextStart: Long, expectedUntil: Long, now: Long): Int
+
+    @Query("UPDATE app_usage_sessions SET taskId = :taskId, taskContextStartedAt = :at WHERE id = :id AND endedAt IS NULL")
+    suspend fun bindTask(id: Long, taskId: Long?, at: Long)
+
     @Insert
     suspend fun insert(session: AppUsageSessionEntity): Long
 
@@ -37,7 +46,7 @@ interface AppUsageSessionDao {
 
     @Query(
         "UPDATE app_usage_sessions SET remindedAt = :remindedAt " +
-            "WHERE id = :sessionId AND remindedAt IS NULL AND endedAt IS NULL"
+            "WHERE id = :sessionId AND (remindedAt IS NULL OR remindedAt < taskContextStartedAt) AND endedAt IS NULL"
     )
     suspend fun markRemindedIfNeeded(sessionId: Long, remindedAt: Long): Int
 

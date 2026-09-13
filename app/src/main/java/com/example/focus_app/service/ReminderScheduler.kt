@@ -1,4 +1,8 @@
 package com.example.focus_app.service
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
+import com.example.focus_app.R
+import com.example.focus_app.data.language.localizedText
 
 import com.example.focus_app.data.repository.AppSessionRepository
 import com.example.focus_app.data.repository.AppSettings
@@ -46,7 +50,8 @@ class ReminderScheduler(
     private val launchDataProvider: suspend (AppUsageSession, AppSettings) -> ReminderLaunchData,
     private val displayRepository: ReminderDisplayRepository,
     private val attemptIdProvider: () -> String,
-    private val followUpScheduler: FollowUpScheduler = NoOpFollowUpScheduler
+    private val followUpScheduler: FollowUpScheduler = NoOpFollowUpScheduler,
+    private val taskEligible: suspend (AppUsageSession) -> Boolean = { true }
 ) : SessionReminderScheduler {
     private val jobs = ConcurrentHashMap<Long, Job>()
     private val quotaMutex = Mutex()
@@ -62,7 +67,8 @@ class ReminderScheduler(
         customReturnAppStore: CustomReturnAppStore,
         followUpScheduler: FollowUpScheduler,
         displayRepository: ReminderDisplayRepository,
-        attemptIdGenerator: ReminderAttemptIdGenerator
+        attemptIdGenerator: ReminderAttemptIdGenerator,
+        @ApplicationContext context: Context
     ) : this(
         repository = repository,
         launcher = launcher,
@@ -72,6 +78,7 @@ class ReminderScheduler(
         displayRepository = displayRepository,
         attemptIdProvider = attemptIdGenerator::newId,
         followUpScheduler = followUpScheduler,
+        taskEligible = taskRepository::isSessionEligible,
         launchDataProvider = { session, settings ->
             val taskTitle = session.taskId?.let { taskId ->
                 taskRepository.observeAll().first().firstOrNull { it.id == taskId }?.title
@@ -83,9 +90,14 @@ class ReminderScheduler(
             ReminderLaunchData(
                 sessionId = session.id,
                 taskId = session.taskId,
+                taskContextStartedAt = session.reminderContextStart(),
                 taskTitle = taskTitle,
                 appName = session.appName,
-                message = cachedMessage ?: localFallback(session.appName, taskTitle),
+                message = cachedMessage ?: if (taskTitle.isNullOrBlank()) {
+                    context.localizedText(R.string.service_no_task_reminder, session.appName)
+                } else {
+                    context.localizedText(R.string.service_task_reminder, taskTitle.take(40), session.appName)
+                },
                 showBreathing = settings.enableBreathingPause,
                 returnDestination = settings.returnDestination,
                 targetPackageName = session.packageName,
@@ -103,22 +115,29 @@ class ReminderScheduler(
         appStillForeground: suspend () -> Boolean
     ) {
         val job = scope.launch {
-            val settings = settingsProvider()
-            delay(settings.reminderDelaySeconds * 1_000L)
+            val initialSettings = settingsProvider()
+            if (!guardianAllows(session, initialSettings)) return@launch
+            val elapsed = (clock.nowMillis() - session.startedAt).coerceAtLeast(0L)
+            delay((initialSettings.reminderDelaySeconds * 1_000L - elapsed).coerceAtLeast(0L))
             if (!appStillForeground()) return@launch
             if (repository.currentOpenSession()?.id != session.id) return@launch
 
             quotaMutex.withLock {
+                val settings = settingsProvider()
+                if (!guardianAllows(session, settings) || !taskEligible(session)) return@withLock
                 val reminderTimes = displayRepository.timesSince(
                     clock.nowMillis() - settings.reminderWindowMinutes * 60_000L
                 )
                 if (!policy.canShow(reminderTimes, settings)) return@withLock
-                if (!repository.markRemindedIfNeeded(session.id, clock.nowMillis())) return@withLock
+                if (!repository.markReminderForContext(session, clock.nowMillis())) return@withLock
                 val data = launchDataProvider(session, settings).copy(
                     attemptId = attemptIdProvider(),
                     displayKind = ReminderDisplayKind.INITIAL
                 )
-                launcher.show(data)
+                // Settings may change while text/cache data is being read.
+                val latestSettings = settingsProvider()
+                if (guardianAllows(session, latestSettings) && taskEligible(session) &&
+                    repository.currentOpenSession()?.id == session.id && appStillForeground()) launcher.show(data)
             }
         }
         jobs.put(session.id, job)?.cancel()
@@ -137,12 +156,9 @@ class ReminderScheduler(
     override fun scheduleFollowUp(sessionId: Long, delayMillis: Long) = followUpScheduler.schedule(sessionId, delayMillis)
 
     private companion object {
-        fun localFallback(appName: String, taskTitle: String?): String =
-            if (taskTitle.isNullOrBlank()) {
-                "先放下 $appName，回到 Focus 选一件真正想完成的事。"
-            } else {
-                "你原本准备完成「${taskTitle.take(24)}」。先放下 $appName，现在就回去继续。"
-            }
+        fun guardianAllows(session: AppUsageSession, settings: AppSettings): Boolean =
+            settings.guardianEnabled && settings.targetApps.any { it.packageName == session.packageName }
+
     }
 }
 

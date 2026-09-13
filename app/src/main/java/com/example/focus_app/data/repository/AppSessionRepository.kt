@@ -7,6 +7,12 @@ import com.example.focus_app.domain.model.AppUsageSession
 import javax.inject.Inject
 
 interface AppSessionRepository {
+    suspend fun markReminderForContext(session: AppUsageSession, at: Long): Boolean = markRemindedIfNeeded(session.id, at)
+    suspend fun claimSnoozeForContext(session: AppUsageSession, now: Long): Boolean = claimSnooze(session.id)
+
+    /** Update optional copy context without resetting the user-selected snooze deadline. */
+    suspend fun bindTask(sessionId: Long, taskId: Long?, at: Long) = Unit
+
     suspend fun openSession(
         packageName: String,
         appName: String,
@@ -50,6 +56,15 @@ interface AppSessionRepository {
 class RoomAppSessionRepository @Inject constructor(
     private val dao: AppUsageSessionDao
 ) : AppSessionRepository {
+    override suspend fun markReminderForContext(session: AppUsageSession, at: Long): Boolean =
+        dao.markReminderForContext(session.id, session.taskContextStartedAt, at) == 1
+    override suspend fun claimSnoozeForContext(session: AppUsageSession, now: Long): Boolean {
+        val expected = session.snoozeUntil ?: return false
+        return dao.claimSnoozeForContext(session.id, session.taskContextStartedAt, expected, now) == 1
+    }
+
+    override suspend fun bindTask(sessionId: Long, taskId: Long?, at: Long) = dao.bindTask(sessionId, taskId, at)
+
     override suspend fun openSession(
         packageName: String,
         appName: String,

@@ -1,10 +1,32 @@
 package com.example.focus_app.ui.reminder
 
+import android.content.Context
+import com.example.focus_app.R
+
+internal fun localizedReminderEscalationCopy(context: Context, windowReminderCount: Int, windowLimit: Int): ReminderEscalationCopy {
+    if (windowLimit <= 0 || windowReminderCount <= 1) {
+        return ReminderEscalationCopy(context.getString(R.string.core_pause_title), null)
+    }
+    val count = windowReminderCount.coerceIn(1, windowLimit)
+    val remaining = (windowLimit - count).coerceAtLeast(0)
+    if (remaining == 0) return ReminderEscalationCopy(
+        context.getString(R.string.core_final_title), context.getString(R.string.core_final_directive))
+    val progress = count.toFloat() / windowLimit
+    val title = if (progress <= 0.4f) R.string.core_returned_title else R.string.core_delay_title
+    val directive = when {
+        progress <= 0.4f -> R.string.core_early_directive
+        progress <= 0.7f -> R.string.core_middle_directive
+        else -> R.string.core_late_directive
+    }
+    return ReminderEscalationCopy(context.getString(title), context.getString(directive, count, remaining))
+}
+
 internal data class ReminderEscalationCopy(
     val title: String,
     val directive: String?
 )
 
+// Legacy pure helper retained for existing tests; the overlay uses the localized helper above.
 internal fun reminderEscalationCopy(
     windowReminderCount: Int,
     windowLimit: Int

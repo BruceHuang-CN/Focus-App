@@ -1,6 +1,11 @@
 package com.example.focus_app.ui.navigation
 
+import com.example.focus_app.R
 import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.unit.dp
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.DateRange
@@ -31,6 +36,7 @@ import androidx.navigation.compose.rememberNavController
 import com.example.focus_app.ui.home.HomeScreen
 import com.example.focus_app.ui.mood.MoodPickerScreen
 import com.example.focus_app.ui.onboarding.OnboardingScreen
+import com.example.focus_app.ui.onboarding.TutorialScreen
 import com.example.focus_app.ui.settings.CustomReturnAppPickerScreen
 import com.example.focus_app.ui.settings.AppGroupEditorScreen
 import com.example.focus_app.ui.settings.AppGroupsScreen
@@ -42,6 +48,7 @@ import com.example.focus_app.util.PermissionHelper
 
 sealed class Screen(val route: String) {
     object Onboarding : Screen("onboarding")
+    object Tutorial : Screen("tutorial")
     object Home : Screen("home")
     object Tasks : Screen("tasks")
     object Mood : Screen("mood")
@@ -55,7 +62,7 @@ sealed class Screen(val route: String) {
     }
 }
 
-private data class TabItem(val route: String, val label: String, val icon: ImageVector)
+private data class TabItem(val route: String, val label: Int, val icon: ImageVector)
 
 private sealed interface SettingsExitRequest {
     data object Back : SettingsExitRequest
@@ -73,10 +80,10 @@ private fun savedSettingsExitRequest(value: String): SettingsExitRequest =
     if (value == SETTINGS_EXIT_BACK) SettingsExitRequest.Back else SettingsExitRequest.Tab(value)
 
 private val mainTabs = listOf(
-    TabItem(Screen.Home.route, "首页", Icons.Filled.Home),
-    TabItem(Screen.Tasks.route, "任务", Icons.AutoMirrored.Filled.List),
-    TabItem(Screen.Stats.route, "统计", Icons.Filled.DateRange),
-    TabItem(Screen.Settings.route, "设置", Icons.Filled.Settings)
+    TabItem(Screen.Home.route, R.string.core_home, Icons.Filled.Home),
+    TabItem(Screen.Tasks.route, R.string.core_tasks, Icons.AutoMirrored.Filled.List),
+    TabItem(Screen.Stats.route, R.string.core_stats, com.example.focus_app.ui.theme.ForestIcons.Statistics),
+    TabItem(Screen.Settings.route, R.string.core_settings, Icons.Filled.Settings)
 )
 
 internal fun mainStartDestination(
@@ -95,9 +102,10 @@ internal fun settingsExitNeedsConfirmation(
 
 @Composable
 fun NavGraph(openTasksRequestId: Int = 0) {
+    val textContext = androidx.compose.ui.platform.LocalContext.current
     val context = LocalContext.current
     val navController = rememberNavController()
-    val onboardingDone = remember { PermissionHelper.isOnboardingDone(context) }
+    var onboardingDone by remember { mutableStateOf(PermissionHelper.isOnboardingDone(context)) }
     val startDest = remember {
         mainStartDestination(
             onboardingDone = onboardingDone,
@@ -135,7 +143,7 @@ fun NavGraph(openTasksRequestId: Int = 0) {
         }
     }
 
-    LaunchedEffect(openTasksRequestId) {
+    LaunchedEffect(openTasksRequestId, onboardingDone) {
         if (openTasksRequestId > 0 && onboardingDone && currentRoute != Screen.Tasks.route) {
             requestSettingsExit(SettingsExitRequest.Tab(Screen.Tasks.route))
         }
@@ -144,7 +152,10 @@ fun NavGraph(openTasksRequestId: Int = 0) {
     Scaffold(
         bottomBar = {
             if (currentRoute in tabRoutes) {
-                NavigationBar {
+                NavigationBar(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp).clip(RoundedCornerShape(26.dp)),
+                    containerColor = MaterialTheme.colorScheme.surface
+                ) {
                     mainTabs.forEach { tab ->
                         NavigationBarItem(
                             selected = currentRoute == tab.route,
@@ -153,8 +164,8 @@ fun NavGraph(openTasksRequestId: Int = 0) {
                                     requestSettingsExit(SettingsExitRequest.Tab(tab.route))
                                 }
                             },
-                            icon = { Icon(tab.icon, contentDescription = tab.label) },
-                            label = { Text(tab.label) }
+                            icon = { Icon(tab.icon, contentDescription = textContext.getString(tab.label)) },
+                            label = { Text(textContext.getString(tab.label)) }
                         )
                     }
                 }
@@ -168,15 +179,20 @@ fun NavGraph(openTasksRequestId: Int = 0) {
         ) {
             composable(Screen.Onboarding.route) {
                 OnboardingScreen(onComplete = {
+                    onboardingDone = PermissionHelper.isOnboardingDone(context)
                     navController.navigate(Screen.Home.route) {
                         popUpTo(Screen.Onboarding.route) { inclusive = true }
                     }
                 })
             }
+            composable(Screen.Tutorial.route) {
+                TutorialScreen(onComplete = { navController.popBackStack() })
+            }
             composable(Screen.Home.route) {
                 HomeScreen(
                     navigateToMood = { navController.navigate(Screen.Mood.route) },
-                    navigateToTasks = { navController.navigate(Screen.Tasks.route) }
+                    navigateToTasks = { navController.navigate(Screen.Tasks.route) },
+                    navigateToTutorial = { navController.navigate(Screen.Tutorial.route) }
                 )
             }
             composable(Screen.Tasks.route) {
@@ -196,7 +212,8 @@ fun NavGraph(openTasksRequestId: Int = 0) {
                         navController.navigate(Screen.CustomReturnPicker.route)
                     },
                     navigateToFeedbackAndSupport = { navController.navigate(Screen.FeedbackAndSupport.route) },
-                    navigateToAppGroups = { navController.navigate(Screen.AppGroups.route) }
+                    navigateToAppGroups = { navController.navigate(Screen.AppGroups.route) },
+                    navigateToTutorial = { navController.navigate(Screen.Tutorial.route) }
                 )
             }
             composable(Screen.FeedbackAndSupport.route) {
@@ -226,8 +243,8 @@ fun NavGraph(openTasksRequestId: Int = 0) {
         val request = savedSettingsExitRequest(savedRequest)
         AlertDialog(
             onDismissRequest = { pendingSettingsExit = null },
-            title = { Text("保存设置？") },
-            text = { Text("你有未保存的修改。请先保存，或继续修改。") },
+            title = { Text(textContext.getString(R.string.core_leave_settings)) },
+            text = { Text(textContext.getString(R.string.core_unsaved_settings)) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -237,13 +254,13 @@ fun NavGraph(openTasksRequestId: Int = 0) {
                     }
                 ) {
                     Text(
-                        if (request is SettingsExitRequest.Tab) "保存并切换" else "保存并退出"
+                        if (request is SettingsExitRequest.Tab) textContext.getString(R.string.core_leave_switch) else textContext.getString(R.string.core_leave)
                     )
                 }
             },
             dismissButton = {
                 TextButton(onClick = { pendingSettingsExit = null }) {
-                    Text("继续修改")
+                    Text(textContext.getString(R.string.core_keep_editing))
                 }
             }
         )

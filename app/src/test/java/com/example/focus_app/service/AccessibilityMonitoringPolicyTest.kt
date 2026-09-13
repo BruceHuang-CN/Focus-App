@@ -7,6 +7,15 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AccessibilityMonitoringPolicyTest {
+    @Test fun delayed_target_window_does_not_replace_newer_focus_foreground() {
+        val state = AccessibilityForegroundState()
+        state.onWindowStateChanged("com.example.focus_app", true, 200L)
+        assertFalse(state.onWindowStateChanged("com.ss.android.ugc.aweme", true, 100L))
+        assertTrue(state.isForeground("com.example.focus_app"))
+        assertTrue(state.onWindowStateChanged("com.ss.android.ugc.aweme", true, 300L))
+        assertTrue(state.isForeground("com.ss.android.ugc.aweme"))
+    }
+
     @Test
     fun system_overlay_windows_do_not_replace_the_last_real_application_package() {
         val foregroundState = AccessibilityForegroundState()

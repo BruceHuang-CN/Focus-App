@@ -1,6 +1,11 @@
 package com.example.focus_app.ui.reminder
 
-import androidx.compose.animation.Crossfade
+import com.example.focus_app.R
+import android.os.SystemClock
+import androidx.compose.runtime.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -42,13 +47,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.focus_app.service.ReminderLaunchData
 import kotlinx.coroutines.delay
 
-// 决策页固定配色（与呼吸页绿色系同源），不随应用主题切换。
-private val ReminderHighlightRed = Color(0xFFE53935)
-private val DecisionInk = Color(0xFF17342A)
-private val DecisionBody = Color(0xFF5B6B60)
-private val DecisionFaint = Color(0xFF8A9A8F)
-private val DecisionCardWhite = Color(0xFFFFFFFF)
-
 @Composable
 fun ReminderOverlay(
     data: ReminderLaunchData,
@@ -56,7 +54,26 @@ fun ReminderOverlay(
     onDismiss: () -> Unit,
     viewModel: ReminderViewModel = hiltViewModel()
 ) {
+    val textContext = androidx.compose.ui.platform.LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
+    val colors = MaterialTheme.colorScheme
+    val ReminderHighlightRed = colors.primary
+    val DecisionInk = colors.onSurface
+    val DecisionBody = colors.onSurfaceVariant
+    val DecisionFaint = colors.onSurfaceVariant
+    val DecisionCardWhite = colors.surface
+    val startedElapsed = rememberSaveable(data.attemptId) { SystemClock.elapsedRealtime() }
+    val startedWall = rememberSaveable(data.attemptId) { System.currentTimeMillis() }
+    val progress = produceState(0f, data.attemptId) {
+        do {
+            val elapsed = if (SystemClock.elapsedRealtime() >= startedElapsed)
+                SystemClock.elapsedRealtime() - startedElapsed else System.currentTimeMillis() - startedWall
+            value = (elapsed / BREATHING_TOTAL_MS.toFloat()).coerceIn(0f, 1f)
+            if (value < 1f) withFrameNanos { }
+        } while (value < 1f)
+    }
+    val breathing by remember(data.attemptId, data.showBreathing, progress) { derivedStateOf { data.showBreathing && progress.value < 1f } }
+
     var customTimedAction by rememberSaveable(data.attemptId) {
         mutableStateOf<ReminderDecisionAction?>(null)
     }
@@ -64,9 +81,7 @@ fun ReminderOverlay(
     val urgency = remember(data.windowReminderCount, data.windowLimit) {
         reminderUrgency(data.windowReminderCount, data.windowLimit)
     }
-    val escalation = remember(data.windowReminderCount, data.windowLimit) {
-        reminderEscalationCopy(data.windowReminderCount, data.windowLimit)
-    }
+    val escalation = localizedReminderEscalationCopy(textContext, data.windowReminderCount, data.windowLimit)
     val actionOrderSeed = data.attemptId.ifBlank { "session-${data.sessionId}" }
     val actionOrder = remember(actionOrderSeed, uiState.randomizeActions) {
         uiState.randomizeActions?.let { randomize ->
@@ -75,22 +90,10 @@ fun ReminderOverlay(
     }
 
     LaunchedEffect(data) { viewModel.init(data) }
-    LaunchedEffect(uiState.showBreathing, uiState.breathingStep) {
-        if (uiState.showBreathing && uiState.breathingStep > 0) {
-            delay(1_000L)
-            val nextStep = uiState.breathingStep - 1
-            viewModel.onBreathingTick(nextStep)
-            if (nextStep == 0) viewModel.fadeBreathing()
-        }
-    }
-
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Crossfade(
-            targetState = uiState.showBreathing && uiState.breathingStep > 0,
-            label = "breathingTransition"
-        ) { breathing ->
+        run {
             if (breathing) {
-                BreathingScreen(step = uiState.breathingStep, modifier = Modifier.fillMaxSize())
+                BreathingScreen(progress = progress, modifier = Modifier.fillMaxSize(), animationKey = data.attemptId)
             } else {
                 ReminderGreenBackdrop(modifier = Modifier.fillMaxSize()) {
                     Card(
@@ -110,6 +113,7 @@ fun ReminderOverlay(
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
+                                .verticalScroll(rememberScrollState())
                                 .padding(horizontal = 24.dp, vertical = 28.dp),
                             contentAlignment = Alignment.Center
                         ) {
@@ -128,11 +132,11 @@ fun ReminderOverlay(
                                 )
                                 Text(
                                     buildAnnotatedString {
-                                        append("你刚刚打开了 ")
+                                        append(textContext.getString(R.string.core_opened_prefix))
                                         withStyle(
                                             SpanStyle(color = ReminderHighlightRed, fontWeight = FontWeight.Bold)
                                         ) {
-                                            append(uiState.appName)
+                                            append(uiState.appName.ifBlank { textContext.getString(R.string.core_target_app) })
                                         }
                                     },
                                     style = MaterialTheme.typography.titleMedium,
@@ -142,7 +146,7 @@ fun ReminderOverlay(
                                 uiState.taskTitle?.let { taskTitle ->
                                     Text(
                                         buildAnnotatedString {
-                                            append("原本任务：")
+                                            append(textContext.getString(R.string.core_task_prefix))
                                             withStyle(
                                                 SpanStyle(color = ReminderHighlightRed, fontWeight = FontWeight.Bold)
                                             ) {
@@ -179,7 +183,7 @@ fun ReminderOverlay(
                                         color = DecisionFaint
                                     )
                                     Spacer(Modifier.width(8.dp))
-                                    Text(text = "此刻，就是最好的开始。", fontSize = 14.sp, color = DecisionFaint)
+                                    Text(text = textContext.getString(R.string.core_start_now), fontSize = 14.sp, color = DecisionFaint)
                                     Spacer(Modifier.width(8.dp))
                                     Text(
                                         text = "”",
@@ -208,15 +212,14 @@ fun ReminderOverlay(
                                 )
                                 if (uiState.windowLimit > 0) {
                                     Text(
-                                        "本窗口（${uiState.windowMinutes} 分钟）已提醒 " +
-                                            "${uiState.windowReminderCount}/${uiState.windowLimit} 次",
+                                        textContext.getString(R.string.core_window_count, uiState.windowMinutes, uiState.windowReminderCount, uiState.windowLimit),
                                         style = MaterialTheme.typography.labelMedium,
                                         color = DecisionFaint
                                     )
                                 }
                                 uiState.customReturnError?.let { error ->
                                     Text(
-                                        error,
+                                        textContext.getString(error),
                                         style = MaterialTheme.typography.labelMedium,
                                         color = ReminderHighlightRed,
                                         textAlign = TextAlign.Center
@@ -236,9 +239,9 @@ fun ReminderOverlay(
             title = {
                 Text(
                     if (action == ReminderDecisionAction.INTENTIONAL) {
-                        "有目的使用多久"
+                        textContext.getString(R.string.core_intentional_duration)
                     } else {
-                        "休息多久"
+                        textContext.getString(R.string.core_rest_duration)
                     }
                 )
             },
@@ -246,7 +249,7 @@ fun ReminderOverlay(
                 OutlinedTextField(
                     value = customSnoozeMinutes,
                     onValueChange = { customSnoozeMinutes = it },
-                    label = { Text("\u8bf7\u8f93\u5165 1-60 \u5206\u949f") },
+                    label = { Text(textContext.getString(R.string.core_custom_minute_range)) },
                     singleLine = true
                 )
             },
@@ -264,11 +267,11 @@ fun ReminderOverlay(
                             )
                         }
                     }
-                ) { Text("\u786e\u5b9a") }
+                ) { Text(textContext.getString(R.string.core_confirm)) }
             },
             dismissButton = {
                 TextButton(onClick = { customTimedAction = null }) {
-                    Text("\u53d6\u6d88")
+                    Text(textContext.getString(R.string.core_cancel))
                 }
             }
         )

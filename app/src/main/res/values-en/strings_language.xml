@@ -1,0 +1,5 @@
+<resources>
+    <string name="language_tag">en</string>
+    <string name="language_system">System default</string>
+    <string name="language_selection">Language: %1$s</string>
+</resources>

@@ -14,6 +14,8 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.example.focus_app.MainActivity
+import com.example.focus_app.R
+import com.example.focus_app.data.language.localizedText
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -71,8 +73,8 @@ class AndroidFollowUpCountdownNotifier @Inject constructor(
         )
         val notification = NotificationCompat.Builder(context, alertPolicy.channelId)
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
-            .setContentTitle("稍后提醒倒计时")
-            .setContentText("到时间后再次确认是否继续使用目标应用")
+            .setContentTitle(context.localizedText(R.string.service_countdown_title))
+            .setContentText(context.localizedText(R.string.service_countdown_text))
             .setWhen(dueAt)
             .setShowWhen(true)
             .setUsesChronometer(true)
@@ -107,10 +109,10 @@ class AndroidFollowUpCountdownNotifier @Inject constructor(
         context.getSystemService(NotificationManager::class.java).createNotificationChannel(
             NotificationChannel(
                 alertPolicy.channelId,
-                "稍后提醒倒计时",
+                context.localizedText(R.string.service_countdown_title),
                 alertPolicy.channelImportance
             ).apply {
-                description = "显示距离下一次 Focus 提醒的剩余时间"
+                description = context.localizedText(R.string.service_countdown_description)
                 if (!alertPolicy.useDefaultSound) setSound(null, null)
                 enableVibration(false)
             }

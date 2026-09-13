@@ -1,4 +1,5 @@
 package com.example.focus_app.ui.settings
+import com.example.focus_app.R
 
 import com.example.focus_app.data.local.dao.FocusTaskDao
 import com.example.focus_app.data.local.dao.SettingsDao
@@ -35,6 +36,34 @@ import retrofit2.Response
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SettingsViewModelDetectionTest {
+    @Test fun saving_badge_waits_for_write_and_failure_can_be_retried() = runTest(dispatcher) {
+        val dao = DetectionSettingsDao(SettingsEntity(targetApps = "[]"))
+        val vm = newViewModel(dao)
+        runCurrent()
+        dao.failWrites = true
+        vm.updateReminderDelaySeconds(30)
+        assertEquals(R.string.setup_text_298, vm.saveStatus.value)
+        runCurrent()
+        assertEquals(R.string.setup_text_225, vm.saveStatus.value)
+        dao.failWrites = false
+        vm.updateReminderDelaySeconds(30)
+        runCurrent()
+        assertEquals(30, dao.current.reminderDelaySeconds)
+        assertEquals(R.string.setup_text_300, vm.saveStatus.value)
+    }
+    @Test fun consecutive_switch_values_are_saved_in_order() = runTest(dispatcher) {
+        val dao = DetectionSettingsDao(SettingsEntity(targetApps = "[]"))
+        val vm = newViewModel(dao)
+        runCurrent()
+        vm.setForceReminder(true)
+        vm.setForceReminder(false)
+        vm.setBreathingPause(true)
+        runCurrent()
+        assertFalse(dao.current.forceReminder)
+        assertTrue(dao.current.enableBreathingPause)
+        assertEquals(R.string.setup_text_300, vm.saveStatus.value)
+    }
+
     private val dispatcher = StandardTestDispatcher()
 
     @Before
@@ -61,7 +90,7 @@ class SettingsViewModelDetectionTest {
     }
 
     @Test
-    fun onboarding_compatibility_persists_mode_and_disables_accessibility() = runTest(dispatcher) {
+    fun legacy_onboarding_request_uses_realtime_and_enables_accessibility() = runTest(dispatcher) {
         val dao = DetectionSettingsDao(SettingsEntity(targetApps = "[]"))
         val viewModel = newViewModel(dao)
         runCurrent()
@@ -69,8 +98,8 @@ class SettingsViewModelDetectionTest {
         viewModel.applyOnboardingDetectionMode(DetectionMode.COMPATIBILITY)
         runCurrent()
 
-        assertEquals("compatibility", dao.current.detectionMode)
-        assertFalse(dao.current.enableAccessibility)
+        assertEquals("realtime", dao.current.detectionMode)
+        assertTrue(dao.current.enableAccessibility)
     }
 
     @Test
@@ -93,7 +122,7 @@ class SettingsViewModelDetectionTest {
     }
 
     @Test
-    fun updating_detection_mode_persists_the_choice() = runTest(dispatcher) {
+    fun legacy_mode_update_keeps_realtime() = runTest(dispatcher) {
         val dao = DetectionSettingsDao(SettingsEntity(targetApps = "[]"))
         val viewModel = newViewModel(dao)
         runCurrent()
@@ -101,7 +130,7 @@ class SettingsViewModelDetectionTest {
         viewModel.updateDetectionMode(DetectionMode.COMPATIBILITY)
         runCurrent()
 
-        assertEquals("compatibility", dao.current.detectionMode)
+        assertEquals("realtime", dao.current.detectionMode)
     }
     @Test
     fun setting_force_reminder_persists_only_the_force_reminder_field() = runTest(dispatcher) {
@@ -188,10 +217,12 @@ class SettingsViewModelDetectionTest {
 }
 
 private class DetectionSettingsDao(initial: SettingsEntity) : SettingsDao {
+    var failWrites = false
     private val state = MutableStateFlow<SettingsEntity?>(initial)
     val current: SettingsEntity get() = checkNotNull(state.value)
 
     override suspend fun insertOrUpdate(settings: SettingsEntity) {
+        check(!failWrites) { "Simulated write failure" }
         state.value = settings
     }
     override fun getSettings(): Flow<SettingsEntity?> = state

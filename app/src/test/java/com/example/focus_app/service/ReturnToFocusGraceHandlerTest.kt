@@ -9,6 +9,14 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ReturnToFocusGraceHandlerTest {
+    @Test fun generic_guardian_return_also_has_grace() {
+        val launcher = GraceRecordingLauncher()
+        val handler = ReturnToFocusGraceHandler(launcher, { "generic-grace" }, { 1000L })
+        handler.start(TEMPLATE.copy(taskId = null, taskTitle = null, message = "先放下手机"))
+        assertTrue(handler.showIfActive(newSession(12L, TARGET_PACKAGE).copy(taskId = null)))
+        assertEquals(null, launcher.shown.single().taskId)
+    }
+
     @Test
     fun matching_reentry_within_30_seconds_shows_an_immediate_uncounted_reminder() {
         var now = 1_000L
@@ -31,6 +39,8 @@ class ReturnToFocusGraceHandlerTest {
         assertTrue(shown.forceReminder)
         assertTrue(shown.message.contains("30 秒都没撑住"))
         assertTrue(shown.message.contains(TEMPLATE.message))
+        assertFalse(handler.showIfActive(newSession(id = 13L, packageName = TARGET_PACKAGE)))
+        assertEquals(1, launcher.shown.size)
     }
 
     @Test

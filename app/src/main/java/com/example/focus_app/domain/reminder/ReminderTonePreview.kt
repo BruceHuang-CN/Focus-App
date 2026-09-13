@@ -8,6 +8,23 @@ import com.example.focus_app.domain.model.ReminderTone
  */
 object ReminderTonePreview {
     fun sampleMessage(
+        context: android.content.Context,
+        tone: ReminderTone,
+        customInstruction: String,
+        taskTitle: String?
+    ): String {
+        val resources = com.example.focus_app.data.language.AppLanguage.context(context)
+        val body = if (tone == ReminderTone.CUSTOM && customInstruction.isNotBlank()) {
+            customInstruction.trim().take(80)
+        } else resources.getString(when (tone) {
+            ReminderTone.GENTLE -> com.example.focus_app.R.string.tone_preview_gentle
+            ReminderTone.DIRECT -> com.example.focus_app.R.string.tone_preview_direct
+            ReminderTone.SARCASTIC -> com.example.focus_app.R.string.tone_preview_sarcastic
+            ReminderTone.CUSTOM -> com.example.focus_app.R.string.tone_preview_custom
+        })
+        return listOfNotNull(taskTitle?.take(40)?.let { "[$it]" }, body).joinToString(" ")
+    }
+    fun sampleMessage(
         tone: ReminderTone,
         customInstruction: String,
         taskTitle: String?

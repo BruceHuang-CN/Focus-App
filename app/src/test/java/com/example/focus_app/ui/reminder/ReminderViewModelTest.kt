@@ -211,7 +211,7 @@ class ReminderViewModelTest {
         assertEquals(null, fixture.repository.action)
         assertEquals(false, completed)
         assertEquals(true, fixture.presentationRegistry.protectsSession())
-        assertEquals("指定应用不可用，请重新选择", fixture.viewModel.uiState.value.customReturnError)
+        assertEquals(com.example.focus_app.R.string.core_return_app_unavailable, fixture.viewModel.uiState.value.customReturnError)
     }
 
     @Test
@@ -254,6 +254,7 @@ class ReminderViewModelTest {
                 reminderPresentationRegistry = presentationRegistry,
                 appSessionCoordinator = appSessionCoordinator,
                 returnToFocusGrace = returnGrace,
+                returnNavigationGuard = com.example.focus_app.service.ReturnNavigationGuard { 1000L },
                 actionOrderStore = actionOrderStore
             ),
             repository,

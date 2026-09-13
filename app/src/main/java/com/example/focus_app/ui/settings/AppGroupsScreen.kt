@@ -1,5 +1,7 @@
 package com.example.focus_app.ui.settings
 
+import com.example.focus_app.R
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -43,18 +45,19 @@ fun AppGroupsScreen(
     onEdit: (String) -> Unit,
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
+    val setupContext = androidx.compose.ui.platform.LocalContext.current
     val groups by viewModel.appGroups.collectAsState()
     val activeId by viewModel.activeAppGroupId.collectAsState()
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-    LaunchedEffect(Unit) { viewModel.appGroupMessages.collect { snackbar.showSnackbar(it) } }
+    LaunchedEffect(viewModel, setupContext) { viewModel.appGroupMessages.collect { snackbar.showSnackbar(it.resolve(setupContext)) } }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
-            TopAppBar(title = { Text("应用组管理") }, navigationIcon = {
+            TopAppBar(title = { Text(setupContext.getString(R.string.setup_text_156)) }, navigationIcon = {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = setupContext.getString(R.string.setup_text_164))
                 }
             })
         }
@@ -64,27 +67,27 @@ fun AppGroupsScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item {
-                Button(onClick = onAdd, modifier = Modifier.fillMaxWidth()) { Text("新增应用组") }
+                Button(onClick = onAdd, modifier = Modifier.fillMaxWidth()) { Text(setupContext.getString(R.string.setup_text_148)) }
             }
             items(groups, key = { it.id }) { group ->
                 Column(modifier = Modifier.fillMaxWidth().clickable { onEdit(group.id) }.padding(vertical = 8.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(group.name, style = MaterialTheme.typography.titleMedium)
                         Spacer(Modifier.width(8.dp))
-                        if (group.id == activeId) Text("正在守护", color = MaterialTheme.colorScheme.primary)
+                        if (group.id == activeId) Text(setupContext.getString(R.string.setup_text_157), color = MaterialTheme.colorScheme.primary)
                     }
-                    Text("${group.apps.size} 个 App", style = MaterialTheme.typography.bodyMedium)
+                    Text(setupContext.getString(R.string.setup_text_158, group.apps.size), style = MaterialTheme.typography.bodyMedium)
                     Row {
-                        TextButton(onClick = { viewModel.activateAppGroup(group.id) }, enabled = group.id != activeId) { Text("启用") }
-                        TextButton(onClick = { onEdit(group.id) }) { Text("编辑") }
+                        TextButton(onClick = { viewModel.activateAppGroup(group.id) }, enabled = group.id != activeId) { Text(setupContext.getString(R.string.setup_text_159)) }
+                        TextButton(onClick = { onEdit(group.id) }) { Text(setupContext.getString(R.string.setup_text_160)) }
                         TextButton(
                             onClick = {
                                 viewModel.deleteAppGroup(group.id).exceptionOrNull()?.let { error ->
-                                    scope.launch { snackbar.showSnackbar("删除应用组失败：${error.message}") }
+                                    scope.launch { snackbar.showSnackbar(setupContext.getString(R.string.setup_text_161, error.message)) }
                                 }
                             },
                             enabled = groups.size > 1 && group.id != activeId
-                        ) { Text("删除") }
+                        ) { Text(setupContext.getString(R.string.setup_text_162)) }
                     }
                 }
             }

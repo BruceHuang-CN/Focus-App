@@ -6,31 +6,35 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import com.example.focus_app.domain.model.AppThemeColor
 import com.example.focus_app.domain.model.AppThemeMode
 
 private val MintLight = lightColorScheme(
-    primary = Color(0xFF0E7C5E), onPrimary = Color(0xFFFFFFFF),
-    primaryContainer = Color(0xFFC9F0DF), onPrimaryContainer = Color(0xFF073B2C),
-    secondary = Color(0xFF2BB673), onSecondary = Color(0xFFFFFFFF),
-    secondaryContainer = Color(0xFFD9F5E5), onSecondaryContainer = Color(0xFF083B26),
-    tertiary = Color(0xFFF5A623),
-    background = Color(0xFFF6FAF7), onBackground = Color(0xFF1B1C1A),
-    surface = Color(0xFFFFFFFF), onSurface = Color(0xFF1B1C1A),
-    surfaceVariant = Color(0xFFE2ECE6), onSurfaceVariant = Color(0xFF414D47),
-    outline = Color(0xFF7A8A82)
+    primary = Color(0xFF205C35), onPrimary = Color.White,
+    primaryContainer = Color(0xFFDDEEDD), onPrimaryContainer = Color(0xFF143E22),
+    secondary = Color(0xFF42694D), onSecondary = Color.White,
+    secondaryContainer = Color(0xFFE4EFE4), onSecondaryContainer = Color(0xFF173B24),
+    background = Color(0xFFEDF6ED), onBackground = Color(0xFF102416),
+    surface = Color.White, onSurface = Color(0xFF102416),
+    surfaceVariant = Color(0xFFF2F6F2), onSurfaceVariant = Color(0xFF5E6D63),
+    surfaceContainer = Color(0xFFF2F6F2), surfaceContainerLow = Color(0xFFF7FAF7),
+    surfaceContainerHigh = Color(0xFFE7EFE7), surfaceContainerHighest = Color(0xFFE2ECE2),
+    outline = Color(0xFF637667), outlineVariant = Color(0xFFCDDCCF),
+    error = Color(0xFFB23A35)
 )
-
 private val MintDark = darkColorScheme(
-    primary = Color(0xFF7FD9B5), onPrimary = Color(0xFF063B2B),
-    primaryContainer = Color(0xFF0E4F3C), onPrimaryContainer = Color(0xFFB9EED7),
-    secondary = Color(0xFF5CC694), onSecondary = Color(0xFF0A3A25),
-    secondaryContainer = Color(0xFF15543A), onSecondaryContainer = Color(0xFFA9E8C8),
-    tertiary = Color(0xFFFFC46B),
-    background = Color(0xFF0F1512), onBackground = Color(0xFFE2E8E4),
-    surface = Color(0xFF151B17), onSurface = Color(0xFFE2E8E4),
-    surfaceVariant = Color(0xFF3B4741), onSurfaceVariant = Color(0xFFC2CDC7),
-    outline = Color(0xFF8B9790)
+    primary = Color(0xFF9CD4AA), onPrimary = Color(0xFF102A19),
+    primaryContainer = Color(0xFF294C35), onPrimaryContainer = Color(0xFFD7F0DC),
+    secondary = Color(0xFFAFCCB5), onSecondary = Color(0xFF193322),
+    secondaryContainer = Color(0xFF334D3A), onSecondaryContainer = Color(0xFFD7EBDD),
+    background = Color(0xFF101A14), onBackground = Color(0xFFE6EEE7),
+    surface = Color(0xFF1A2820), onSurface = Color(0xFFE6EEE7),
+    surfaceVariant = Color(0xFF23352A), onSurfaceVariant = Color(0xFFB1C0B5),
+    surfaceContainer = Color(0xFF23352A), surfaceContainerLow = Color(0xFF1A2820),
+    surfaceContainerHigh = Color(0xFF2A3E30), surfaceContainerHighest = Color(0xFF314737),
+    outline = Color(0xFF8FA695), outlineVariant = Color(0xFF42574A),
+    error = Color(0xFFFFB4AC)
 )
 
 private val BlueLight = lightColorScheme(
@@ -122,5 +126,16 @@ fun FocusAppTheme(
         AppThemeColor.ORANGE -> if (darkTheme) OrangeDark else OrangeLight
         AppThemeColor.GRAPHITE -> if (darkTheme) GraphiteDark else GraphiteLight
     }
-    MaterialTheme(colorScheme = colorScheme, typography = AppTypography, content = content)
+    MaterialTheme(
+        colorScheme = colorScheme, typography = AppTypography,
+        shapes = androidx.compose.material3.Shapes(
+            small = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+            medium = androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
+            large = androidx.compose.foundation.shape.RoundedCornerShape(26.dp),
+            extraLarge = androidx.compose.foundation.shape.RoundedCornerShape(30.dp)
+        )
+    ) {
+        ForestSystemBars(darkTheme)
+        content()
+    }
 }

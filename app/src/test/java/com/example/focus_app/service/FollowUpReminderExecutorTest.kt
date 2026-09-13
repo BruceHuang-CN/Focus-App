@@ -129,7 +129,33 @@ class FollowUpReminderExecutorTest {
         assertEquals(1, fixture.launcher.shown.size)
     }
 
+    @Test fun generic_follow_up_does_not_require_task() = kotlinx.coroutines.test.runTest {
+        val fixture=fixture(repository=FakeSessionRepository(session.copy(taskId=null)))
+        assertEquals(FollowUpDecision.SHOW,fixture.executor.execute(session.id))
+        assertNull(fixture.launcher.shown.single().taskTitle)
+    }
+    @Test fun guard_disabled_while_loading_copy_cannot_launch() = kotlinx.coroutines.test.runTest {
+        var enabled=true
+        val fixture=fixture(settingsRead={ settings.copy(guardianEnabled=enabled) },
+            messageRead={ enabled=false; "旧文案" })
+        assertEquals(FollowUpDecision.SKIP,fixture.executor.execute(session.id))
+        assertEquals(0,fixture.launcher.shown.size)
+    }
+    @Test fun expired_context_becomes_generic_without_losing_follow_up() = kotlinx.coroutines.test.runTest {
+        val repository = FakeSessionRepository(session)
+        val fixture=fixture(repository=repository, contextRefresh={
+            repository.bindTask(it.id, null, 3000L)
+            repository.sessionById(it.id)!!
+        })
+        assertEquals(FollowUpDecision.SHOW,fixture.executor.execute(session.id))
+        assertNull(fixture.launcher.shown.single().taskId)
+        assertNull(fixture.repository.session(session.id)?.snoozeUntil)
+    }
+
     private fun fixture(
+        settingsRead: suspend () -> AppSettings = { settings },
+        messageRead: (suspend (AppUsageSession) -> String?)? = null,
+        contextRefresh: suspend (AppUsageSession) -> AppUsageSession = { it },
         repository: FakeSessionRepository = FakeSessionRepository(session),
         environment: FakeEnvironment = FakeEnvironment(
             interactive = true,
@@ -140,11 +166,11 @@ class FollowUpReminderExecutorTest {
         val countdownNotifier = RecordingCountdownNotifier()
         val executor = FollowUpReminderExecutor(
             sessionRepository = repository,
-            settingsProvider = { settings },
+            settingsProvider = settingsRead,
             taskTitleProvider = { taskId ->
                 if (taskId == 7L) "写方案" else null
             },
-            messageProvider = { usageSession ->
+            messageProvider = messageRead ?: { usageSession ->
                 if (usageSession.taskId == 7L) "Return to 写方案." else null
             },
             returnPackageProvider = { "" },
@@ -153,7 +179,8 @@ class FollowUpReminderExecutorTest {
             environment = environment,
             displayRepository = FakeDisplayRepository(),
             attemptIdProvider = { "attempt-1" },
-            countdownNotifier = countdownNotifier
+            countdownNotifier = countdownNotifier,
+            refreshContext = contextRefresh
         )
         return Fixture(executor, repository, launcher, countdownNotifier)
     }
@@ -202,6 +229,11 @@ class FollowUpReminderExecutorTest {
         private val sessions = mutableMapOf(initial.id to initial)
 
         fun session(id: Long) = sessions[id]
+
+        override suspend fun bindTask(sessionId: Long, taskId: Long?, at: Long) {
+            val current = sessions.getValue(sessionId)
+            sessions[sessionId] = current.copy(taskId = taskId, taskContextStartedAt = at)
+        }
 
         override suspend fun openSession(
             packageName: String,

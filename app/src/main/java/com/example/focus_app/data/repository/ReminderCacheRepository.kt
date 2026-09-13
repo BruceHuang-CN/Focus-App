@@ -1,5 +1,8 @@
 package com.example.focus_app.data.repository
 
+import android.content.Context
+import com.example.focus_app.data.language.AppLanguage
+import dagger.hilt.android.qualifiers.ApplicationContext
 import com.example.focus_app.data.local.dao.AiReminderCacheDao
 import com.example.focus_app.data.local.entity.AiReminderCacheEntity
 import com.example.focus_app.domain.time.Clock
@@ -14,10 +17,12 @@ import javax.inject.Singleton
 @Singleton
 class ReminderCacheRepository(
     private val dao: AiReminderCacheDao,
-    private val clock: Clock
+    private val clock: Clock,
+    private val currentLanguage: () -> String = { "zh-CN" }
 ) {
     @Inject
-    constructor(dao: AiReminderCacheDao) : this(dao, SystemClock)
+    constructor(dao: AiReminderCacheDao, @ApplicationContext context: Context) :
+        this(dao, SystemClock, { AppLanguage.tag(context) })
 
     private val mutableRevision = MutableStateFlow(0L)
     val revision: StateFlow<Long> = mutableRevision.asStateFlow()
@@ -31,7 +36,8 @@ class ReminderCacheRepository(
         taskId: Long,
         packageName: String,
         toneKey: String,
-        messages: List<String>
+        messages: List<String>,
+        languageTag: String = currentLanguage()
     ) {
         val normalized = messages.map { it.trim() }
         require(normalized.size == 3 && normalized.distinct().size == 3)
@@ -40,12 +46,12 @@ class ReminderCacheRepository(
         dao.replace(
             taskId,
             packageName,
-            toneKey,
+            languageToneKey(toneKey, languageTag),
             normalized.map { message ->
                 AiReminderCacheEntity(
                     taskId = taskId,
                     appPackageName = packageName,
-                    toneKey = toneKey,
+                    toneKey = languageToneKey(toneKey, languageTag),
                     text = message,
                     createdAt = now
                 )
@@ -53,9 +59,15 @@ class ReminderCacheRepository(
         )
     }
 
-    suspend fun next(taskId: Long, packageName: String, toneKey: String): String? =
-        dao.takeNext(taskId, packageName, toneKey, clock.nowMillis())?.text
+    suspend fun next(taskId: Long, packageName: String, toneKey: String, languageTag: String = currentLanguage()): String? =
+        dao.takeNext(taskId, packageName, languageToneKey(toneKey, languageTag), clock.nowMillis())?.text
 
-    suspend fun isReady(taskId: Long, packageName: String, toneKey: String): Boolean =
-        dao.count(taskId, packageName, toneKey) == 3
+    suspend fun isReady(taskId: Long, packageName: String, toneKey: String, languageTag: String = currentLanguage()): Boolean =
+        dao.count(taskId, packageName, languageToneKey(toneKey, languageTag)) == 3
+
+    companion object {
+        /** Keep existing Chinese rows readable; isolate English without a database migration. */
+        fun languageToneKey(toneKey: String, languageTag: String): String =
+            if (languageTag.startsWith("en", ignoreCase = true)) "en:$toneKey" else toneKey
+    }
 }

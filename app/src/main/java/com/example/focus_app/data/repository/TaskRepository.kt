@@ -7,9 +7,9 @@ import com.example.focus_app.domain.model.FocusTask
 import com.example.focus_app.domain.task.ActiveTaskResolver
 import com.example.focus_app.domain.time.Clock
 import com.example.focus_app.domain.time.SystemClock
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
@@ -31,16 +31,24 @@ enum class ScheduleValidation {
 @Singleton
 class TaskRepository(
     private val dao: FocusTaskDao,
-    private val clock: Clock
+    private val clock: Clock,
+    private val groups: TaskGroupRepository? = null
 ) {
     @Inject
-    constructor(dao: FocusTaskDao) : this(dao, SystemClock)
+    constructor(dao: FocusTaskDao, groups: TaskGroupRepository) : this(dao, SystemClock, groups)
+
+    constructor(dao: FocusTaskDao) : this(dao, SystemClock, null)
 
     private val resolver = ActiveTaskResolver()
 
-    fun observeAll(): Flow<List<FocusTask>> = dao.observeAll().map { tasks ->
-        tasks.map { it.toDomain() }
-    }
+    fun observeAll(): Flow<List<FocusTask>> = groups?.observeSnapshot()?.map { snapshot ->
+        snapshot.flatMap { row -> row.tasks.map { entity ->
+            val task = entity.toDomain()
+            if (task.inheritsGroupSchedule) task.copy(scheduleStartMinute = row.group.scheduleStartMinute,
+                scheduleEndMinute = row.group.scheduleEndMinute, repeatDaysMask = row.group.repeatDaysMask)
+            else task
+        } }
+    } ?: dao.observeAll().map { tasks -> tasks.map { it.toDomain() } }
 
     fun observeActive(): Flow<FocusTask?> = activeTaskFlow().distinctUntilChanged()
 
@@ -54,16 +62,18 @@ class TaskRepository(
                 emit(resolver.resolve(tasks, now))
                 val waitMillis = millisUntilNextScheduleBoundary(tasks, now)
                 if (waitMillis == null) awaitCancellation()
-                delay(waitMillis)
+                delay(minOf(waitMillis, 30_000L))
             }
         }
     }
 
     suspend fun create(task: FocusTask): ScheduleValidation {
+        groups?.ensureUngrouped()
         val validation = validateSchedule(task, observeAll().first())
         if (validation == ScheduleValidation.VALID) {
             val now = clock.nowMillis()
-            dao.insert(task.copy(createdAt = now, updatedAt = now).toEntity())
+            val saved = task.copy(createdAt = now, updatedAt = now)
+            if (groups != null) groups.writeTask(saved, insert = true) else dao.insert(saved.toEntity())
         }
         return validation
     }
@@ -72,7 +82,8 @@ class TaskRepository(
         val validation = validateSchedule(task, observeAll().first())
         if (validation == ScheduleValidation.VALID) {
             val now = clock.nowMillis()
-            dao.update(task.copy(updatedAt = now).toEntity())
+            val saved = task.copy(updatedAt = now, isManualActive = false, manualStartedAt = null, manualUntil = null)
+            if (groups != null) groups.writeTask(saved, insert = false) else dao.update(saved.toEntity())
         }
         return validation
     }
@@ -82,25 +93,47 @@ class TaskRepository(
     }
 
     suspend fun setCompleted(id: Long, isCompleted: Boolean = true) {
-        dao.setCompleted(id, isCompleted, clock.nowMillis())
+        if (groups != null) groups.complete(id, isCompleted, clock.nowMillis())
+        else dao.setCompleted(id, isCompleted, clock.nowMillis())
     }
 
-    suspend fun setManualActive(id: Long) {
-        dao.setManualActive(id)
+    suspend fun setManualActive(id: Long, minutes: Int = 30) {
+        val task = observeAll().first().firstOrNull { it.id == id && !it.isCompleted } ?: return
+        val now = clock.now()
+        val start = clock.nowMillis()
+        val requestedEnd = start + minutes.coerceIn(1, 180) * 60_000L
+        val scheduledEnd = com.example.focus_app.domain.task.TaskActivation.window(task, now)?.second
+        val end = scheduledEnd ?: requestedEnd
+        if (groups != null) groups.activate(id, start, end)
+        else {
+            dao.clearManualActive()
+            dao.update(task.copy(isManualActive = true, manualStartedAt = start, manualUntil = end).toEntity())
+        }
+    }
+
+    /** Validate optional task context, not whether guardian monitoring is enabled.
+     * A taskless session is current when there is no active task. Guardian/app/quotas are checked by callers.
+     * Keep rejecting a stale non-null task so an old reminder cannot quote a completed/expired task.
+     */
+    suspend fun isSessionEligible(session: com.example.focus_app.domain.model.AppUsageSession): Boolean {
+        if (session.endedAt != null) return false
+        val task = observeActive().first() ?: return session.taskId == null
+        return task.id == session.taskId && com.example.focus_app.domain.task.TaskActivation.accepts(
+            task, session.taskContextStartedAt.takeIf { it > 0 } ?: session.startedAt, clock.now())
     }
 
     fun validateSchedule(task: FocusTask, existing: List<FocusTask>): ScheduleValidation {
         val start = task.scheduleStartMinute
         val end = task.scheduleEndMinute
-        if (start != null && end != null && end <= start) {
+        if (!task.inheritsGroupSchedule && ((start == null) != (end == null) || (start != null && end != null && (end <= start || start !in 0..1439 || end !in 1..1440 || task.repeatDaysMask == 0)))) {
             return ScheduleValidation.END_NOT_AFTER_START
         }
-        if (task.isCompleted || start == null || end == null || task.repeatDaysMask == 0) {
+        if (task.inheritsGroupSchedule || task.isCompleted || start == null || end == null || task.repeatDaysMask == 0) {
             return ScheduleValidation.VALID
         }
 
         val overlaps = existing.any { other ->
-            other.id != task.id &&
+            other.id != task.id && (other.groupId != task.groupId || task.groupId == 1L) &&
                 !other.isCompleted &&
                 other.scheduleStartMinute != null &&
                 other.scheduleEndMinute != null &&
@@ -115,7 +148,9 @@ class TaskRepository(
         dao.completedCountBetween(startedAt, endedAt)
 
     private fun millisUntilNextScheduleBoundary(tasks: List<FocusTask>, now: ZonedDateTime): Long? {
-        var nextBoundary: ZonedDateTime? = null
+        var nextBoundary: ZonedDateTime? = tasks.filter { !it.isCompleted && it.isManualActive }
+            .mapNotNull { it.manualUntil }.filter { it > now.toInstant().toEpochMilli() }.minOrNull()
+            ?.let { java.time.Instant.ofEpochMilli(it).atZone(now.zone) }
         for (offset in 0..7) {
             val date = now.toLocalDate().plusDays(offset.toLong())
             val dayMask = 1 shl (date.dayOfWeek.value - 1)

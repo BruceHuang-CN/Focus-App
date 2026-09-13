@@ -10,7 +10,7 @@ class FeedbackAndSupportContentTest {
     fun `wechat selection uses only the wechat qr code`() {
         val content = supportPaymentContent(SupportPaymentMethod.WECHAT)
 
-        assertEquals("微信", content.label)
+        assertEquals(R.string.setup_text_167, content.label)
         assertEquals(R.drawable.qr_wechat_support, content.qrResource)
     }
 
@@ -18,7 +18,7 @@ class FeedbackAndSupportContentTest {
     fun `alipay selection uses only the alipay qr code`() {
         val content = supportPaymentContent(SupportPaymentMethod.ALIPAY)
 
-        assertEquals("支付宝", content.label)
+        assertEquals(R.string.setup_text_170, content.label)
         assertEquals(R.drawable.qr_alipay_support, content.qrResource)
     }
 

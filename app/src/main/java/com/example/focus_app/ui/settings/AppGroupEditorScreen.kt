@@ -1,5 +1,7 @@
 package com.example.focus_app.ui.settings
 
+import com.example.focus_app.R
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -49,6 +51,7 @@ fun AppGroupEditorScreen(
     onBack: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
+    val setupContext = androidx.compose.ui.platform.LocalContext.current
     val group = viewModel.appGroups.value.firstOrNull { it.id == groupId }
     val context = LocalContext.current
     val installedApps by produceState<List<InstalledApp>>(emptyList(), context) {
@@ -66,14 +69,14 @@ fun AppGroupEditorScreen(
     val filtered = installedApps.filter { query.isBlank() || it.appName.contains(query, true) || it.packageName.contains(query, true) }
 
     Scaffold(snackbarHost = { SnackbarHost(snackbar) }, topBar = {
-        TopAppBar(title = { Text(if (group == null) "新增应用组" else "编辑应用组") }, navigationIcon = {
-            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
+        TopAppBar(title = { Text(if (group == null) setupContext.getString(R.string.setup_text_148) else setupContext.getString(R.string.setup_text_149)) }, navigationIcon = {
+            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = setupContext.getString(R.string.setup_text_164)) }
         })
     }) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
-            OutlinedTextField(value = name, onValueChange = { name = it.take(24) }, label = { Text("应用组名称") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-            OutlinedTextField(value = query, onValueChange = { query = it }, label = { Text("搜索 App") }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp), singleLine = true)
-            Text("已选择 ${selectedApps.size} 个 App", modifier = Modifier.padding(vertical = 8.dp))
+            OutlinedTextField(value = name, onValueChange = { name = it.take(24) }, label = { Text(setupContext.getString(R.string.setup_text_150)) }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+            OutlinedTextField(value = query, onValueChange = { query = it }, label = { Text(setupContext.getString(R.string.setup_text_151)) }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp), singleLine = true)
+            Text(setupContext.getString(R.string.setup_text_152, selectedApps.size), modifier = Modifier.padding(vertical = 8.dp))
             LazyColumn(modifier = Modifier.weight(1f)) {
                 items(filtered, key = { it.packageName }) { app ->
                     val checked = app.packageName in selectedPackages
@@ -90,18 +93,19 @@ fun AppGroupEditorScreen(
                     }
                 }
             }
-            validation.errorMessage?.let { Text(it) }
+            if (!validation.canSave) Text(setupContext.getString(
+                if (validation.normalizedName.isBlank()) R.string.setup_group_name_required else R.string.setup_text_130))
             Button(
                 onClick = {
                     scope.launch {
                         val result = viewModel.saveAppGroup(groupId, name, selectedApps)
                         if (result.isSuccess) onBack()
-                        else snackbar.showSnackbar("保存应用组失败：${result.exceptionOrNull()?.message ?: "请稍后重试"}")
+                        else snackbar.showSnackbar(setupContext.getString(R.string.setup_text_153, result.exceptionOrNull()?.message ?: setupContext.getString(R.string.setup_text_154)))
                     }
                 },
                 enabled = validation.canSave,
                 modifier = Modifier.fillMaxWidth()
-            ) { Text("保存") }
+            ) { Text(setupContext.getString(R.string.setup_text_155)) }
         }
     }
 }

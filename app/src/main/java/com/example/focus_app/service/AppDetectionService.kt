@@ -1,4 +1,6 @@
 package com.example.focus_app.service
+import com.example.focus_app.R
+import com.example.focus_app.data.language.localizedText
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -143,7 +145,7 @@ class AppDetectionService : Service() {
         val channelId = "focus_detection"
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             getSystemService(NotificationManager::class.java).createNotificationChannel(
-                NotificationChannel(channelId, "专注检测", NotificationManager.IMPORTANCE_LOW).apply { description = "Focus 正在守护你的专注力" })
+                NotificationChannel(channelId, localizedText(R.string.service_detection_channel), NotificationManager.IMPORTANCE_LOW).apply { description = localizedText(R.string.service_detection_description) })
         }
         val openFocus = PendingIntent.getActivity(
             this,
@@ -152,7 +154,7 @@ class AppDetectionService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        return NotificationCompat.Builder(this, channelId).setContentTitle("Focus 专注助手").setContentText("正在为你守护专注力...")
+        return NotificationCompat.Builder(this, channelId).setContentTitle(localizedText(R.string.app_name)).setContentText(localizedText(R.string.service_detection_text))
             .setSmallIcon(android.R.drawable.ic_menu_view).setPriority(NotificationCompat.PRIORITY_LOW).setOngoing(true)
             .setContentIntent(openFocus).build()
     }

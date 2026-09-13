@@ -9,5 +9,10 @@ data class FocusTask(
     val scheduleEndMinute: Int? = null,
     val repeatDaysMask: Int = 0,
     val createdAt: Long = 0L,
-    val updatedAt: Long = 0L
+    val updatedAt: Long = 0L,
+    val groupId: Long = 1,
+    val sortOrder: Long = 0,
+    val inheritsGroupSchedule: Boolean = false,
+    val manualStartedAt: Long? = null,
+    val manualUntil: Long? = null
 )

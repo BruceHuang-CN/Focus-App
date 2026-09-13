@@ -74,7 +74,7 @@ class SettingsMappingTest {
         assertEquals(120, persisted.reminderWindowMinutes)
         assertEquals(5, persisted.maxRemindersPerWindow)
         assertEquals("home", persisted.returnDestination)
-        assertEquals("compatibility", persisted.detectionMode)
+        assertEquals("realtime", persisted.detectionMode)
         assertEquals("sarcastic", persisted.toneKey)
         assertEquals("Call me captain", persisted.customToneInstruction)
         assertEquals(90, persisted.dailyShortVideoLimitMinutes)

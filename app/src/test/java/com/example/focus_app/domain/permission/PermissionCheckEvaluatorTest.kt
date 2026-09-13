@@ -19,7 +19,7 @@ class PermissionCheckEvaluatorTest {
             hasTargetApps = false
         )
 
-        assertEquals(listOf("accessibility", "app_switch", "notification", "overlay", "targets"), items.map { it.id })
+        assertEquals(listOf("usage", "accessibility", "app_switch", "notification", "overlay", "targets"), items.map { it.id })
         assertTrue(items.all { it.status == PermissionCheckStatus.MISSING })
     }
 
@@ -28,7 +28,7 @@ class PermissionCheckEvaluatorTest {
         val items = PermissionCheckEvaluator.evaluate(
             mode = DetectionMode.REALTIME,
             accessibilityEnabled = true,
-            usageStatsGranted = false,
+            usageStatsGranted = true,
             notificationGranted = true,
             overlayGranted = true,
             enableAccessibility = true,

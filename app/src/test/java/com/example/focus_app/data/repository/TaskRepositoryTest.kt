@@ -23,6 +23,29 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class TaskRepositoryTest {
     @Test
+    fun no_tasks_is_a_valid_generic_reminder_context() = runTest {
+        val repository = TaskRepository(FakeFocusTaskDao())
+        val session = com.example.focus_app.domain.model.AppUsageSession(
+            id = 5, packageName = "target", appName = "应用", startedAt = 1, toneKey = "gentle")
+        assertEquals(true, repository.isSessionEligible(session))
+        assertEquals(false, repository.isSessionEligible(session.copy(endedAt = 2)))
+        assertEquals(false, repository.isSessionEligible(session.copy(taskId = 9)))
+    }
+
+    @Test
+    fun future_and_completed_tasks_do_not_block_generic_reminders() = runTest {
+        val now = mondayAt(8, 0, 0).toInstant().toEpochMilli()
+        val repository = TaskRepository(FakeFocusTaskDao(taskEntities(
+            task(id = 1, start = 540, end = 600, days = MONDAY_MASK),
+            task(id = 2, completed = true, start = 420, end = 540, days = MONDAY_MASK)
+        )), ControlledClock(now))
+        val session = com.example.focus_app.domain.model.AppUsageSession(
+            id = 5, packageName = "target", appName = "应用", startedAt = now, toneKey = "gentle")
+        assertEquals(true, repository.isSessionEligible(session))
+        assertEquals(false, repository.isSessionEligible(session.copy(taskId = 2)))
+    }
+
+    @Test
     fun schedule_end_must_be_after_schedule_start() {
         val repository = TaskRepository(FakeFocusTaskDao())
 
@@ -108,23 +131,23 @@ class TaskRepositoryTest {
         val job = launch { repository.observeActive().collect { activeIds += it?.id } }
 
         runCurrent()
-        assertEquals(listOf(1L), activeIds)
+        assertEquals(listOf<Long?>(null), activeIds)
 
         clock.advanceBy(1_000)
         advanceTimeBy(1_000)
         runCurrent()
-        assertEquals(listOf(1L, 2L), activeIds)
+        assertEquals(listOf(null, 2L), activeIds)
 
         clock.advanceBy(60_000)
         advanceTimeBy(60_000)
         runCurrent()
-        assertEquals(listOf(1L, 2L, 1L), activeIds)
+        assertEquals(listOf(null, 2L, null), activeIds)
 
         job.cancel()
     }
 
     @Test
-    fun observe_active_suppresses_the_same_task_at_its_schedule_boundary() = runTest {
+    fun legacy_manual_task_activates_only_at_its_schedule_start() = runTest {
         val clock = ControlledClock(mondayAt(8, 59, 59).toInstant().toEpochMilli())
         val repository = TaskRepository(
             FakeFocusTaskDao(
@@ -148,12 +171,12 @@ class TaskRepositoryTest {
         advanceTimeBy(1_000L)
         runCurrent()
 
-        assertEquals(listOf(1L), activeIds)
+        assertEquals(listOf(null, 1L), activeIds)
         job.cancel()
     }
 
     @Test
-    fun observe_active_events_emits_same_task_again_at_its_schedule_boundary() = runTest {
+    fun active_events_observe_schedule_start_without_valid_manual_override() = runTest {
         val clock = ControlledClock(mondayAt(8, 59, 59).toInstant().toEpochMilli())
         val repository = TaskRepository(
             FakeFocusTaskDao(
@@ -177,7 +200,7 @@ class TaskRepositoryTest {
         advanceTimeBy(1_000L)
         runCurrent()
 
-        assertEquals(listOf(1L, 1L), activeIds)
+        assertEquals(listOf(null, 1L), activeIds)
         job.cancel()
     }
 
@@ -194,7 +217,8 @@ class TaskRepositoryTest {
 
         repository.setManualActive(2)
 
-        assertEquals(1L, repository.observeActive().first()?.id)
+        assertEquals(null, repository.observeActive().first()?.id)
+        assertEquals(true, repository.observeAll().first().first { it.id == 1L }.isManualActive)
     }
 
     private fun task(

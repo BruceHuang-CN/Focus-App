@@ -1,5 +1,9 @@
 package com.example.focus_app.di
 
+import com.example.focus_app.data.local.dao.TaskGroupDao
+import com.example.focus_app.data.local.migration.MIGRATION_6_7
+import com.example.focus_app.data.local.dao.ReminderAnalyticsDao
+import com.example.focus_app.data.local.migration.MIGRATION_7_8
 import android.content.Context
 import androidx.room.Room
 import com.example.focus_app.data.appgroup.AppGroupStore
@@ -58,7 +62,9 @@ object DatabaseModule {
                 MIGRATION_2_3,
                 MIGRATION_3_4,
                 MIGRATION_4_5,
-                MIGRATION_5_6
+                MIGRATION_5_6,
+                MIGRATION_6_7,
+                MIGRATION_7_8
             )
             .build()
     }
@@ -66,6 +72,8 @@ object DatabaseModule {
     @Provides fun provideAppUsageEventDao(db: AppDatabase): AppUsageEventDao = db.appUsageEventDao()
     @Provides fun provideMoodRecordDao(db: AppDatabase): MoodRecordDao = db.moodRecordDao()
     @Provides fun provideSettingsDao(db: AppDatabase): SettingsDao = db.settingsDao()
+    @Provides fun provideReminderAnalyticsDao(db: AppDatabase): ReminderAnalyticsDao = db.reminderAnalyticsDao()
+    @Provides fun provideTaskGroupDao(db: AppDatabase): TaskGroupDao = db.taskGroupDao()
     @Provides fun provideFocusTaskDao(db: AppDatabase): FocusTaskDao = db.focusTaskDao()
     @Provides fun provideAppUsageSessionDao(db: AppDatabase): AppUsageSessionDao = db.appUsageSessionDao()
     @Provides fun provideAiReminderCacheDao(db: AppDatabase): AiReminderCacheDao = db.aiReminderCacheDao()

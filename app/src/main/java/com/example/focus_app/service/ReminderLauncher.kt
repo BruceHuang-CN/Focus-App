@@ -1,4 +1,6 @@
 package com.example.focus_app.service
+import com.example.focus_app.R
+import com.example.focus_app.data.language.localizedText
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -99,6 +101,7 @@ class AndroidReminderLauncher @Inject constructor(
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
             putExtra(ReminderLaunchData.EXTRA_SESSION_ID, data.sessionId)
             data.taskId?.let { putExtra(ReminderLaunchData.EXTRA_TASK_ID, it) }
+            putExtra(ReminderLaunchData.EXTRA_TASK_CONTEXT_STARTED_AT, data.taskContextStartedAt)
             putExtra(ReminderLaunchData.EXTRA_TASK_TITLE, data.taskTitle)
             putExtra(ReminderLaunchData.EXTRA_APP_NAME, data.appName)
             putExtra(ReminderLaunchData.EXTRA_MESSAGE, data.message)
@@ -128,7 +131,7 @@ class AndroidReminderLauncher @Inject constructor(
         )
         val notification = NotificationCompat.Builder(context, REMINDER_ALERT_CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setContentTitle("Focus：先停一下")
+            .setContentTitle(context.localizedText(R.string.service_reminder_title))
             .setContentText(data.message)
             .setStyle(NotificationCompat.BigTextStyle().bigText(data.message))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
@@ -145,10 +148,10 @@ class AndroidReminderLauncher @Inject constructor(
         manager.createNotificationChannel(
             NotificationChannel(
                 REMINDER_ALERT_CHANNEL_ID,
-                "Focus 任务召回",
+                context.localizedText(R.string.service_reminder_channel),
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "打开短视频应用时的任务召回提醒"
+                description = context.localizedText(R.string.service_reminder_description)
             }
         )
     }

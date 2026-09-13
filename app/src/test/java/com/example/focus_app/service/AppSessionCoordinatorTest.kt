@@ -17,6 +17,50 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppSessionCoordinatorTest {
+    @Test fun turning_guardian_off_closes_usage_and_cancels_reminders() = runTest {
+        val fixture = fixture()
+        fixture.coordinator.onPackageChanged(TARGET_A)
+        val session = fixture.repository.sessions.single()
+        fixture.clock.epochMillis += 10000
+        fixture.coordinator.reconcileGuardian(false, setOf(TARGET_A), TARGET_A) { true }
+        assertEquals(fixture.clock.epochMillis, fixture.repository.sessions.single().endedAt)
+        assertEquals(listOf(session.id), fixture.reminderScheduler.cancelledSessionIds)
+        fixture.coordinator.reconcileGuardian(true, setOf(TARGET_A), TARGET_A) { true }
+        assertEquals(2, fixture.repository.sessions.size)
+        assertNull(fixture.repository.sessions.last().endedAt)
+    }
+
+    @Test fun task_expiry_preserves_chosen_snooze_deadline() = runTest {
+        val fixture = fixture()
+        fixture.coordinator.onPackageChanged(TARGET_A)
+        val session = fixture.repository.sessions.single()
+        fixture.repository.sessions[0] = session.copy(snoozeUntil = fixture.clock.epochMillis + 60000)
+        fixture.clock.epochMillis += 10000
+        fixture.contextProvider.context = fixture.contextProvider.context.copy(activeTaskId = null)
+        fixture.coordinator.refreshTaskContext { true }
+        assertEquals(listOf(session.id to 50000L), fixture.reminderScheduler.followUps)
+        assertEquals(1, fixture.reminderScheduler.startedSessionIds.size)
+        assertEquals(session.startedAt, fixture.repository.sessions.single().startedAt)
+    }
+
+    @Test
+    fun task_ending_restarts_generic_reminder_without_splitting_usage_session() = runTest {
+        val fixture = fixture(activeTaskId = 7L)
+        fixture.coordinator.onPackageChanged(TARGET_A)
+        val original = fixture.repository.sessions.single()
+        fixture.clock.epochMillis += 1_000L
+        fixture.contextProvider.context = fixture.contextProvider.context.copy(activeTaskId = null)
+        fixture.coordinator.refreshTaskContext { it == TARGET_A }
+        assertEquals(listOf(original.id), fixture.reminderScheduler.cancelledSessionIds)
+        assertEquals(listOf(original.id, original.id), fixture.reminderScheduler.startedSessionIds)
+        assertEquals(1, fixture.repository.sessions.size)
+        assertEquals(original.startedAt, fixture.repository.sessions.single().startedAt)
+        assertNull(fixture.repository.sessions.single().endedAt)
+        assertNull(fixture.repository.sessions.single().taskId)
+        fixture.coordinator.refreshTaskContext { true }
+        assertEquals(2, fixture.reminderScheduler.startedSessionIds.size)
+    }
+
     @Test
     fun same_package_window_changes_create_one_session_and_leaving_closes_it() = runTest {
         val fixture = fixture()
@@ -230,7 +274,7 @@ class AppSessionCoordinatorTest {
     }
 
     @Test
-    fun compatibility_verifier_is_forwarded_to_the_delayed_reminder_check() = runTest {
+    fun foreground_verifier_is_rechecked_by_the_delayed_reminder() = runTest {
         val fixture = fixture()
         val verifiedPackages = mutableListOf<String>()
 
@@ -238,12 +282,12 @@ class AppSessionCoordinatorTest {
             packageName = TARGET_A,
             foregroundVerifier = { expectedPackage ->
                 verifiedPackages += expectedPackage
-                false
+                verifiedPackages.size <= 2
             }
         )
 
         assertEquals(false, fixture.reminderScheduler.foregroundChecks.single().invoke())
-        assertEquals(listOf(TARGET_A), verifiedPackages)
+        assertEquals(listOf(TARGET_A, TARGET_A, TARGET_A), verifiedPackages)
     }
 
     @Test
@@ -316,6 +360,31 @@ class AppSessionCoordinatorTest {
 
         assertEquals(listOf(TARGET_A), grace.shownFor.map { it.packageName })
         assertTrue(fixture.reminderScheduler.startedSessionIds.isEmpty())
+    }
+
+    @Test fun stale_target_after_return_does_not_create_session_or_consume_grace() = runTest {
+        val grace = RecordingReturnToFocusGrace(handlesSession = true)
+        val fixture = fixture(returnToFocusGrace = grace)
+        fixture.coordinator.onPackageChanged(TARGET_A)
+        fixture.coordinator.stopCurrentSession()
+        grace.shownFor.clear()
+        fixture.coordinator.onPackageChanged(TARGET_A, foregroundVerifier = { false })
+        assertEquals(1, fixture.repository.sessions.size)
+        assertTrue(grace.shownFor.isEmpty())
+        fixture.coordinator.onPackageChanged(TARGET_A, foregroundVerifier = { true })
+        assertEquals(2, fixture.repository.sessions.size)
+        assertEquals(1, grace.shownFor.size)
+        assertTrue(fixture.reminderScheduler.startedSessionIds.isEmpty())
+    }
+
+    @Test fun foreground_change_during_database_work_cannot_launch_immediate_grace() = runTest {
+        val grace = RecordingReturnToFocusGrace(handlesSession = true)
+        val fixture = fixture(returnToFocusGrace = grace, activeTaskId = null)
+        var checks = 0
+        fixture.coordinator.onPackageChanged(TARGET_A, foregroundVerifier = { ++checks == 1 })
+        assertTrue(grace.shownFor.isEmpty())
+        assertTrue(fixture.reminderScheduler.startedSessionIds.isEmpty())
+        assertNull(fixture.repository.currentOpenSession())
     }
 
     private fun TestScope.fixture(
@@ -432,6 +501,13 @@ private class FakeAppSessionRepository(
         sessions[index] = sessions[index].copy(endedAt = endedAt)
     }
 
+    override suspend fun sessionById(id: Long) = sessions.firstOrNull { it.id == id }
+
+    override suspend fun bindTask(sessionId: Long, taskId: Long?, at: Long) {
+        val index = sessions.indexOfFirst { it.id == sessionId }
+        sessions[index] = sessions[index].copy(taskId = taskId, taskContextStartedAt = at)
+    }
+
     override suspend fun currentOpenSession(): AppUsageSession? =
         sessions.lastOrNull { it.endedAt == null }
 
@@ -448,6 +524,8 @@ private class RecordingSessionReminderScheduler(
     val startedSessionIds = mutableListOf<Long>()
     val cancelledSessionIds = mutableListOf<Long>()
     val foregroundChecks = mutableListOf<suspend () -> Boolean>()
+    val followUps = mutableListOf<Pair<Long, Long>>()
+    override fun scheduleFollowUp(sessionId: Long, delayMillis: Long) { followUps += sessionId to delayMillis }
 
     override fun onSessionStarted(
         session: AppUsageSession,

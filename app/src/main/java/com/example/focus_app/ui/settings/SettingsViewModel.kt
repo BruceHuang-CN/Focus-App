@@ -1,5 +1,7 @@
 package com.example.focus_app.ui.settings
 
+import com.example.focus_app.R
+
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.focus_app.data.repository.AiRepository
@@ -32,6 +34,14 @@ import com.example.focus_app.domain.usecase.UpdateGuardianStateUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import com.example.focus_app.domain.usecase.ResetReminderQuotaUseCase
+import com.example.focus_app.domain.usecase.RegenerateReminderMessagesUseCase
+import com.example.focus_app.domain.usecase.ReminderRegenerationResult
 import javax.inject.Inject
 
 /** AI 连接测试的界面状态。 */
@@ -39,7 +49,7 @@ sealed interface AiConnectionUiState {
     data object Idle : AiConnectionUiState
     data object Loading : AiConnectionUiState
     data class Success(val modelIds: List<String>) : AiConnectionUiState
-    data class Error(val message: String) : AiConnectionUiState
+    data class Error(val message: String, val localizedMessage: SetupMessage? = null) : AiConnectionUiState
 }
 
 @HiltViewModel
@@ -54,10 +64,69 @@ class SettingsViewModel @Inject constructor(
     private val themeStore: ThemeStore,
     private val appGroupRepository: AppGroupRepository? = null,
     private val updateGuardianStateUseCase: UpdateGuardianStateUseCase? = null,
-    private val reminderActionOrderStore: ReminderActionOrderStore = DefaultReminderActionOrderStore
+    private val reminderActionOrderStore: ReminderActionOrderStore = DefaultReminderActionOrderStore,
+    private val resetQuotaUseCase: ResetReminderQuotaUseCase? = null,
+    private val regenerateUseCase: RegenerateReminderMessagesUseCase? = null
 ) : ViewModel() {
+    private val saveMutex = Mutex()
+    private var pendingWrites = 0
+    private var writeFailure = false
+    private val _saveStatus = MutableStateFlow(R.string.setup_text_297)
+    val saveStatus = _saveStatus.asStateFlow()
+    private val _settingsMessages = MutableSharedFlow<SetupMessage>(extraBufferCapacity = 4)
+    val settingsMessages = _settingsMessages.asSharedFlow()
+    private val _regenerating = MutableStateFlow(false)
+    val regenerating = _regenerating.asStateFlow()
+
+    private fun persist(block: suspend () -> Unit) {
+        if (pendingWrites == 0) writeFailure = false
+        pendingWrites++
+        _saveStatus.value = R.string.setup_text_298
+        viewModelScope.launch {
+            try {
+                saveMutex.withLock { block() }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                writeFailure = true
+                _settingsMessages.emit(SetupMessage(R.string.setup_text_299))
+            } finally {
+                pendingWrites--
+                _saveStatus.value = if (pendingWrites > 0) R.string.setup_text_298 else if (writeFailure) R.string.setup_text_225 else R.string.setup_text_300
+            }
+        }
+    }
+
+    fun setGuardianEnabled(enabled: Boolean) = persist {
+        val useCase = updateGuardianStateUseCase
+        if (useCase != null) useCase.setGuardianEnabled(enabled) else settingsRepository.setGuardianEnabled(enabled)
+    }
+    fun setBreathingPause(enabled: Boolean) = update { it.copy(enableBreathingPause = enabled) }
+    fun resetReminderQuota() = persist {
+        requireNotNull(resetQuotaUseCase).invoke()
+        _settingsMessages.emit(SetupMessage(R.string.setup_text_301))
+    }
+    fun regenerateMessages() {
+        if (_regenerating.value) return
+        _regenerating.value = true
+        viewModelScope.launch {
+            try {
+                val result = requireNotNull(regenerateUseCase).invoke()
+                _settingsMessages.emit(when (result) {
+                    is ReminderRegenerationResult.Success -> SetupMessage(R.string.setup_text_302, result.targetCount)
+                    ReminderRegenerationResult.NoActiveTask -> SetupMessage(R.string.setup_text_303)
+                    ReminderRegenerationResult.NoTargetApps -> SetupMessage(R.string.setup_text_304)
+                    is ReminderRegenerationResult.Failed -> SetupMessage(R.string.setup_text_305, result.reason)
+                })
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { _settingsMessages.emit(SetupMessage(R.string.setup_text_306)) }
+            finally { _regenerating.value = false }
+        }
+    }
+
     val settings: StateFlow<AppSettings> = settingsRepository.getSettingsFlow().stateIn(viewModelScope, SharingStarted.Eagerly, AppSettings())
 
+    private var connectionRevision = 0L
     private val _aiConnection = MutableStateFlow<AiConnectionUiState>(AiConnectionUiState.Idle)
     val aiConnection: StateFlow<AiConnectionUiState> = _aiConnection.asStateFlow()
 
@@ -76,8 +145,8 @@ class SettingsViewModel @Inject constructor(
     val appGroups: StateFlow<List<AppGroup>> = appGroupRepository?.groups ?: MutableStateFlow(emptyList())
     val activeAppGroupId: StateFlow<String> = appGroupRepository?.activeGroupId ?: MutableStateFlow("")
 
-    private val _tonePreview = MutableStateFlow("")
-    val tonePreview: StateFlow<String> = _tonePreview.asStateFlow()
+    private val _tonePreviewTask = MutableStateFlow<String?>(null)
+    val tonePreviewTask: StateFlow<String?> = _tonePreviewTask.asStateFlow()
 
     private val _notificationPermissionRequests = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     val notificationPermissionRequests: SharedFlow<Unit> = _notificationPermissionRequests.asSharedFlow()
@@ -93,14 +162,10 @@ class SettingsViewModel @Inject constructor(
                 settingsRepository.getSettingsFlow(),
                 taskRepository.observeActive()
             ) { currentSettings, activeTask ->
-                ReminderTonePreview.sampleMessage(
-                    tone = currentSettings.toneKey,
-                    customInstruction = currentSettings.customToneInstruction,
-                    taskTitle = activeTask?.title
-                )
+                activeTask?.title
             }
                 .distinctUntilChanged()
-                .collect { preview -> _tonePreview.value = preview }
+                .collect { title -> _tonePreviewTask.value = title }
         }
     }
 
@@ -112,7 +177,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     private suspend fun refreshPermissionStatus(current: AppSettings) {
-        _permissionStatus.value = PermissionCheckEvaluator.evaluate(
+        _permissionStatus.value = withContext(Dispatchers.IO) { PermissionCheckEvaluator.evaluate(
             mode = current.detectionMode,
             accessibilityEnabled = permissionStatusProvider.accessibilityEnabled(),
             usageStatsGranted = permissionStatusProvider.usageStatsGranted(),
@@ -120,7 +185,7 @@ class SettingsViewModel @Inject constructor(
             overlayGranted = permissionStatusProvider.overlayGranted(),
             enableAccessibility = current.enableAccessibility,
             hasTargetApps = current.targetApps.isNotEmpty()
-        )
+        ) }
     }
 
     fun updateReminderDelaySeconds(seconds: Int) {
@@ -138,7 +203,7 @@ class SettingsViewModel @Inject constructor(
     fun setForceReminder(enabled: Boolean) { update { it.copy(forceReminder = enabled) } }
 
     fun setRandomizeReminderActions(enabled: Boolean) {
-        reminderActionOrderStore.setRandomizeEnabled(enabled)
+        persist { reminderActionOrderStore.setRandomizeEnabled(enabled) }
     }
 
     fun updateDailyShortVideoLimitMinutes(minutes: Int) {
@@ -161,19 +226,19 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun setThemeMode(mode: AppThemeMode) {
-        themeStore.setMode(mode)
+        persist { themeStore.setMode(mode) }
     }
 
     fun setThemeColor(color: AppThemeColor) {
-        themeStore.setColor(color)
+        persist { themeStore.setColor(color) }
     }
 
     fun setKeepAliveEnabled(enabled: Boolean) {
-        keepAliveStore.setEnabled(enabled)
+        persist { keepAliveStore.setEnabled(enabled) }
     }
 
     fun updateDetectionMode(mode: DetectionMode) {
-        update { it.copy(detectionMode = mode) }
+        update { it.copy(detectionMode = DetectionMode.REALTIME) }
         _notificationPermissionRequests.tryEmit(Unit)
     }
 
@@ -183,8 +248,8 @@ class SettingsViewModel @Inject constructor(
     fun applyOnboardingDetectionMode(mode: DetectionMode) {
         update {
             it.copy(
-                detectionMode = mode,
-                enableAccessibility = mode == DetectionMode.REALTIME
+                detectionMode = DetectionMode.REALTIME,
+                enableAccessibility = true
             )
         }
     }
@@ -213,8 +278,9 @@ class SettingsViewModel @Inject constructor(
             )
         }
     }
-    fun updateAiProvider(p: AiProvider) { update { it.copy(aiProvider = p, apiEndpoint = p.defaultEndpoint, aiModel = p.defaultModel) } }
+    fun updateAiProvider(p: AiProvider) { invalidateConnection(); update { it.copy(aiProvider = p, apiEndpoint = p.defaultEndpoint, aiModel = p.defaultModel) } }
     fun updateAiConnection(endpoint: String, model: String) {
+        invalidateConnection()
         val savedEndpoint = endpoint.trim()
         val savedModel = model.trim()
         update {
@@ -229,24 +295,42 @@ class SettingsViewModel @Inject constructor(
             )
         }
     }
-    fun updateApiKey(k: String) {
-        viewModelScope.launch { settingsRepository.saveApiKey(k) }
+    fun updateApiKey(k: String, onSaved: () -> Unit = {}) {
+        persist { settingsRepository.saveApiKey(k); invalidateConnection(); onSaved() }
+    }
+
+    private fun invalidateConnection() {
+        connectionRevision++
+        _aiConnection.value = AiConnectionUiState.Idle
     }
 
     fun testAiConnection() {
+        if (_aiConnection.value is AiConnectionUiState.Loading) return
+        val request = ++connectionRevision
+        _aiConnection.value = AiConnectionUiState.Loading
         viewModelScope.launch {
-            _aiConnection.value = AiConnectionUiState.Loading
-            val currentSettings = settingsRepository.getSettings()
-            _aiConnection.value = when (val result = aiRepository.testConnection(currentSettings)) {
-                is ConnectionTestResult.Success -> AiConnectionUiState.Success(result.modelIds)
-                is ConnectionTestResult.Error -> AiConnectionUiState.Error(result.message)
-                ConnectionTestResult.Loading -> AiConnectionUiState.Loading
-            }
+            try {
+                val currentSettings = saveMutex.withLock { settingsRepository.getSettings() }
+                val result = aiRepository.testConnection(currentSettings)
+                val latest = settingsRepository.getSettings()
+                if (request != connectionRevision) return@launch
+                if (latest.aiProvider != currentSettings.aiProvider || latest.apiEndpoint != currentSettings.apiEndpoint || latest.aiModel != currentSettings.aiModel ||
+                    _aiConnection.value !is AiConnectionUiState.Loading) {
+                    _aiConnection.value = AiConnectionUiState.Idle
+                    return@launch
+                }
+                _aiConnection.value = when (result) {
+                    is ConnectionTestResult.Success -> AiConnectionUiState.Success(result.modelIds)
+                    is ConnectionTestResult.Error -> AiConnectionUiState.Error(result.message)
+                    ConnectionTestResult.Loading -> AiConnectionUiState.Loading
+                }
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { if (request == connectionRevision) _aiConnection.value = AiConnectionUiState.Error("", SetupMessage(R.string.setup_text_307)) }
         }
     }
 
     fun clearApiKey() {
-        viewModelScope.launch { settingsRepository.clearApiKey() }
+        persist { settingsRepository.clearApiKey(); invalidateConnection() }
     }
     fun updatePersonality(p: String) { update { it.copy(aiPersonality = p, toneKey = ReminderTone.fromKey(p)) } }
     fun toggleBreathingPause() { update { it.copy(enableBreathingPause = !it.enableBreathingPause) } }
@@ -270,15 +354,15 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             val failure = requireNotNull(updateGuardianStateUseCase).activateGroup(groupId).exceptionOrNull()
             if (failure != null) {
-                _appGroupMessages.emit("启用应用组失败：${failure.message ?: "请稍后重试"}")
+                _appGroupMessages.emit(SetupMessage(R.string.setup_text_308, failure.message ?: SetupMessage(R.string.setup_text_154)))
             }
         }
     }
 
-    private val _appGroupMessages = MutableSharedFlow<String>(extraBufferCapacity = 1)
-    val appGroupMessages: SharedFlow<String> = _appGroupMessages.asSharedFlow()
+    private val _appGroupMessages = MutableSharedFlow<SetupMessage>(extraBufferCapacity = 1)
+    val appGroupMessages: SharedFlow<SetupMessage> = _appGroupMessages.asSharedFlow()
 
     private fun update(transform: (AppSettings) -> AppSettings) {
-        viewModelScope.launch { settingsRepository.update(transform) }
+        persist { settingsRepository.update(transform) }
     }
 }

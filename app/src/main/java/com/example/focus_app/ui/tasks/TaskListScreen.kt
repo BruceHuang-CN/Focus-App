@@ -1,180 +1,105 @@
 package com.example.focus_app.ui.tasks
 
-import androidx.compose.foundation.clickable
+import com.example.focus_app.R
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.focus_app.data.repository.ScheduleValidation
 import com.example.focus_app.domain.model.FocusTask
+import com.example.focus_app.domain.model.TaskGroup
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TaskListScreen(
-    onBack: () -> Unit,
-    viewModel: TaskViewModel = hiltViewModel()
-) {
-    val tasks by viewModel.tasks.collectAsState()
-    val activeTask by viewModel.activeTask.collectAsState()
-    var editing by remember { mutableStateOf<FocusTask?>(null) }
-    var showEditor by remember { mutableStateOf(false) }
-    var validationMessage by remember { mutableStateOf<String?>(null) }
-
-    if (showEditor) {
-        TaskEditorScreen(
-            initial = editing,
-            validationMessage = validationMessage,
+fun TaskListScreen(onBack: () -> Unit, viewModel: TaskViewModel = hiltViewModel()) {
+    val textContext = androidx.compose.ui.platform.LocalContext.current
+    val tasks by viewModel.tasks.collectAsStateWithLifecycle()
+    val groups by viewModel.groups.collectAsStateWithLifecycle()
+    val active by viewModel.activeTask.collectAsStateWithLifecycle()
+    var editor by rememberSaveable { mutableStateOf<String?>(null) }
+    var editId by rememberSaveable { mutableStateOf(0L) }
+    var targetGroup by rememberSaveable { mutableStateOf(1L) }
+    var inherit by rememberSaveable { mutableStateOf(true) }
+    var message by rememberSaveable { mutableStateOf<String?>(null) }
+    var moveId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var deleteGroupId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var activateTaskId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var activateGroupId by rememberSaveable { mutableStateOf<Long?>(null) }
+    val result: (ScheduleValidation) -> Unit = {
+        message = when (it) {
+            ScheduleValidation.VALID -> null
+            ScheduleValidation.END_NOT_AFTER_START -> textContext.getString(R.string.core_schedule_invalid)
+            ScheduleValidation.OVERLAP -> textContext.getString(R.string.core_schedule_overlap)
+        }
+        if (it == ScheduleValidation.VALID) editor = null
+    }
+    if (editor != null) {
+        val group = groups.firstOrNull { it.id == editId }
+        val task = tasks.firstOrNull { it.id == editId }
+        val isGroup = editor == "group"
+        val initial = if (isGroup) group?.let { FocusTask(id = it.id, title = it.name,
+            scheduleStartMinute = it.scheduleStartMinute, scheduleEndMinute = it.scheduleEndMinute,
+            repeatDaysMask = it.repeatDaysMask) } else task
+        TaskEditorScreen(initial, message,
             onSave = { title, start, end, mask ->
-                val task = editing?.copy(
-                    title = title,
-                    scheduleStartMinute = start,
-                    scheduleEndMinute = end,
-                    repeatDaysMask = mask,
-                    isCompleted = false
-                ) ?: FocusTask(title = title, scheduleStartMinute = start, scheduleEndMinute = end, repeatDaysMask = mask)
-                val onResult: (ScheduleValidation) -> Unit = { result ->
-                    when (result) {
-                        ScheduleValidation.VALID -> {
-                            showEditor = false
-                            editing = null
-                            validationMessage = null
-                        }
-                        ScheduleValidation.END_NOT_AFTER_START ->
-                            validationMessage = "结束时间必须晚于开始时间"
-                        ScheduleValidation.OVERLAP ->
-                            validationMessage = "与已有任务的时间段冲突，请调整"
-                    }
+                if (isGroup) viewModel.saveGroup((group ?: TaskGroup(name = title)).copy(name = title,
+                    scheduleStartMinute = start, scheduleEndMinute = end, repeatDaysMask = mask), result)
+                else {
+                    val value = (task ?: FocusTask(title = title, groupId = targetGroup,
+                        sortOrder = System.currentTimeMillis())).copy(title = title,
+                        inheritsGroupSchedule = inherit, scheduleStartMinute = start,
+                        scheduleEndMinute = end, repeatDaysMask = mask)
+                    if (task == null) viewModel.create(value, result) else viewModel.update(value, result)
                 }
-                if (editing == null) {
-                    viewModel.create(task, onResult)
-                } else {
-                    viewModel.update(task, onResult)
-                }
-            },
-            onDismiss = {
-                showEditor = false
-                editing = null
-                validationMessage = null
-            }
-        )
+            }, onDismiss = { editor = null; message = null },
+            editorTitle = if (isGroup) { if (group == null) textContext.getString(R.string.core_new_group) else textContext.getString(R.string.core_edit_group_schedule) }
+                else if (task == null) textContext.getString(R.string.core_add_task) else textContext.getString(R.string.core_edit_task),
+            inheritsGroupSchedule = if (isGroup) null else inherit, onInheritChange = { inherit = it },
+            titleLabel = if (isGroup) textContext.getString(R.string.core_group_title) else textContext.getString(R.string.core_task_title),
+            initialDisplayTitle = if (isGroup) group?.displayName(textContext) else null)
         return
     }
-
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("任务") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                    }
+    TasksContent(groups, tasks, active?.id, onBack = onBack,
+        onNewGroup = { editor = "group"; editId = 0; message = null },
+        onEditGroup = { editor = "group"; editId = it; message = null },
+        onDeleteGroup = { deleteGroupId = it }, onActivateGroup = { activateGroupId = it },
+        onAddTask = { targetGroup = it; editId = 0; editor = "task"; inherit = true; message = null },
+        onEditTask = { editId = it.id; targetGroup = it.groupId; inherit = it.inheritsGroupSchedule; editor = "task"; message = null },
+        onCompleteTask = { if (it.isCompleted) viewModel.restore(it.id) else viewModel.complete(it.id) },
+        onDeleteTask = viewModel::delete, onMoveTask = { moveId = it.id }, onActivateTask = { activateTaskId = it.id })
+    (activateGroupId ?: activateTaskId)?.let { id ->
+        AlertDialog(onDismissRequest = { activateGroupId = null; activateTaskId = null }, title = { Text(if (activateTaskId != null) textContext.getString(R.string.core_activate_task) else textContext.getString(R.string.core_activate_group)) },
+            text = { Column {
+                Text(textContext.getString(R.string.core_activation_help))
+                listOf(15, 30, 60).forEach { minutes ->
+                    TextButton(onClick = { if (activateTaskId != null) viewModel.setManualActive(id, minutes) else viewModel.activateGroup(id, minutes); activateGroupId = null; activateTaskId = null }) { Text(textContext.getString(R.string.core_focus_minutes, minutes)) }
                 }
-            )
-        },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = {
-                    editing = null
-                    validationMessage = null
-                    showEditor = true
-                }
-            ) {
-                Icon(Icons.Filled.Add, contentDescription = "新建任务")
-            }
-        }
-    ) { padding ->
-        if (tasks.isEmpty()) {
-            Column(
-                modifier = Modifier.fillMaxSize().padding(padding),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                Text("还没有任务", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    "点击右下角 + 创建第一个专注任务",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.outline
-                )
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(padding),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(tasks, key = { it.id }) { task ->
-                    TaskCard(
-                        task = task,
-                        isActive = task.id == activeTask?.id,
-                        onComplete = { viewModel.complete(task.id) },
-                        onRestore = { viewModel.restore(task.id) },
-                        onSetActive = { viewModel.setManualActive(task.id) },
-                        onEdit = {
-                            editing = task
-                            validationMessage = null
-                            showEditor = true
-                        },
-                        onDelete = { viewModel.delete(task) }
-                    )
+            } }, confirmButton = {}, dismissButton = { TextButton(onClick = { activateGroupId = null; activateTaskId = null }) { Text(textContext.getString(R.string.core_cancel)) } })
+    }
+    deleteGroupId?.let { id ->
+        AlertDialog(onDismissRequest = { deleteGroupId = null }, title = { Text(textContext.getString(R.string.core_delete_group_question)) },
+            text = { Text(textContext.getString(R.string.core_delete_group_help)) },
+            confirmButton = { TextButton(onClick = { viewModel.deleteGroup(id); deleteGroupId = null }) { Text(textContext.getString(R.string.core_delete_group_keep)) } },
+            dismissButton = { TextButton(onClick = { deleteGroupId = null }) { Text(textContext.getString(R.string.core_cancel)) } })
+    }
+    moveId?.let { id ->
+        var follow by rememberSaveable(id) { mutableStateOf(true) }
+        AlertDialog(onDismissRequest = { moveId = null }, title = { Text(textContext.getString(R.string.core_move_task)) }, text = {
+            Column(Modifier.heightIn(max = 400.dp).verticalScroll(rememberScrollState())) {
+                Row { Checkbox(follow, { follow = it }); Text(textContext.getString(R.string.core_follow_new_group)) }
+                groups.filter { it.id != tasks.firstOrNull { t -> t.id == id }?.groupId }.forEach { group ->
+                    TextButton(onClick = { viewModel.move(id, group.id, follow); moveId = null }) { Text(group.displayName(textContext)) }
                 }
             }
-        }
+        }, confirmButton = {}, dismissButton = { TextButton(onClick = { moveId = null }) { Text(textContext.getString(R.string.core_cancel)) } })
     }
 }
 
-@Composable
-private fun TaskCard(
-    task: FocusTask,
-    isActive: Boolean,
-    onComplete: () -> Unit,
-    onRestore: () -> Unit,
-    onSetActive: () -> Unit,
-    onEdit: () -> Unit,
-    onDelete: () -> Unit
-) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    task.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    textDecoration = if (task.isCompleted) TextDecoration.LineThrough else null,
-                    modifier = Modifier.weight(1f)
-                )
-                if (isActive) {
-                    AssistChip(onClick = {}, label = { Text("当前") })
-                }
-            }
-            Text(
-                task.scheduleLabel(),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.outline
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(
-                    onClick = { if (task.isCompleted) onRestore() else onComplete() }
-                ) {
-                    Text(if (task.isCompleted) "恢复" else "完成")
-                }
-                TextButton(
-                    onClick = onSetActive,
-                    enabled = !task.isCompleted && !isActive
-                ) { Text("设为当前") }
-                TextButton(onClick = onEdit) { Text("编辑") }
-                TextButton(onClick = onDelete) { Text("删除") }
-            }
-        }
-    }
-}
+// Only the original built-in name is translated. Renamed groups retain user input.
+internal fun TaskGroup.displayName(context: android.content.Context): String =
+    if (id == 1L && name == "未分组") context.getString(R.string.core_ungrouped) else name

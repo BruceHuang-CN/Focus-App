@@ -5,8 +5,15 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.Bundle
+import com.example.focus_app.R
+import com.example.focus_app.data.language.localizedText
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import com.example.focus_app.data.theme.ThemeStore
+import com.example.focus_app.ui.theme.FocusAppTheme
 import android.view.ViewTreeObserver
-import androidx.activity.ComponentActivity
+import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
 import androidx.core.content.ContextCompat
@@ -20,13 +27,17 @@ import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 
 @AndroidEntryPoint
-class ReminderActivity : ComponentActivity() {
+class ReminderActivity : AppCompatActivity() {
+    @Inject lateinit var settingsRepository: com.example.focus_app.data.repository.SettingsRepository
+    @Inject lateinit var taskRepository: com.example.focus_app.data.repository.TaskRepository
+    @Inject lateinit var themeStore: ThemeStore
     @Inject
     lateinit var sessionRepository: AppSessionRepository
 
@@ -36,6 +47,7 @@ class ReminderActivity : ComponentActivity() {
     @Inject
     lateinit var reminderDisplayCoordinator: ReminderDisplayCoordinator
 
+    private var taskValidityJob: Job? = null
     private var launchData: ReminderLaunchData? = null
     private var overlayAttached = false
     private var displayConfirmed = false
@@ -78,10 +90,10 @@ class ReminderActivity : ComponentActivity() {
         displayConfirmationJob = null
         setIntent(intent)
         launchData = incoming
-        overlayAttached = true
         displayConfirmed = false
         displayConfirmationStarted = false
-        renderReminder(incoming, interactionsEnabled = false)
+        overlayAttached = false
+        confirmAndRenderIfSessionCurrent()
     }
 
     private fun readLaunchData(intent: Intent): ReminderLaunchData {
@@ -93,10 +105,11 @@ class ReminderActivity : ComponentActivity() {
         return ReminderLaunchData(
             sessionId = intent.getLongExtra(ReminderLaunchData.EXTRA_SESSION_ID, 0L),
             taskId = taskId,
+            taskContextStartedAt = intent.getLongExtra(ReminderLaunchData.EXTRA_TASK_CONTEXT_STARTED_AT, 0L),
             taskTitle = intent.getStringExtra(ReminderLaunchData.EXTRA_TASK_TITLE),
-            appName = intent.getStringExtra(ReminderLaunchData.EXTRA_APP_NAME) ?: "目标应用",
+            appName = intent.getStringExtra(ReminderLaunchData.EXTRA_APP_NAME) ?: localizedText(R.string.service_target_app),
             message = intent.getStringExtra(ReminderLaunchData.EXTRA_MESSAGE)
-                ?: "停一下，想想你原本准备完成什么。",
+                ?: localizedText(R.string.service_generic_reminder),
             showBreathing = intent.getBooleanExtra(ReminderLaunchData.EXTRA_SHOW_BREATHING, false),
             returnDestination = ReturnDestination.fromKey(
                 intent.getStringExtra(ReminderLaunchData.EXTRA_RETURN_DESTINATION).orEmpty()
@@ -132,9 +145,22 @@ class ReminderActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         confirmAndRenderIfSessionCurrent()
+        taskValidityJob?.cancel()
+        taskValidityJob = lifecycleScope.launch {
+            combine(taskRepository.observeActiveEvents(), settingsRepository.getSettingsFlow()) { _, settings -> settings }.collect { settings ->
+                val data = launchData ?: return@collect
+                val session = sessionRepository.sessionById(data.sessionId)
+                if (!settings.guardianEnabled || settings.targetApps.none { it.packageName == data.targetPackageName } || session == null || !matchesReminderContext(data, session) || !taskRepository.isSessionEligible(session)) {
+                    reminderPresentationRegistry.hide(data.sessionId, data.attemptId)
+                    finishAndRemoveTask()
+                }
+            }
+        }
     }
 
     override fun onStop() {
+        taskValidityJob?.cancel()
+        taskValidityJob = null
         displayConfirmationJob?.cancel()
         displayConfirmationJob = null
         displayConfirmationStarted = false
@@ -179,7 +205,9 @@ class ReminderActivity : ComponentActivity() {
             ) {
                 return@launch
             }
-            if (!sessionIsCurrent) {
+            val boundSession = sessionRepository.sessionById(data.sessionId)
+            if (!guardianAllows(data) || !sessionIsCurrent || boundSession == null || !matchesReminderContext(data, boundSession) ||
+                !taskRepository.isSessionEligible(boundSession)) {
                 reminderPresentationRegistry.hide(data.sessionId, data.attemptId)
                 finishAndRemoveTask()
                 return@launch
@@ -204,6 +232,12 @@ class ReminderActivity : ComponentActivity() {
                 return@launch
             }
 
+            val latestSession = sessionRepository.sessionById(data.sessionId)
+            if (!guardianAllows(data) || latestSession == null || !matchesReminderContext(data, latestSession) || !taskRepository.isSessionEligible(latestSession)) {
+                reminderPresentationRegistry.hide(data.sessionId, data.attemptId)
+                finishAndRemoveTask()
+                return@launch
+            }
             val confirmed = try {
                 reminderDisplayCoordinator.confirm(data)
             } catch (cancelled: CancellationException) {
@@ -242,13 +276,23 @@ class ReminderActivity : ComponentActivity() {
         }
     }
 
+    private suspend fun guardianAllows(data: ReminderLaunchData): Boolean {
+        val settings = settingsRepository.getSettings()
+        return settings.guardianEnabled && settings.targetApps.any { it.packageName == data.targetPackageName }
+    }
+
     private fun renderReminder(data: ReminderLaunchData, interactionsEnabled: Boolean) {
         setContent {
-            ReminderOverlay(
-                data = data,
-                interactionsEnabled = interactionsEnabled,
-                onDismiss = { finishAndRemoveTask() }
-            )
+            val theme by themeStore.settings.collectAsState()
+            FocusAppTheme(mode = theme.mode, color = theme.color) {
+                key(data.attemptId) {
+                    ReminderOverlay(
+                        data = data,
+                        interactionsEnabled = interactionsEnabled,
+                        onDismiss = { finishAndRemoveTask() }
+                    )
+                }
+            }
         }
     }
 

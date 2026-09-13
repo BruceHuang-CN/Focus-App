@@ -9,7 +9,13 @@ class LocalReminderProvider : AiReminderProvider {
     ): Result<List<String>> {
         val task = context.taskTitle.take(24)
         val app = context.appName.take(16)
-        val messages = listOf(
+        val messages = if (context.languageTag.startsWith("en", true)) listOf(
+            "Your task is waiting. Close the app and take one small step.",
+            "This can wait. Return to your task before more time slips away.",
+            "Stop scrolling now. Close the app and get back to your task.",
+            "Give your attention back to what you planned to do.",
+            "Choose your next step: leave this app and return to your task."
+        ) else listOf(
             "你原本准备完成「$task」。先放下$app，回去做最小的一步。",
             "你又把注意力交给了$app。别再拖，关掉它，继续「$task」。",
             "别再用“稍后”敷衍自己。现在退出$app，立刻回到「$task」。",

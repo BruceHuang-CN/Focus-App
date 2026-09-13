@@ -1,115 +1,68 @@
 package com.example.focus_app.domain.stats
 
-import com.example.focus_app.domain.model.AppShare
-import com.example.focus_app.domain.model.AppUsageSession
-import com.example.focus_app.domain.model.DayBucket
-import com.example.focus_app.domain.model.FocusStats
-import com.example.focus_app.domain.model.HourBucket
-import com.example.focus_app.domain.model.HourAppUsage
+import com.example.focus_app.domain.model.*
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import java.time.temporal.ChronoUnit
 
-/**
- * 将会话记录聚合为统计结果。
- * - 只统计 startedAt 落在所选范围内的会话；
- * - 跨午夜/跨小时的会话按小时和本地日期拆分时长；
- * - 小时与日期都补零，避免图表缺段；
- * - 打开次数按会话计入其开始的小时与日期。
- */
+/** Accumulate milliseconds first; truncate once at each displayed bucket, never per session. */
 object StatsAggregator {
-
-    fun aggregate(
-        sessions: List<AppUsageSession>,
-        rangeStart: Long,
-        rangeEnd: Long,
-        zone: ZoneId
-    ): FocusStats {
-        val inRange = sessions.filter { it.startedAt in rangeStart until rangeEnd }
-        val openCount = inRange.size
-        val remindedCount = inRange.count { it.remindedAt != null }
-        val activeExitCount = inRange.count { it.userAction in ACTIVE_EXIT_ACTIONS }
-        val continuedCount = inRange.count { it.userAction == "continued" }
-
-        val hourDurations = IntArray(24)
+    fun aggregate(sessions: List<AppUsageSession>, rangeStart: Long, rangeEnd: Long,
+        zone: ZoneId, nowMillis: Long = System.currentTimeMillis()): FocusStats {
+        val endLimit = minOf(rangeEnd, nowMillis)
+        val opened = sessions.filter { it.startedAt >= rangeStart && it.startedAt < endLimit }
+        val inRange = sessions.filter { it.startedAt < endLimit && (it.endedAt ?: endLimit) > rangeStart }
+        val hours = LongArray(24)
         val hourOpens = IntArray(24)
-        val hourApps = MutableList(24) { linkedMapOf<String, Int>() }
-        val daily = LinkedHashMap<LocalDate, DayBucket>()
-        val byApp = LinkedHashMap<String, AppShare>()
-        var totalMinutes = 0
-
+        val hourApps = List(24) { linkedMapOf<String, Long>() }
+        val days = linkedMapOf<LocalDate, Long>()
+        val dayOpens = linkedMapOf<LocalDate, Int>()
+        val appMillis = linkedMapOf<String, Long>()
+        val appNames = linkedMapOf<String, String>()
+        var total = 0L
+        opened.forEach { session ->
+            val dateTime = Instant.ofEpochMilli(session.startedAt).atZone(zone)
+            hourOpens[dateTime.hour]++
+            dayOpens[dateTime.toLocalDate()] = dayOpens.getOrDefault(dateTime.toLocalDate(), 0) + 1
+        }
         for (session in inRange) {
             val start = maxOf(session.startedAt, rangeStart)
-            val end = minOf(session.endedAt ?: rangeEnd, rangeEnd)
+            val end = minOf(session.endedAt ?: endLimit, endLimit)
             if (end <= start) continue
-
-            val startInstant = Instant.ofEpochMilli(start).atZone(zone)
-            val startHour = startInstant.hour
-            val startDay = startInstant.toLocalDate()
-
-            hourOpens[startHour] += 1
-            val dayBucket = daily.getOrPut(startDay) { DayBucket(startDay, 0, 0) }
-            daily[startDay] = dayBucket.copy(openCount = dayBucket.openCount + 1)
-
+            total += end - start
+            appMillis[session.packageName] = appMillis.getOrDefault(session.packageName, 0L) + end - start
+            appNames[session.packageName] = session.appName
             var cursor = start
             while (cursor < end) {
-                val nextHour = cursor - cursor % HOUR_MILLIS + HOUR_MILLIS
-                val segmentEnd = minOf(end, nextHour)
-                val minutes = minutesOf(segmentEnd - cursor)
-                val hour = Instant.ofEpochMilli(cursor).atZone(zone).hour
-                hourDurations[hour] += minutes
-                hourApps[hour][session.appName] =
-                    hourApps[hour].getOrDefault(session.appName, 0) + minutes
-                val day = Instant.ofEpochMilli(cursor).atZone(zone).toLocalDate()
-                val existing = daily.getOrPut(day) { DayBucket(day, 0, 0) }
-                daily[day] = existing.copy(durationMinutes = existing.durationMinutes + minutes)
+                val local = Instant.ofEpochMilli(cursor).atZone(zone)
+                // Use local hour boundaries; UTC-hour modulo is wrong for e.g. Asia/Kolkata.
+                val nextHour = local.toLocalDateTime().truncatedTo(ChronoUnit.HOURS).plusHours(1).atZone(zone).toInstant().toEpochMilli()
+                val nextDay = local.toLocalDate().plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
+                // Split at offset transitions too, including 30-minute DST changes.
+                val transition = zone.rules.nextTransition(local.toInstant())?.instant?.toEpochMilli() ?: Long.MAX_VALUE
+                val segmentEnd = minOf(end, nextHour, nextDay, transition)
+                val duration = segmentEnd - cursor
+                hours[local.hour] += duration
+                hourApps[local.hour][session.appName] = hourApps[local.hour].getOrDefault(session.appName, 0L) + duration
+                days[local.toLocalDate()] = days.getOrDefault(local.toLocalDate(), 0L) + duration
                 cursor = segmentEnd
             }
-
-            totalMinutes += minutesOf(end - start)
-            val app = byApp.getOrPut(session.packageName) {
-                AppShare(session.packageName, session.appName, 0)
-            }
-            byApp[session.packageName] = app.copy(
-                durationMinutes = app.durationMinutes + minutesOf(end - start)
-            )
         }
-
-        val startDate = Instant.ofEpochMilli(rangeStart).atZone(zone).toLocalDate()
-        val endDate = Instant.ofEpochMilli(rangeEnd).atZone(zone).toLocalDate()
-        var date = startDate
-        while (date.isBefore(endDate)) {
-            daily.getOrPut(date) { DayBucket(date, 0, 0) }
-            date = date.plusDays(1)
-        }
-
+        var date = Instant.ofEpochMilli(rangeStart).atZone(zone).toLocalDate()
+        val lastDate = Instant.ofEpochMilli(maxOf(rangeStart, rangeEnd - 1)).atZone(zone).toLocalDate()
+        while (date <= lastDate) { days.putIfAbsent(date, 0L); date = date.plusDays(1) }
+        val exits = opened.count { it.userAction in setOf("returned_to_focus", "returned_home") }
         return FocusStats(
-            totalDurationMinutes = totalMinutes,
-            openCount = openCount,
-            remindedCount = remindedCount,
-            activeExitCount = activeExitCount,
-            continuedCount = continuedCount,
-            exitRate = if (openCount > 0) activeExitCount.toFloat() / openCount else 0f,
-            hourly = (0..23).map { hour ->
-                HourBucket(
-                    hour = hour,
-                    durationMinutes = hourDurations[hour],
-                    openCount = hourOpens[hour],
-                    apps = hourApps[hour]
-                        .map { (appName, minutes) -> HourAppUsage(appName, minutes) }
-                        .sortedByDescending { it.durationMinutes }
-                )
-            },
-            daily = daily.values.sortedBy { it.date },
-            byApp = byApp.values.sortedByDescending { it.durationMinutes }
+            totalDurationMinutes = minutes(total), openCount = opened.size,
+            remindedCount = opened.count { it.remindedAt != null && it.remindedAt <= endLimit },
+            activeExitCount = exits, continuedCount = opened.count { it.userAction == "continued" },
+            exitRate = if (opened.isEmpty()) 0f else exits.toFloat() / opened.size,
+            hourly = (0..23).map { hour -> HourBucket(hour, minutes(hours[hour]), hourOpens[hour],
+                hourApps[hour].map { (name, duration) -> HourAppUsage(name, minutes(duration)) }.sortedByDescending { it.durationMinutes }) },
+            daily = days.map { (day, duration) -> DayBucket(day, minutes(duration), dayOpens[day] ?: 0) }.sortedBy { it.date },
+            byApp = appMillis.map { (pkg, duration) -> AppShare(pkg, appNames.getValue(pkg), minutes(duration)) }.sortedByDescending { it.durationMinutes }
         )
     }
-
-    private const val HOUR_MILLIS = 3_600_000L
-    private const val MINUTE_MILLIS = 60_000L
-
-    private fun minutesOf(millis: Long): Int =
-        ((millis + MINUTE_MILLIS - 1) / MINUTE_MILLIS).toInt()
-
-    private val ACTIVE_EXIT_ACTIONS = setOf("returned_to_focus", "returned_home")
+    private fun minutes(millis: Long) = (millis.coerceAtLeast(0L) / 60_000L).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
 }

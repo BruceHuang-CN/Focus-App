@@ -24,23 +24,35 @@ internal fun shouldProcessQueuedAccessibilityEvent(settings: AppSettings): Boole
 
 internal class AccessibilityForegroundState {
     @Volatile private var latestPackageName: String? = null
+    @Volatile private var latestEventUptime: Long = Long.MIN_VALUE
 
-    fun onWindowStateChanged(packageName: String, isApplicationTask: Boolean) {
+    fun onWindowStateChanged(packageName: String, isApplicationTask: Boolean,
+        eventUptimeMillis: Long = 0L): Boolean {
+        if (eventUptimeMillis < latestEventUptime) return false
         if (isApplicationTask) {
             latestPackageName = packageName
+            latestEventUptime = eventUptimeMillis
         }
+        return true
     }
+
+    fun currentEventUptime(): Long = latestEventUptime
+
+    fun currentPackage(): String? = latestPackageName
 
     fun isForeground(expectedPackage: String): Boolean = latestPackageName == expectedPackage
 }
 
 private data class PackageChange(
     val packageName: String,
+    val eventUptimeMillis: Long,
     val isReminderPresentation: Boolean
 )
 
 @AndroidEntryPoint
 class FocusAccessibilityService : AccessibilityService() {
+    @Inject lateinit var returnNavigationGuard: ReturnNavigationGuard
+    @Inject lateinit var taskRepository: com.example.focus_app.data.repository.TaskRepository
     @Inject lateinit var settingsRepository: SettingsRepository
     @Inject lateinit var appSessionCoordinator: AppSessionCoordinator
     @Inject lateinit var reminderPresentationRegistry: ReminderPresentationRegistry
@@ -61,11 +73,24 @@ class FocusAccessibilityService : AccessibilityService() {
         accessibilityDiagnosticsStore.recordServiceConnected()
         if (monitoringStarted) return
         monitoringStarted = true
+        scope.launch {
+            taskRepository.observeActiveEvents().collect {
+                if (shouldProcessAccessibilityEvents(currentSettings)) {
+                    appSessionCoordinator.refreshTaskContext(::isForeground)
+                }
+            }
+        }
 
         scope.launch {
             settingsRepository.getSettingsFlow().collect { settings ->
                 currentSettings = settings
                 isRealtimeMode = shouldProcessAccessibilityEvents(settings)
+                appSessionCoordinator.reconcileGuardian(
+                    enabled = isRealtimeMode,
+                    targets = settings.targetApps.map { it.packageName }.toSet(),
+                    observedPackage = foregroundState.currentPackage(),
+                    foregroundVerifier = ::isForeground
+                )
             }
         }
         scope.launch {
@@ -73,7 +98,10 @@ class FocusAccessibilityService : AccessibilityService() {
                 if (!shouldProcessQueuedAccessibilityEvent(currentSettings)) continue
                 appSessionCoordinator.onPackageChanged(
                     packageName = change.packageName,
-                    foregroundVerifier = foregroundState::isForeground,
+                    foregroundVerifier = { expected ->
+                        isForeground(expected) && (expected == packageName ||
+                            returnNavigationGuard.allowsExternalEvent(change.eventUptimeMillis))
+                    },
                     isReminderPresentation = change.isReminderPresentation
                 )
             }
@@ -83,11 +111,13 @@ class FocusAccessibilityService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event?.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
         val pkg = event.packageName?.toString() ?: return
+        if (pkg != packageName && !returnNavigationGuard.allowsExternalEvent(event.eventTime)) return
         val isApplicationTask = packageManager.getLaunchIntentForPackage(pkg) != null
-        foregroundState.onWindowStateChanged(
+        if (!foregroundState.onWindowStateChanged(
             packageName = pkg,
-            isApplicationTask = isApplicationTask
-        )
+            isApplicationTask = isApplicationTask,
+            eventUptimeMillis = event.eventTime
+        )) return
         if (isApplicationTask) {
             realtimeForegroundProvider.onRealApplicationForeground(pkg)
         }
@@ -96,12 +126,18 @@ class FocusAccessibilityService : AccessibilityService() {
         packageChanges.trySend(
             PackageChange(
                 packageName = pkg,
+                eventUptimeMillis = event.eventTime,
                 isReminderPresentation = isReminderPresentationForForegroundChange(
                     reminderPresentationRegistry.protectsSession()
                 )
             )
         )
     }
+
+    private fun isForeground(expectedPackage: String): Boolean =
+        foregroundState.isForeground(expectedPackage) &&
+            (expectedPackage == packageName ||
+                returnNavigationGuard.allowsExternalEvent(foregroundState.currentEventUptime()))
 
     override fun onInterrupt() {
         accessibilityDiagnosticsStore.recordServiceInterrupted()

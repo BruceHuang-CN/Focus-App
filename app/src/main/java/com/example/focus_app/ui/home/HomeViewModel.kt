@@ -35,7 +35,7 @@ data class HomeUiState(
     val completedToday: Int = 0,
     val streakDays: Int = 0,
     val guardianEnabled: Boolean = true,
-    val activeGroupName: String = "\u672a\u8bbe\u7f6e\u5e94\u7528\u7ec4",
+    val activeGroupName: String = "",
     val reminderWindowMinutes: Int = 60,
     val windowReminderCount: Int = 0,
     val windowReminderLimit: Int = 3,
@@ -51,7 +51,7 @@ data class HomeUiState(
 
 sealed interface HomeEvent {
     data object ReminderQuotaReset : HomeEvent
-    data class ReminderMessagesRegenerated(val message: String) : HomeEvent
+    data class ReminderMessagesRegenerated(val result: ReminderRegenerationResult) : HomeEvent
 }
 
 @HiltViewModel
@@ -75,6 +75,9 @@ class HomeViewModel @Inject constructor(
 
     init {
         loadStats()
+        viewModelScope.launch {
+            taskRepository.observeActive().collect { active -> _uiState.update { it.copy(activeTask = active) } }
+        }
         observeGuardianState()
         observeAccessibilityDiagnostics()
     }
@@ -107,7 +110,7 @@ class HomeViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         guardianEnabled = guardianEnabled,
-                        activeGroupName = activeGroupName ?: "\u672a\u8bbe\u7f6e\u5e94\u7528\u7ec4"
+                        activeGroupName = activeGroupName.orEmpty()
                     )
                 }
             }
@@ -137,7 +140,7 @@ class HomeViewModel @Inject constructor(
                     remindedCountToday = todaySessions.count { it.remindedAt != null },
                     exitedCountToday = todaySessions.count { it.userAction in ACTIVE_EXIT_ACTIONS },
                     latestMood = moodRepository.getLatestMood()?.mood,
-                    activeTask = taskRepository.observeActive().first(),
+                    activeTask = it.activeTask,
                     completedToday = completedToday,
                     recentReminders = recentReminders,
                     reminderWindowMinutes = settings.reminderWindowMinutes,
@@ -180,15 +183,8 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             val result = regenerateReminderMessagesUseCase()
             _uiState.update { it.copy(isRegeneratingMessages = false) }
-            _events.emit(HomeEvent.ReminderMessagesRegenerated(result.userMessage()))
+            _events.emit(HomeEvent.ReminderMessagesRegenerated(result))
         }
-    }
-
-    private fun ReminderRegenerationResult.userMessage(): String = when (this) {
-        is ReminderRegenerationResult.Success -> "AI 文案已更新（$targetCount 个目标应用）"
-        ReminderRegenerationResult.NoActiveTask -> "请先创建或选中当前任务"
-        ReminderRegenerationResult.NoTargetApps -> "请先设置需要监控的目标应用"
-        is ReminderRegenerationResult.Failed -> "生成失败：$reason；已保留原文案"
     }
 
     private companion object {

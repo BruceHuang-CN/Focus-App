@@ -18,10 +18,12 @@ data class ReminderLaunchData(
     val returnPackageName: String = "",
     val forceReminder: Boolean = false,
     val attemptId: String = "",
-    val displayKind: ReminderDisplayKind = ReminderDisplayKind.INITIAL
+    val displayKind: ReminderDisplayKind = ReminderDisplayKind.INITIAL,
+    val taskContextStartedAt: Long = 0
 ) {
     companion object {
         const val EXTRA_SESSION_ID = "session_id"
+        const val EXTRA_TASK_CONTEXT_STARTED_AT = "task_context_started_at"
         const val EXTRA_TASK_ID = "task_id"
         const val EXTRA_TASK_TITLE = "task_title"
         const val EXTRA_APP_NAME = "app_name"

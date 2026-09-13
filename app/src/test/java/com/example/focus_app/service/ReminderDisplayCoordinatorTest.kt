@@ -50,7 +50,7 @@ class ReminderDisplayCoordinatorTest {
     }
 
     @Test
-    fun forced_redisplay_keeps_the_original_count_without_recording_another_touch() = runTest {
+    fun forced_redisplay_records_actual_display_with_quota_bypass() = runTest {
         val repository = FakeReminderDisplayRepository(ReminderDisplayResult.Displayed(4))
         val coordinator = ReminderDisplayCoordinator(repository, clock = { 10_000L })
 
@@ -63,9 +63,9 @@ class ReminderDisplayCoordinatorTest {
             )
         )
 
-        assertEquals(1, confirmed?.windowReminderCount)
-        assertEquals(emptyList<String>(), repository.attemptIds)
-        assertEquals(emptyList<Int>(), repository.limits)
+        assertEquals(4, confirmed?.windowReminderCount)
+        assertEquals(listOf("attempt-2"), repository.attemptIds)
+        assertEquals(listOf(Int.MAX_VALUE), repository.limits)
     }
 
     private class FakeReminderDisplayRepository(

@@ -1,0 +1,5 @@
+<resources>
+    <string name="language_tag">zh-CN</string>
+    <string name="language_system">跟随系统</string>
+    <string name="language_selection">语言：%1$s</string>
+</resources>

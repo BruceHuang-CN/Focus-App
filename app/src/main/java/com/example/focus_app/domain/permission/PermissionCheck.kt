@@ -37,10 +37,11 @@ object PermissionCheckEvaluator {
         hasTargetApps: Boolean
     ): List<PermissionCheckItem> = when (mode) {
         DetectionMode.REALTIME -> listOf(
+            item("usage", "使用情况访问权限", "用于提醒到期时复核前台应用", usageStatsGranted, PermissionCheckAction.OPEN_USAGE_STATS),
             item(
                 id = "accessibility",
                 label = "系统无障碍服务",
-                detail = "设置 → 无障碍 → Focus 专注助手",
+                detail = "设置 → 无障碍 → 回神",
                 ok = accessibilityEnabled,
                 action = PermissionCheckAction.OPEN_ACCESSIBILITY
             ),

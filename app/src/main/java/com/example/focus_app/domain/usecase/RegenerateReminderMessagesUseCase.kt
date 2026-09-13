@@ -1,5 +1,9 @@
 package com.example.focus_app.domain.usecase
 
+import android.content.Context
+import com.example.focus_app.data.language.AppLanguage
+import com.example.focus_app.data.remote.AiFailure
+import dagger.hilt.android.qualifiers.ApplicationContext
 import com.example.focus_app.data.repository.AiRepository
 import com.example.focus_app.data.repository.AppInfo
 import com.example.focus_app.data.repository.AppSettings
@@ -24,7 +28,8 @@ class RegenerateReminderMessagesUseCase internal constructor(
     private val settings: suspend () -> AppSettings,
     private val buildContext: suspend (FocusTask, AppInfo, AppSettings) -> ReminderContext,
     private val generateRemote: suspend (ReminderContext, AppSettings) -> Result<List<String>>,
-    private val replaceCache: suspend (Long, String, String, List<String>) -> Unit
+    private val replaceCache: suspend (Long, String, String, List<String>) -> Unit,
+    private val currentLanguage: () -> String = { "zh-CN" }
 ) {
     @Inject
     constructor(
@@ -32,13 +37,15 @@ class RegenerateReminderMessagesUseCase internal constructor(
         settingsRepository: SettingsRepository,
         contextBuilder: BuildReminderContextUseCase,
         aiRepository: AiRepository,
-        cacheRepository: ReminderCacheRepository
+        cacheRepository: ReminderCacheRepository,
+        @ApplicationContext applicationContext: Context
     ) : this(
         activeTask = { taskRepository.observeActive().first() },
         settings = settingsRepository::getSettings,
         buildContext = contextBuilder::invoke,
-        generateRemote = { context, current -> aiRepository.generateRemoteBatch(context, current) },
-        replaceCache = cacheRepository::replace
+        generateRemote = { context, current -> aiRepository.generateRemoteBatch(context, current, languageTag = context.languageTag) },
+        replaceCache = { taskId, packageName, bucket, messages -> cacheRepository.replace(taskId, packageName, bucket, messages, "zh-CN") },
+        currentLanguage = { AppLanguage.tag(applicationContext) }
     )
 
     suspend operator fun invoke(): ReminderRegenerationResult {
@@ -47,11 +54,12 @@ class RegenerateReminderMessagesUseCase internal constructor(
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Exception) {
-            ReminderRegenerationResult.Failed(error.message ?: "DeepSeek 请求失败")
+            ReminderRegenerationResult.Failed(AiFailure.fromException(error).message(currentLanguage()))
         }
     }
 
     private suspend fun regenerate(): ReminderRegenerationResult {
+        val languageTag = currentLanguage()
         val task = activeTask() ?: return ReminderRegenerationResult.NoActiveTask
         val currentSettings = settings()
         val targets = currentSettings.targetApps.distinctBy { it.packageName }
@@ -59,10 +67,10 @@ class RegenerateReminderMessagesUseCase internal constructor(
 
         val generated = mutableListOf<Pair<AppInfo, List<String>>>()
         for (app in targets) {
-            val context = buildContext(task, app, currentSettings)
+            val context = buildContext(task, app, currentSettings).copy(languageTag = languageTag)
             val messages = generateRemote(context, currentSettings).getOrElse { error ->
                 return ReminderRegenerationResult.Failed(
-                    error.message ?: "DeepSeek 请求失败"
+                    error.message ?: AiFailure.REQUEST.message(languageTag)
                 )
             }
             generated += app to messages
@@ -73,6 +81,7 @@ class RegenerateReminderMessagesUseCase internal constructor(
         val originalPackages = targets.map { it.packageName }
         val latestPackages = latestSettings.targetApps.distinctBy { it.packageName }.map { it.packageName }
         if (
+            currentLanguage() != languageTag ||
             latestTask?.id != task.id ||
             latestTask?.updatedAt != task.updatedAt ||
             latestSettings.toneKey != currentSettings.toneKey ||
@@ -82,11 +91,11 @@ class RegenerateReminderMessagesUseCase internal constructor(
             latestSettings.aiModel != currentSettings.aiModel ||
             latestPackages != originalPackages
         ) {
-            return ReminderRegenerationResult.Failed("任务或 AI 设置已变化，请重新生成")
+            return ReminderRegenerationResult.Failed(if (currentLanguage().startsWith("en", true)) "The task, language or AI settings changed. Generate again." else "任务、语言或 AI 设置已变化，请重新生成")
         }
 
         generated.forEach { (app, messages) ->
-            replaceCache(task.id, app.packageName, currentSettings.toneKey.key, messages)
+            replaceCache(task.id, app.packageName, ReminderCacheRepository.languageToneKey(currentSettings.toneKey.key, languageTag), messages)
         }
         return ReminderRegenerationResult.Success(targetCount = generated.size)
     }

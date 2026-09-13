@@ -1,5 +1,6 @@
 package com.example.focus_app.data.local.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import com.example.focus_app.domain.model.FocusTask
@@ -14,7 +15,12 @@ data class FocusTaskEntity(
     val scheduleEndMinute: Int? = null,
     val repeatDaysMask: Int = 0,
     val createdAt: Long,
-    val updatedAt: Long
+    val updatedAt: Long,
+    @ColumnInfo(defaultValue = "1") val groupId: Long = 1,
+    @ColumnInfo(defaultValue = "0") val sortOrder: Long = 0,
+    @ColumnInfo(defaultValue = "0") val inheritsGroupSchedule: Boolean = false,
+    val manualStartedAt: Long? = null,
+    val manualUntil: Long? = null
 )
 
 fun FocusTaskEntity.toDomain(): FocusTask = FocusTask(
@@ -26,7 +32,9 @@ fun FocusTaskEntity.toDomain(): FocusTask = FocusTask(
     scheduleEndMinute = scheduleEndMinute,
     repeatDaysMask = repeatDaysMask,
     createdAt = createdAt,
-    updatedAt = updatedAt
+    updatedAt = updatedAt,
+    groupId = groupId, sortOrder = sortOrder, inheritsGroupSchedule = inheritsGroupSchedule,
+    manualStartedAt = manualStartedAt, manualUntil = manualUntil
 )
 
 fun FocusTask.toEntity(): FocusTaskEntity = FocusTaskEntity(
@@ -38,5 +46,7 @@ fun FocusTask.toEntity(): FocusTaskEntity = FocusTaskEntity(
     scheduleEndMinute = scheduleEndMinute,
     repeatDaysMask = repeatDaysMask,
     createdAt = createdAt,
-    updatedAt = updatedAt
+    updatedAt = updatedAt,
+    groupId = groupId, sortOrder = sortOrder, inheritsGroupSchedule = inheritsGroupSchedule,
+    manualStartedAt = manualStartedAt, manualUntil = manualUntil
 )

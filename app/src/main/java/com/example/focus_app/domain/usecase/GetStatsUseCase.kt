@@ -28,7 +28,8 @@ class GetStatsUseCase(
             sessions.sessionsBetween(rangeStart, rangeEnd),
             rangeStart,
             rangeEnd,
-            zone
+            zone,
+            nowMillis = clock.nowMillis()
         )
     }
 }

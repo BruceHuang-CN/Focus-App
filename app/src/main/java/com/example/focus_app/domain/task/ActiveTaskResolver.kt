@@ -5,21 +5,10 @@ import java.time.ZonedDateTime
 
 class ActiveTaskResolver {
     fun resolve(tasks: List<FocusTask>, now: ZonedDateTime): FocusTask? {
-        val minuteOfDay = now.hour * 60 + now.minute
-        val dayMask = 1 shl (now.dayOfWeek.value - 1)
-        val scheduled = tasks.filter { task ->
-            !task.isCompleted &&
-                task.scheduleStartMinute != null &&
-                task.scheduleEndMinute != null &&
-                (task.repeatDaysMask and dayMask) != 0 &&
-                minuteOfDay >= task.scheduleStartMinute &&
-                minuteOfDay < task.scheduleEndMinute
-        }.sortedWith(compareBy<FocusTask> { it.id }.thenBy { it.createdAt }).firstOrNull()
-
-        if (scheduled != null) return scheduled
-
-        return tasks.filter { !it.isCompleted && it.isManualActive }
-            .sortedWith(compareBy<FocusTask> { it.id }.thenBy { it.createdAt })
-            .firstOrNull()
+        val pending = tasks.filterNot { it.isCompleted }
+        return pending.filter { TaskActivation.manualValid(it, now) }
+            .maxByOrNull { it.manualStartedAt ?: 0 }
+            ?: pending.filter { TaskActivation.window(it, now) != null }
+                .minWithOrNull(compareBy<FocusTask> { it.sortOrder }.thenBy { it.id })
     }
 }

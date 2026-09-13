@@ -32,6 +32,7 @@ class FocusApp : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
+        com.example.focus_app.data.language.AppLanguage.initialize(this)
         accessibilityDiagnosticsStore.recordAppLaunch(packageLastUpdateTime())
         reminderBatchCoordinator.start(applicationScope)
         applicationScope.launch {
@@ -43,6 +44,11 @@ class FocusApp : Application(), Configuration.Provider {
         get() = Configuration.Builder()
             .setWorkerFactory(workerFactory)
             .build()
+
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        com.example.focus_app.data.language.AppLanguage.refresh(this)
+    }
 
     @Suppress("DEPRECATION")
     private fun packageLastUpdateTime(): Long =
