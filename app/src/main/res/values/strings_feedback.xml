@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 入口 -->
+    <string name="feedback_report_entry_title">问题反馈</string>
+    <string name="feedback_report_entry_description">遇到问题时，可以直接在 App 内填写描述并附上可选诊断信息，一键提交给开发者。</string>
+    <string name="feedback_report_entry_action">填写问题反馈</string>
+
+    <!-- 页面 -->
+    <string name="feedback_report_title">问题反馈</string>
+    <string name="feedback_report_problem_label">遇到了什么问题？（必填）</string>
+    <string name="feedback_report_problem_placeholder">例如：开启守护后打开小红书，等了 30 秒没有提醒，重试两次都一样。请按你的实际情况填写。</string>
+    <string name="feedback_report_steps_label">操作过程（选填）</string>
+    <string name="feedback_report_steps_placeholder">如果一句话说不清，可以按顺序补充：先做了什么，再点了哪里。</string>
+    <string name="feedback_report_expected_label">你原本希望怎样？（选填）</string>
+    <string name="feedback_report_expected_placeholder">例如：进入小红书约 10 秒后收到提醒。</string>
+    <string name="feedback_report_steps_section_toggle">补充操作过程和预期（选填）</string>
+    <string name="feedback_report_steps_section_toggle_expanded">收起选填内容</string>
+    <string name="feedback_report_counter">%1$d/%2$d</string>
+    <string name="feedback_report_required">请先填写这个问题。</string>
+    <string name="feedback_report_too_long">已超过 %1$d 个字符上限，请精简后再提交。</string>
+
+    <!-- 诊断级别 -->
+    <string name="feedback_report_diagnostics_toggle">附带基础诊断信息（推荐）</string>
+    <string name="feedback_report_diagnostics_toggle_hint">自动附上设备与版本、权限与服务状态、守护应用数量、提醒额度和显示设置。可先查看，不含任务正文、应用名单或 API 密钥。</string>
+    <string name="feedback_report_diagnostics_more_options">更多诊断选项</string>
+    <string name="feedback_report_diagnostics_less_options">收起诊断选项</string>
+    <string name="feedback_report_diagnostics_detailed_toggle">附带详细诊断信息</string>
+    <string name="feedback_report_diagnostics_detailed_hint">额外附上系统语言、服务历史时间和提醒延迟设置。</string>
+    <string name="feedback_report_show_diagnostics">查看诊断信息</string>
+    <string name="feedback_report_diagnostics_title">将附带的诊断信息</string>
+    <string name="feedback_report_diagnostics_close">关闭</string>
+    <string name="feedback_report_loading_diagnostics">正在读取诊断信息…</string>
+    <string name="feedback_report_diagnostics_failed">诊断信息读取失败，正文会把这些字段标记为“无法读取”。</string>
+    <string name="feedback_report_refresh_diagnostics">刷新诊断信息</string>
+
+    <!-- 提交 -->
+    <string name="feedback_report_privacy_note">反馈由回神开发者在 brucehere.com 私下查看。你只需描述现象，无需提供修改方案。自动诊断会随正文提交，可在提交前查看或关闭。</string>
+    <string name="feedback_report_submit_action">提交反馈</string>
+    <string name="feedback_report_submitting">正在提交…</string>
+    <string name="feedback_report_preview_action">查看将提交的内容</string>
+    <string name="feedback_report_preview_title">将提交的完整内容</string>
+    <string name="feedback_report_success_title">已收到，谢谢你</string>
+    <string name="feedback_report_success_message">反馈编号</string>
+    <string name="feedback_report_copy_receipt">复制编号</string>
+    <string name="feedback_report_copy_receipt_success">反馈编号已复制到剪贴板。</string>
+    <string name="feedback_report_copy_receipt_failed">无法访问剪贴板，请重试。</string>
+    <string name="feedback_report_start_new">再反馈一个问题</string>
+    <string name="feedback_report_restored_title">发现上次未确认收到的反馈</string>
+    <string name="feedback_report_restored_message">已恢复上次填写的内容和诊断。可以直接重试提交，也可以开始一个新反馈。</string>
+    <string name="feedback_report_retry_action">重试提交</string>
+    <string name="feedback_report_error_unavailable">暂未确认收到，内容已保留。可能是网络或服务暂时不可用，请稍后重试。</string>
+    <string name="feedback_report_error_rejected">服务器未能接受这次提交（%1$s），请检查内容后再试。</string>
+    <string name="feedback_report_error_conflict">这次反馈与已有记录冲突，请修改后作为新反馈提交。</string>
+    <string name="feedback_report_error_rate_limited">提交得有点频繁，请约 %1$d 秒后重试。</string>
+
+    <!-- 备用方式 -->
+    <string name="feedback_report_other_ways_hint">其他方式：生成内容后复制或系统分享。</string>
+    <string name="feedback_report_share_action">系统分享</string>
+    <string name="feedback_report_copy_action">复制反馈内容</string>
+    <string name="feedback_report_copy_success">反馈内容已复制到剪贴板。</string>
+    <string name="feedback_report_copy_failed">无法访问剪贴板，请重试。</string>
+    <string name="feedback_report_share_failed">没有可用的分享应用，可以复制反馈内容后手动发送。</string>
+    <string name="feedback_report_share_hint">系统分享和复制只是备用方式，不代表反馈已经由服务器确认收到。</string>
+    <string name="feedback_report_share_subject">回神问题反馈</string>
+    <string name="feedback_report_clip_label">回神问题反馈</string>
+
+    <!-- 正文文本 -->
+    <string name="feedback_report_label_suffix">：</string>
+    <string name="feedback_report_text_title">回神问题反馈</string>
+    <string name="feedback_report_text_problem">问题描述</string>
+    <string name="feedback_report_text_steps">复现过程</string>
+    <string name="feedback_report_text_expected">预期结果</string>
+    <string name="feedback_report_text_diagnostics">可选诊断信息</string>
+    <string name="feedback_report_text_empty">未填写</string>
+    <string name="feedback_report_text_no_record">暂无记录</string>
+    <string name="feedback_report_text_unavailable">无法读取</string>
+    <string name="feedback_report_text_yes">是</string>
+    <string name="feedback_report_text_no">否</string>
+    <string name="feedback_report_text_detection_realtime">实时模式</string>
+    <string name="feedback_report_text_detection_compatibility">兼容模式</string>
+    <string name="feedback_report_text_manufacturer">手机厂商</string>
+    <string name="feedback_report_text_model">手机型号</string>
+    <string name="feedback_report_text_android_version">Android 版本</string>
+    <string name="feedback_report_text_api_level">API Level</string>
+    <string name="feedback_report_text_version_name">应用版本</string>
+    <string name="feedback_report_text_version_code">版本号（versionCode）</string>
+    <string name="feedback_report_text_system_language">系统语言</string>
+    <string name="feedback_report_text_collected_at">诊断采集时间</string>
+    <string name="feedback_report_text_service_bound">无障碍服务已连接（App 记录）</string>
+    <string name="feedback_report_text_last_connected">最近连接时间</string>
+    <string name="feedback_report_text_last_destroyed">最近断开时间</string>
+    <string name="feedback_report_text_last_interrupted">最近中断时间</string>
+    <string name="feedback_report_text_diagnostics_note">服务连接记录来自 App 自身，只表示 App 记录到的状态，不代表系统授权开关、崩溃原因或提醒已送达。</string>
+    <string name="feedback_report_text_settings_header">本地设置摘要</string>
+    <string name="feedback_report_text_guardian_enabled">守护开关</string>
+    <string name="feedback_report_text_detection_mode">检测模式</string>
+    <string name="feedback_report_text_reminder_delay">提醒延迟（秒）</string>
+    <string name="feedback_report_text_reminder_window">提醒窗口（分钟）</string>
+    <string name="feedback_report_text_max_reminders">窗口内提醒上限（次）</string>
+
+    <!-- 清晰描述与可见的自动诊断补充 -->
+    <string name="feedback_guide_intro">不用分析原因，写出当时做了什么、实际发生了什么即可。</string>
+    <string name="feedback_guide_choose">不知道怎么描述？可以点一下看提示（选填）</string>
+    <string name="feedback_guide_guardian">守护 / 提醒</string>
+    <string name="feedback_guide_ui">界面 / 操作</string>
+    <string name="feedback_guide_other">其他问题</string>
+    <string name="feedback_guide_guardian_hint">说说打开了哪款应用、等了多久、有没有出现提醒。如果记得，也可以写下大致时间，以及每次都会发生还是偶尔发生。</string>
+    <string name="feedback_guide_ui_hint">说说在哪个页面、点了哪个按钮，以及实际看到什么。比如文字被挡住、无法滑到底或点了没反应。</string>
+    <string name="feedback_guide_other_hint">说说问题出现前做了什么、有没有错误提示，以及重试后是否仍然出现。不记得的可以不填。</string>
+    <string name="feedback_report_combined_too_long">操作过程加上自动诊断超过了 2000 字。请精简操作过程，或关闭附带诊断后提交；你的原文没有被截断。</string>
+    <string name="feedback_context_header">自动诊断补充</string>
+    <string name="feedback_context_note">以下是采集时的状态，不代表问题发生时的状态，也不直接判定故障原因。</string>
+    <string name="feedback_context_accessibility">无障碍系统开关已开启</string>
+    <string name="feedback_context_notifications">通知已允许</string>
+    <string name="feedback_context_overlay">悬浮窗已允许</string>
+    <string name="feedback_context_usage">使用情况访问已允许</string>
+    <string name="feedback_context_battery">已获电池优化豁免</string>
+    <string name="feedback_context_app_count">已选择的守护应用数量</string>
+    <string name="feedback_context_reminder_count">当前窗口已计入额度的提醒次数</string>
+    <string name="feedback_context_width">当前窗口宽度（dp）</string>
+    <string name="feedback_context_height">当前窗口高度（dp）</string>
+    <string name="feedback_context_font_scale">系统字体缩放倍数</string>
+    <string name="feedback_context_dark_theme">系统处于深色模式</string>
+</resources>

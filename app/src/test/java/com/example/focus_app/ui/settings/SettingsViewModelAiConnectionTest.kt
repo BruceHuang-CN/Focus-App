@@ -118,7 +118,7 @@ class SettingsViewModelAiConnectionTest {
 
         val state = viewModel.aiConnection.value
         assertTrue(state is AiConnectionUiState.Error)
-        assertEquals("API Key 无效或无权限", (state as AiConnectionUiState.Error).message)
+        assertEquals("API Key 无效，或与 API 地址不匹配", (state as AiConnectionUiState.Error).message)
     }
 
     @Test

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="polish_guardian_settings">Guardian settings</string>
+    <string name="polish_complete_failed">Could not save task completion. Please try again.</string>
+    <string name="polish_task_completed">✓ One more thing done</string>
+    <string name="polish_breath_tap">Tap to gather particles and grow the center orb</string>
+    <string name="summary_title">Daily reflection</string>
+    <string name="summary_schedule">Daily AI reflection reminder</string>
+    <string name="summary_schedule_help">When enabled, use your configured API and model at your chosen local time. Sends completed-task counts, monitored-app usage totals and a mood category; excludes task text, mood notes and app lists. Model usage may incur charges. Battery restrictions may delay reminders.</string>
+    <string name="summary_time">Reminder time · %1$s</string>
+    <string name="summary_enable_notifications">Enable system notifications for reminders</string>
+    <string name="summary_notification_ready">Your daily reflection is ready. Tap to read it.</string>
+    <string name="summary_notification_pending">Time to reflect. Tap to view your data or retry generation.</string>
+    <string name="summary_data_help">Sends task counts, monitored-app usage totals and a mood category to your configured API and model; charges may apply. Data is captured at the time shown. Monitored-app usage is not focus duration.</string>
+    <string name="summary_facts">%1$d tasks completed · %2$d min in monitored apps · %3$d opens</string>
+    <string name="summary_empty">No reflection yet. Generate one now or enable daily reminders in Settings.</string>
+    <string name="summary_failed">Could not read today’s data. Please try again.</string>
+    <string name="summary_generating">Generating…</string>
+    <string name="summary_generate">Generate / update today’s reflection</string>
+    <string name="polish_self_control_feedback">Well done! You’ve regained a little self-control.</string>
+    <string name="polish_pending_checks">Check: %1$s</string>
+    <string name="polish_no_guarded_apps">No guarded apps selected yet. Reminders will start after you choose apps.</string>
+    <string name="polish_choose_guarded_apps">Choose guarded apps</string>
+    <string name="polish_manage_guarded_apps">Manage guarded apps (%1$d)</string>
+    <string name="polish_accessibility_reconnect">Accessibility is enabled, but the service is disconnected. Turn Huishen off and on in accessibility settings, then return to check its connection.</string>
+    <string name="polish_celebration_title">Well done!</string>
+    <string name="polish_celebration_body">You’ve regained a little\nself-control.</string>
+    <string name="polish_celebration_continue">Tap to continue</string>
+</resources>

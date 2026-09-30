@@ -36,13 +36,14 @@ import java.time.DayOfWeek
 fun StatsContent(state: StatsUiState, modifier: Modifier = Modifier,
     onRange: (StatsRange) -> Unit = {}, onPeriod: (ActivityPeriod) -> Unit = {},
     onShiftPeriod: (Int) -> Unit = {}, onDay: (LocalDate) -> Unit = {},
-    onDecision: (DecisionKind) -> Unit = {}, onDetails: () -> Unit = {}, onRetry: () -> Unit = {}) {
+    onDecision: (DecisionKind) -> Unit = {}, onDetails: () -> Unit = {}, onRetry: () -> Unit = {}, dailyContent: @Composable () -> Unit = {}) {
     val textContext = androidx.compose.ui.platform.LocalContext.current
     Column(modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)
         .verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Spacer(Modifier.height(12.dp))
         Text(textContext.getString(R.string.core_stats), fontSize = 40.sp, fontWeight = FontWeight.ExtraBold)
         Text(textContext.getString(R.string.core_stats_subtitle), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        dailyContent()
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             StatsRange.entries.forEach { range ->
                 Surface(onClick = { onRange(range) }, shape = RoundedCornerShape(18.dp), modifier = Modifier.weight(1f),
@@ -66,9 +67,6 @@ fun StatsContent(state: StatsUiState, modifier: Modifier = Modifier,
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (snapshot.legacySessionCount > 0) Text(textContext.getString(R.string.core_legacy_count, snapshot.legacySessionCount),
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        StatsCard {
-            SectionHeading(Icons.Default.Star, textContext.getString(R.string.core_today_status), textContext.getString(R.string.core_status_soon))
         }
         Spacer(Modifier.height(4.dp))
     }

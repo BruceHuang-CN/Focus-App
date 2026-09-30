@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Entry point -->
+    <string name="feedback_report_entry_title">Report an issue</string>
+    <string name="feedback_report_entry_description">Describe the problem inside the app and attach optional diagnostics, then submit it to the developer in one tap.</string>
+    <string name="feedback_report_entry_action">Write a report</string>
+
+    <!-- Screen -->
+    <string name="feedback_report_title">Report an issue</string>
+    <string name="feedback_report_problem_label">What went wrong? (required)</string>
+    <string name="feedback_report_problem_placeholder">Example: I enabled the guardian, opened an app, waited 30 seconds, and saw no reminder. It happened twice. Describe what actually happened to you.</string>
+    <string name="feedback_report_steps_label">What you did (optional)</string>
+    <string name="feedback_report_steps_placeholder">If needed, add the actions in order: what you did first and what you tapped next.</string>
+    <string name="feedback_report_expected_label">What did you expect? (optional)</string>
+    <string name="feedback_report_expected_placeholder">For example: a reminder about 10 seconds after entering Xiaohongshu.</string>
+    <string name="feedback_report_steps_section_toggle">Add steps and expectations (optional)</string>
+    <string name="feedback_report_steps_section_toggle_expanded">Hide optional details</string>
+    <string name="feedback_report_counter">%1$d/%2$d</string>
+    <string name="feedback_report_required">Please describe the problem first.</string>
+    <string name="feedback_report_too_long">Over the %1$d character limit. Please shorten it before submitting.</string>
+
+    <!-- Diagnostic levels -->
+    <string name="feedback_report_diagnostics_toggle">Attach basic diagnostics (recommended)</string>
+    <string name="feedback_report_diagnostics_toggle_hint">Includes device and version, permissions and service status, guardian app count, reminder quota, and display settings. Preview first if you wish. No task text, app list, or API keys.</string>
+    <string name="feedback_report_diagnostics_more_options">More diagnostic options</string>
+    <string name="feedback_report_diagnostics_less_options">Hide diagnostic options</string>
+    <string name="feedback_report_diagnostics_detailed_toggle">Attach detailed diagnostics</string>
+    <string name="feedback_report_diagnostics_detailed_hint">Also includes system language, service history times, and reminder delay settings.</string>
+    <string name="feedback_report_show_diagnostics">View diagnostics</string>
+    <string name="feedback_report_diagnostics_title">Diagnostics to attach</string>
+    <string name="feedback_report_diagnostics_close">Close</string>
+    <string name="feedback_report_loading_diagnostics">Reading diagnostics…</string>
+    <string name="feedback_report_diagnostics_failed">Diagnostics could not be read. The report marks those fields as unavailable.</string>
+    <string name="feedback_report_refresh_diagnostics">Refresh diagnostics</string>
+
+    <!-- Submission -->
+    <string name="feedback_report_privacy_note">The developer reads feedback privately at brucehere.com. Describe the issue; you do not need to suggest a fix. Automatic diagnostics are sent with the report and can be viewed or turned off before submitting.</string>
+    <string name="feedback_report_submit_action">Submit report</string>
+    <string name="feedback_report_submitting">Submitting…</string>
+    <string name="feedback_report_preview_action">View what will be sent</string>
+    <string name="feedback_report_preview_title">Full content to be sent</string>
+    <string name="feedback_report_success_title">Received, thank you</string>
+    <string name="feedback_report_success_message">Receipt</string>
+    <string name="feedback_report_copy_receipt">Copy receipt</string>
+    <string name="feedback_report_copy_receipt_success">Receipt copied to the clipboard.</string>
+    <string name="feedback_report_copy_receipt_failed">Could not access the clipboard. Please try again.</string>
+    <string name="feedback_report_start_new">Report another issue</string>
+    <string name="feedback_report_restored_title">An earlier report was not confirmed</string>
+    <string name="feedback_report_restored_message">Your previous text and diagnostics have been restored. You can retry the same submission or start a new report.</string>
+    <string name="feedback_report_retry_action">Retry submission</string>
+    <string name="feedback_report_error_unavailable">Receipt not confirmed. Your content is saved. The network or service may be temporarily unavailable. Please try again later.</string>
+    <string name="feedback_report_error_rejected">The server did not accept this submission (%1$s). Please review the content and try again.</string>
+    <string name="feedback_report_error_conflict">This report conflicts with an existing record. Please edit it and submit as a new report.</string>
+    <string name="feedback_report_error_rate_limited">Submitting too often. Please try again in about %1$d seconds.</string>
+
+    <!-- Fallback ways -->
+    <string name="feedback_report_other_ways_hint">Other ways: generate the content, then copy or share it.</string>
+    <string name="feedback_report_share_action">Share</string>
+    <string name="feedback_report_copy_action">Copy report</string>
+    <string name="feedback_report_copy_success">Report copied to the clipboard.</string>
+    <string name="feedback_report_copy_failed">Could not access the clipboard. Please try again.</string>
+    <string name="feedback_report_share_failed">No app can receive this text. You can copy the report and send it manually.</string>
+    <string name="feedback_report_share_hint">Sharing and copying are fallbacks only. They do not mean the server confirmed receipt.</string>
+    <string name="feedback_report_share_subject">Huishen issue report</string>
+    <string name="feedback_report_clip_label">Huishen issue report</string>
+
+    <!-- Report body -->
+    <string name="feedback_report_label_suffix">:</string>
+    <string name="feedback_report_text_title">Huishen issue report</string>
+    <string name="feedback_report_text_problem">Problem</string>
+    <string name="feedback_report_text_steps">Steps to reproduce</string>
+    <string name="feedback_report_text_expected">Expected result</string>
+    <string name="feedback_report_text_diagnostics">Optional diagnostics</string>
+    <string name="feedback_report_text_empty">Not provided</string>
+    <string name="feedback_report_text_no_record">No record</string>
+    <string name="feedback_report_text_unavailable">Unavailable</string>
+    <string name="feedback_report_text_yes">Yes</string>
+    <string name="feedback_report_text_no">No</string>
+    <string name="feedback_report_text_detection_realtime">Realtime</string>
+    <string name="feedback_report_text_detection_compatibility">Compatibility</string>
+    <string name="feedback_report_text_manufacturer">Device manufacturer</string>
+    <string name="feedback_report_text_model">Device model</string>
+    <string name="feedback_report_text_android_version">Android version</string>
+    <string name="feedback_report_text_api_level">API level</string>
+    <string name="feedback_report_text_version_name">App version</string>
+    <string name="feedback_report_text_version_code">Version code</string>
+    <string name="feedback_report_text_system_language">System language</string>
+    <string name="feedback_report_text_collected_at">Diagnostics collected at</string>
+    <string name="feedback_report_text_service_bound">Accessibility service connected (app record)</string>
+    <string name="feedback_report_text_last_connected">Last connected at</string>
+    <string name="feedback_report_text_last_destroyed">Last disconnected at</string>
+    <string name="feedback_report_text_last_interrupted">Last interrupted at</string>
+    <string name="feedback_report_text_diagnostics_note">Service connection records come from the app itself. They do not prove that the system permission is on, that a reminder was delivered, or that a crash happened.</string>
+    <string name="feedback_report_text_settings_header">Local settings summary</string>
+    <string name="feedback_report_text_guardian_enabled">Guardian enabled</string>
+    <string name="feedback_report_text_detection_mode">Detection mode</string>
+    <string name="feedback_report_text_reminder_delay">Reminder delay (seconds)</string>
+    <string name="feedback_report_text_reminder_window">Reminder window (minutes)</string>
+    <string name="feedback_report_text_max_reminders">Reminders per window</string>
+
+    <!-- 清晰描述与可见的自动诊断补充 -->
+    <string name="feedback_guide_intro">No need to diagnose the cause. Tell us what you did and what happened.</string>
+    <string name="feedback_guide_choose">Need help describing it? Choose a tip (optional)</string>
+    <string name="feedback_guide_guardian">Guardian / reminders</string>
+    <string name="feedback_guide_ui">Screen / actions</string>
+    <string name="feedback_guide_other">Other issues</string>
+    <string name="feedback_guide_guardian_hint">Which app did you open, how long did you wait, and did a reminder appear? If you remember, add the approximate time and whether it happens every time or occasionally.</string>
+    <string name="feedback_guide_ui_hint">Which screen and button were involved, and what did you see? For example, hidden text, a screen that will not scroll, or a button that does not respond.</string>
+    <string name="feedback_guide_other_hint">What did you do before the issue? Was there an error message, and did trying again help? Leave anything you do not remember blank.</string>
+    <string name="feedback_report_combined_too_long">Your steps plus automatic diagnostics exceed 2,000 characters. Shorten the steps or turn off diagnostics. Your original text has not been truncated.</string>
+    <string name="feedback_context_header">Automatic diagnostic supplement</string>
+    <string name="feedback_context_note">Collected now. These values do not reconstruct the issue or establish its cause.</string>
+    <string name="feedback_context_accessibility">Accessibility system switch enabled</string>
+    <string name="feedback_context_notifications">Notifications allowed</string>
+    <string name="feedback_context_overlay">Display over other apps allowed</string>
+    <string name="feedback_context_usage">Usage access allowed</string>
+    <string name="feedback_context_battery">Battery optimization exemption granted</string>
+    <string name="feedback_context_app_count">Number of selected guardian apps</string>
+    <string name="feedback_context_reminder_count">Reminders counted toward the current quota</string>
+    <string name="feedback_context_width">Current window width (dp)</string>
+    <string name="feedback_context_height">Current window height (dp)</string>
+    <string name="feedback_context_font_scale">System font scale</string>
+    <string name="feedback_context_dark_theme">System dark theme enabled</string>
+</resources>

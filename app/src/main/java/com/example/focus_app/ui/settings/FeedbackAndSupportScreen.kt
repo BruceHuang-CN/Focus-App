@@ -42,7 +42,10 @@ import com.example.focus_app.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FeedbackAndSupportScreen(onBack: () -> Unit) {
+fun FeedbackAndSupportScreen(
+    onBack: () -> Unit,
+    onReportIssue: () -> Unit
+) {
     val setupContext = androidx.compose.ui.platform.LocalContext.current
     val uriHandler = LocalUriHandler.current
     var surveyOpenFailed by rememberSaveable { mutableStateOf(false) }
@@ -82,6 +85,7 @@ fun FeedbackAndSupportScreen(onBack: () -> Unit) {
                 text = setupContext.getString(R.string.setup_text_174),
                 style = MaterialTheme.typography.bodyLarge
             )
+            ReportIssueEntryCard(onReportIssue = onReportIssue)
             FeedbackCard(
                 surveyOpenFailed = surveyOpenFailed,
                 onOpenSurvey = {
@@ -95,6 +99,34 @@ fun FeedbackAndSupportScreen(onBack: () -> Unit) {
                 onPaymentSelected = { selectedPaymentName = it.name }
             )
             Spacer(modifier = Modifier.height(8.dp))
+        }
+    }
+}
+
+@Composable
+private fun ReportIssueEntryCard(onReportIssue: () -> Unit) {
+    val setupContext = androidx.compose.ui.platform.LocalContext.current
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = setupContext.getString(R.string.feedback_report_entry_title),
+                modifier = Modifier.fillMaxWidth(),
+                style = MaterialTheme.typography.titleMedium
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = setupContext.getString(R.string.feedback_report_entry_description),
+                modifier = Modifier.fillMaxWidth(),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Button(
+                onClick = onReportIssue,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(setupContext.getString(R.string.feedback_report_entry_action))
+            }
         }
     }
 }

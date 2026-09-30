@@ -53,14 +53,14 @@ class AiRepositoryConnectionTest {
     fun unauthorized_maps_to_invalid_key_error() = runTest {
         server.enqueue(MockResponse().setResponseCode(401))
         val result = repository("sk-wrong").testConnection(settings(server.url("/").toString()))
-        assertEquals(ConnectionTestResult.Error("API Key 无效或无权限"), result)
+        assertEquals(ConnectionTestResult.Error("API Key 无效，或与 API 地址不匹配"), result)
     }
 
     @Test
     fun unsupported_endpoint_maps_to_endpoint_error() = runTest {
         server.enqueue(MockResponse().setResponseCode(404))
         val result = repository("sk-test").testConnection(settings(server.url("/").toString()))
-        assertEquals(ConnectionTestResult.Error("模型列表接口不可用，请检查 API 端点"), result)
+        assertEquals(ConnectionTestResult.Error("API 地址、接口或模型不存在，请检查配置"), result)
     }
 
     @Test
@@ -73,7 +73,7 @@ class AiRepositoryConnectionTest {
     @Test
     fun unreachable_endpoint_maps_to_network_error() = runTest {
         val result = repository("sk-test").testConnection(settings("http://127.0.0.1:1/"))
-        assertEquals(ConnectionTestResult.Error("网络连接失败，请检查网络或端点"), result)
+        assertEquals(ConnectionTestResult.Error("网络连接失败，请检查网络和 API 地址"), result)
     }
 
     private fun repository(key: String): AiRepository =

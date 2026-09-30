@@ -1,6 +1,8 @@
 package com.example.focus_app.ui.home
 
 import android.content.SharedPreferences
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.cancel
 import com.example.focus_app.data.appgroup.AppGroupRepository
 import com.example.focus_app.data.appgroup.AppGroupStore
 import com.example.focus_app.data.local.dao.AiReminderCacheDao
@@ -151,6 +153,67 @@ class HomeViewModelGuardianTest {
         assertEquals(true, viewModel.uiState.value.accessibilityServiceBound)
     }
 
+    @Test
+    fun completion_feedback_waits_for_persistence_and_ignores_duplicate_taps() = runTest(dispatcher) {
+        val saved = kotlinx.coroutines.CompletableDeferred<Unit>()
+        var writes = 0
+        val dao = completionDao { writes++; saved.await() }
+        val viewModel = fixture().homeViewModel(TaskRepository(dao, FakeClock(1_000_000L)))
+        runCurrent()
+        var successes = 0
+        viewModel.completeCurrentTask(onCompleted = { successes++ })
+        viewModel.completeCurrentTask(onCompleted = { successes++ })
+        runCurrent()
+        assertEquals(1, writes)
+        assertEquals(0, successes)
+        saved.complete(Unit)
+        runCurrent()
+        assertEquals(1, successes)
+        viewModel.viewModelScope.cancel()
+    }
+
+    @Test
+    fun failed_completion_shows_failure_and_can_be_retried() = runTest(dispatcher) {
+        var fail = true
+        val dao = completionDao { if (fail) throw IllegalStateException("write failed") }
+        val viewModel = fixture().homeViewModel(TaskRepository(dao, FakeClock(1_000_000L)))
+        runCurrent()
+        var successes = 0
+        var failures = 0
+        viewModel.completeCurrentTask({ successes++ }, { failures++ })
+        runCurrent()
+        assertEquals(0, successes)
+        assertEquals(1, failures)
+        fail = false
+        viewModel.completeCurrentTask({ successes++ }, { failures++ })
+        runCurrent()
+        assertEquals(1, successes)
+        assertEquals(1, failures)
+        viewModel.viewModelScope.cancel()
+    }
+
+    @Test
+    fun guarded_app_count_tracks_saved_targets() = runTest(dispatcher) {
+        val fixture = fixture()
+        val viewModel = fixture.homeViewModel()
+        runCurrent()
+        assertEquals(0, viewModel.uiState.value.targetAppCount)
+        fixture.settings.update { it.copy(targetApps = listOf(
+            com.example.focus_app.data.repository.AppInfo("test.app", "Test")
+        )) }
+        runCurrent()
+        assertEquals(1, viewModel.uiState.value.targetAppCount)
+        viewModel.viewModelScope.cancel()
+    }
+
+    private fun completionDao(write: suspend () -> Unit): FocusTaskDao = object : FocusTaskDao by HomeTaskDao() {
+        override fun observeAll(): Flow<List<FocusTaskEntity>> = flowOf(listOf(
+            FocusTaskEntity(id = 1, title = "Test task", createdAt = 0, updatedAt = 0,
+                isManualActive = true, manualStartedAt = 900_000L, manualUntil = 2_000_000L)
+        ))
+        override suspend fun setCompleted(id: Long, isCompleted: Boolean, updatedAt: Long) = write()
+    }
+
     private fun fixture(
         guardianEnabled: Boolean = true,
         windowMinutes: Int = 60,
@@ -182,7 +245,7 @@ class HomeViewModelGuardianTest {
     }
 
     private data class Fixture(val settings: SettingsRepository, val groups: AppGroupRepository, val sessions: HomeSessions, val displays: HomeDisplayRepository, val permissions: PermissionStatusProvider, val diagnostics: HomeAccessibilityDiagnosticsStore, val moods: MoodRepository, val tasks: TaskRepository, val updateGuardianState: UpdateGuardianStateUseCase, val resetReminderQuota: ResetReminderQuotaUseCase, val regenerator: RegenerateReminderMessagesUseCase) {
-        fun homeViewModel() = HomeViewModel(sessions, moods, tasks, settings, displays, groups, permissions, diagnostics, updateGuardianState, resetReminderQuota, regenerator)
+        fun homeViewModel(taskRepository: TaskRepository = tasks) = HomeViewModel(sessions, moods, taskRepository, settings, displays, groups, permissions, diagnostics, updateGuardianState, resetReminderQuota, regenerator)
     }
 }
 

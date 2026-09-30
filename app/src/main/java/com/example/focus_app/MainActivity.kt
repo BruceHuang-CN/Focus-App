@@ -1,11 +1,20 @@
 package com.example.focus_app
 
 import android.content.Intent
+import android.content.ActivityNotFoundException
+import android.net.Uri
+import androidx.activity.viewModels
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.focus_app.ui.update.AppUpdateDialog
+import com.example.focus_app.ui.update.AppUpdateViewModel
+import com.example.focus_app.util.PermissionHelper
 import android.os.Build
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import com.example.focus_app.ui.components.TaskCompletionCelebration
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.collectAsState
@@ -51,8 +60,12 @@ class MainActivity : AppCompatActivity() {
     @Inject lateinit var themeStore: ThemeStore
     @Inject lateinit var permissionStatusProvider: PermissionStatusProvider
 
+    private val appUpdates: AppUpdateViewModel by viewModels()
+
     private val systemAccessibilityEnabled = MutableStateFlow(false)
     private var openTasksRequestId by mutableIntStateOf(0)
+    private var openSummaryRequestId by mutableIntStateOf(0)
+    private var celebrationId by mutableIntStateOf(0)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -99,12 +112,23 @@ class MainActivity : AppCompatActivity() {
         }
         setContent {
             val theme by themeStore.settings.collectAsState()
+            val updateState by appUpdates.state.collectAsStateWithLifecycle()
             FocusAppTheme(mode = theme.mode, color = theme.color) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    NavGraph(openTasksRequestId = openTasksRequestId)
+                    Box(Modifier.fillMaxSize()) {
+                        NavGraph(
+                            openTasksRequestId = openTasksRequestId,
+                            openSummaryRequestId = openSummaryRequestId,
+                            onCelebrate = { celebrationId++ },
+                            onCheckUpdates = { appUpdates.check(manual = true) },
+                            updateChecking = updateState.checking
+                        )
+                        AppUpdateDialog(updateState, ::openUpdateWebsite, appUpdates::dismiss)
+                        TaskCompletionCelebration(celebrationId)
+                    }
                 }
             }
         }
@@ -115,6 +139,10 @@ class MainActivity : AppCompatActivity() {
         returnNavigationGuard.onMainResumed(this)
         realtimeForegroundProvider.onRealApplicationForeground(packageName)
         systemAccessibilityEnabled.value = permissionStatusProvider.accessibilityEnabled()
+        // Check on normal app entry, after setup. Reminder return and summary intents keep their flow.
+        if (intent.action == Intent.ACTION_MAIN && PermissionHelper.isOnboardingDone(this)) {
+            appUpdates.check()
+        }
     }
 
     override fun onPause() {
@@ -134,8 +162,26 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun consumeNavigationIntent(intent: Intent) {
-        if (intent.action == ACTION_OPEN_TASKS) {
-            openTasksRequestId += 1
+        if (intent.getBooleanExtra(EXTRA_NAVIGATION_CONSUMED, false)) return
+        when (intent.action) {
+            ACTION_OPEN_TASKS -> {
+                openTasksRequestId += 1
+                if (intent.getBooleanExtra(EXTRA_CELEBRATE_RETURN, false)) celebrationId += 1
+                intent.removeExtra(EXTRA_CELEBRATE_RETURN)
+                intent.putExtra(EXTRA_NAVIGATION_CONSUMED, true)
+            }
+            ACTION_OPEN_SUMMARY -> { openSummaryRequestId += 1; intent.putExtra(EXTRA_NAVIGATION_CONSUMED, true) }
+        }
+    }
+
+    private fun openUpdateWebsite(url: String) {
+        try {
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addCategory(Intent.CATEGORY_BROWSABLE))
+            appUpdates.dismiss()
+        } catch (_: ActivityNotFoundException) {
+            appUpdates.browserUnavailable()
+        } catch (_: SecurityException) {
+            appUpdates.browserUnavailable()
         }
     }
 
@@ -173,6 +219,9 @@ class MainActivity : AppCompatActivity() {
     )
 
     companion object {
+        private const val EXTRA_NAVIGATION_CONSUMED = "navigation_consumed"
+        const val EXTRA_CELEBRATE_RETURN = "celebrate_return_to_focus"
+        const val ACTION_OPEN_SUMMARY = "com.example.focus_app.action.OPEN_SUMMARY"
         const val ACTION_OPEN_TASKS = "com.example.focus_app.action.OPEN_TASKS"
     }
 }

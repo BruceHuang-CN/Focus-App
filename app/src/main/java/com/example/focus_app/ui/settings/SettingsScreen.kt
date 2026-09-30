@@ -1,5 +1,7 @@
 package com.example.focus_app.ui.settings
 
+import androidx.compose.material.icons.filled.Refresh
+
 import com.example.focus_app.R
 
 import android.Manifest
@@ -50,6 +52,7 @@ import kotlinx.coroutines.withContext
 fun SettingsScreen(onExitRequested: () -> Unit, hasUnsavedChanges: Boolean,
     onUnsavedChangesChanged: (Boolean) -> Unit, navigateToCustomReturnPicker: () -> Unit,
     navigateToAppGroups: () -> Unit, navigateToFeedbackAndSupport: () -> Unit,
+    onCheckUpdates: () -> Unit, updateChecking: Boolean,
     navigateToTutorial: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()) {
     val setupContext = androidx.compose.ui.platform.LocalContext.current
@@ -118,6 +121,9 @@ fun SettingsScreen(onExitRequested: () -> Unit, hasUnsavedChanges: Boolean,
                 }
                 item(key = "theme", contentType = "section") { ThemeSettingsSection(viewModel) }
                 item(key = "preferences", contentType = "section") { ReminderPreferenceSettings(viewModel) { editor = it } }
+                item(key = "daily_summary", contentType = "section") {
+                    com.example.focus_app.ui.summary.DailySummarySettingsCard()
+                }
                 item(key = "apps", contentType = "section") { AppSettingsSection(viewModel, navigateToAppGroups, navigateToCustomReturnPicker) }
                 item(key = "ai", contentType = "section") { AiSettingsSummary(viewModel, { page = "ai" }, { editor = "manage" }) }
                 item(key = "tutorial", contentType = "section") {
@@ -128,6 +134,9 @@ fun SettingsScreen(onExitRequested: () -> Unit, hasUnsavedChanges: Boolean,
                 item(key = "support", contentType = "section") {
                     ForestSettingsSection(setupContext.getString(R.string.setup_text_173), icon = Icons.Default.Info) {
                         SettingsEntry(Icons.Default.Email, setupContext.getString(R.string.setup_text_213), onClick = navigateToFeedbackAndSupport)
+                        SettingsEntry(Icons.Default.Refresh,
+                            setupContext.getString(if (updateChecking) R.string.update_checking else R.string.update_check),
+                            onClick = { if (!updateChecking) onCheckUpdates() })
                     }
                 }
                 item(key = "bottom") { Spacer(Modifier.height(16.dp)) }

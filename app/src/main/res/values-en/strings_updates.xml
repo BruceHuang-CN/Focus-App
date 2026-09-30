@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="update_check">Check for updates</string>
+    <string name="update_checking">Checking for updates…</string>
+    <string name="update_available">New version %1$s available</string>
+    <string name="update_browser_help">Open the Huishen website to download and install the new version.</string>
+    <string name="update_open_website">Open download page</string>
+    <string name="update_later">Later</string>
+    <string name="update_current">You are using the latest version.</string>
+    <string name="update_unavailable">Could not check for updates. Check your connection or try again later.</string>
+    <string name="update_unsupported">The new version requires a newer Android system. You can keep using this version.</string>
+    <string name="update_browser_unavailable">Could not open the download page. Visit brucehere.com in your browser.</string>
+    <string name="update_ok">OK</string>
+</resources>

@@ -66,6 +66,7 @@ class AndroidReminderLauncher @Inject constructor(
         context.startActivity(
             Intent(context, MainActivity::class.java).apply {
                 action = MainActivity.ACTION_OPEN_TASKS
+                putExtra(MainActivity.EXTRA_CELEBRATE_RETURN, true)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
                 taskId?.let { putExtra(ACTIVE_TASK_ID, it) }
             }

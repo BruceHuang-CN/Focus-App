@@ -40,7 +40,10 @@ import com.example.focus_app.ui.theme.WarningAmber
 import java.time.format.DateTimeFormatter
 
 @Composable
-fun StatsScreen(onBack: () -> Unit, viewModel: StatsViewModel = hiltViewModel()) {
+fun StatsScreen(onBack: () -> Unit, viewModel: StatsViewModel = hiltViewModel(),
+    navigateToMood: () -> Unit = {},
+    summaryViewModel: com.example.focus_app.ui.summary.DailySummaryViewModel = hiltViewModel(),
+    moodViewModel: com.example.focus_app.ui.mood.MoodViewModel = hiltViewModel()) {
     val textContext = androidx.compose.ui.platform.LocalContext.current
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var details by rememberSaveable { mutableStateOf(false) }
@@ -59,7 +62,13 @@ fun StatsScreen(onBack: () -> Unit, viewModel: StatsViewModel = hiltViewModel())
         }
     } else StatsContent(state, onRange = viewModel::selectRange, onPeriod = viewModel::selectPeriod,
         onShiftPeriod = viewModel::shiftPeriod, onDay = { day = it.toString() },
-        onDecision = { decision = it.name }, onDetails = { details = true }, onRetry = viewModel::refresh)
+        onDecision = { decision = it.name }, onDetails = { details = true }, onRetry = viewModel::refresh, dailyContent = {
+            com.example.focus_app.ui.summary.DailySummaryCard(summaryViewModel)
+            val latestMood by summaryViewModel.latestMood.collectAsStateWithLifecycle()
+            StatsMoodCard(latestMood?.mood, navigateToMood) { mood, note, done ->
+                moodViewModel.saveMood(mood, note.ifBlank { null }, done)
+            }
+        })
     day?.let { selected ->
         val date = java.time.LocalDate.parse(selected)
         val zone = state.snapshot?.asOf?.zone ?: java.time.ZoneId.systemDefault()

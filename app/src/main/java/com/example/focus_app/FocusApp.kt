@@ -30,10 +30,13 @@ class FocusApp : Application(), Configuration.Provider {
     @Inject
     lateinit var accessibilityDiagnosticsStore: AccessibilityDiagnosticsStore
 
+    @Inject lateinit var dailySummaryScheduler: com.example.focus_app.service.DailySummaryScheduler
+
     override fun onCreate() {
         super.onCreate()
         com.example.focus_app.data.language.AppLanguage.initialize(this)
         accessibilityDiagnosticsStore.recordAppLaunch(packageLastUpdateTime())
+        dailySummaryScheduler.scheduleNext()
         reminderBatchCoordinator.start(applicationScope)
         applicationScope.launch {
             pendingFollowUpRestorer.restore()

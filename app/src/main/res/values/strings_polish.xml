@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="polish_guardian_settings">守护设置</string>
+    <string name="polish_complete_failed">任务完成状态未保存，请重试。</string>
+    <string name="polish_task_completed">✓ 又完成了一件事</string>
+    <string name="polish_breath_tap">轻点汇聚，让中心的小球慢慢长大</string>
+    <string name="summary_title">每日总结</string>
+    <string name="summary_schedule">每日 AI 总结提醒</string>
+    <string name="summary_schedule_help">开启后，每天按手机当地时间，使用你在 AI 设置中配置的 API 和模型生成总结并提醒查看。会发送完成任务数、受守护应用使用统计及心情类别，不含任务正文、心情备注或应用名单。可能产生模型调用费用；系统省电可能延迟提醒。</string>
+    <string name="summary_time">提醒时间 · %1$s</string>
+    <string name="summary_enable_notifications">开启系统通知以接收提醒</string>
+    <string name="summary_notification_ready">今天的总结已生成，点击查看。</string>
+    <string name="summary_notification_pending">到了回顾今天的时间，点击查看数据或重试生成总结。</string>
+    <string name="summary_data_help">将完成任务数、受守护应用使用统计及心情类别发送给你配置的 API 和模型，可能产生调用费用。下方时间表示当天数据快照时间；受守护应用使用时长不等于专注时长。</string>
+    <string name="summary_facts">完成 %1$d 个任务 · 受守护应用 %2$d 分钟 · 打开 %3$d 次</string>
+    <string name="summary_empty">还没有总结。你可以立即生成，或在设置中开启每日提醒。</string>
+    <string name="summary_failed">读取当天数据失败，请稍后重试。</string>
+    <string name="summary_generating">正在生成…</string>
+    <string name="summary_generate">生成／更新今天的总结</string>
+    <string name="polish_self_control_feedback">真棒，你已经找回一点自控力了！</string>
+    <string name="polish_pending_checks">待检查：%1$s</string>
+    <string name="polish_no_guarded_apps">还没有选择受守护应用，暂时不会触发提醒。</string>
+    <string name="polish_choose_guarded_apps">选择受守护应用</string>
+    <string name="polish_manage_guarded_apps">管理受守护应用（%1$d）</string>
+    <string name="polish_accessibility_reconnect">无障碍开关已开启，但服务未连接。请在无障碍设置中关闭再开启回神，然后返回检查连接状态。</string>
+    <string name="polish_celebration_title">真棒！</string>
+    <string name="polish_celebration_body">你已经找回\n一点自控力了！</string>
+    <string name="polish_celebration_continue">轻点继续</string>
+</resources>

@@ -117,6 +117,38 @@ class AiRepository internal constructor(
         }
     }
 
+    /** Daily reflection uses the same configured endpoint, model, key store and HTTP client. */
+    suspend fun generateDailySummary(
+        facts: com.example.focus_app.domain.summary.DailySummaryFacts,
+        settings: AppSettings,
+        languageTag: String = currentLanguage()
+    ): Result<String> = try {
+        val key = apiKeyStore.read()
+        if (key.isBlank()) {
+            Result.failure(IllegalStateException(AiFailure.MISSING_KEY.message(languageTag)))
+        } else {
+            val api = getOrCreateApi(settings.apiEndpoint.ifBlank { settings.aiProvider.defaultEndpoint })
+            val response = api.chatCompletion("Bearer $key", com.example.focus_app.data.remote.dto.ChatRequest(
+                model = settings.aiModel.ifBlank { settings.aiProvider.defaultModel },
+                messages = listOf(
+                    com.example.focus_app.data.remote.dto.Message("system", com.example.focus_app.domain.summary.summarySystemMessage(languageTag)),
+                    com.example.focus_app.data.remote.dto.Message("user", com.example.focus_app.domain.summary.summaryUserMessage(facts))
+                ), max_tokens = 500,
+                thinking = if (settings.aiProvider == AiProvider.DEEPSEEK) com.example.focus_app.data.remote.dto.ThinkingConfig("disabled") else null
+            ))
+            val content = response.body()?.choices?.firstOrNull()?.message?.content?.trim()
+            when {
+                !response.isSuccessful -> Result.failure(IllegalStateException(AiFailure.fromHttp(response.code()).message(languageTag)))
+                content.isNullOrBlank() || content.length > 4_000 -> Result.failure(IllegalStateException(AiFailure.INVALID_RESPONSE.message(languageTag)))
+                else -> Result.success(content)
+            }
+        }
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (error: Exception) {
+        Result.failure(IllegalStateException(AiFailure.fromException(error).message(languageTag)))
+    }
+
     private fun getOrCreateApi(endpoint: String): OpenAiApi {
         val normalizedEndpoint = endpoint.trimEnd('/')
         val currentApi = cachedApi

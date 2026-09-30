@@ -96,16 +96,22 @@
 
 - [x] T0：检查指定目录、Git 状态、敏感文件路径、远端及 SHA；fetch 后核对 UI 基线，创建 `huishenfeedback` 分支，保留原有改动。
 - [x] T1：核对反馈页、导航、无障碍 Store、SettingsRepository／AppSettings、最新交付记录，并写入本计划和总清单入口。
-- [ ] T2：新增 `domain/feedback/DiagnosticSnapshot.kt`、`PreparedIssueReport.kt`、`IssueReportFormatter.kt`。确定白名单、缺失值、固定输出格式与诊断关闭语义；先验证正文生成和不泄漏多余字段。
-- [ ] T3：新增 `data/diagnostics/DiagnosticsCollector.kt`，通过 Hilt 注入 ApplicationContext、现有 Store 和 SettingsRepository。复用已有绑定，不创建第二套服务状态系统；处理 API 26 起的版本号和系统语言读取兼容、单项失败、时间语义。
-- [ ] T4：新增 `ui/settings/ReportIssueViewModel.kt`。用 StateFlow 暴露表单、错误、采集中状态及冻结预览；处理必填、长度上限、开关、重试、草稿恢复及预览失效。UI 收集状态遵循 lifecycle；分享操作由显式点击发起，避免重组／重建重复启动。
-- [ ] T5：新增 `ui/settings/ReportIssueScreen.kt`，必要时在同文件拆分纯内容 Composable。完成三项输入、默认勾选、完整诊断预览和反馈预览；复用当前主题；适配键盘、窄屏、大字体及日夜模式。
-- [ ] T6：修改 `FeedbackAndSupportScreen.kt` 和 `NavGraph.kt`。新增明显入口并置于长问卷海报之前；保留问卷和赞助。检查从设置进入子页的回退与未保存设置策略；`FeedbackAndSupportContent.kt` 仅在实际需要时改动。
-- [ ] T7：新增轻量 `ui/settings/IssueReportShare.kt`，集中系统分享与显式复制动作；添加 `res/values/strings_feedback.xml` 和 `res/values-en/strings_feedback.xml`。分享／复制与完整预览一致，失败可恢复。
+- [x] T2：新增 `domain/feedback/DiagnosticSnapshot.kt`、`PreparedIssueReport.kt`、`IssueReportFormatter.kt`。确定白名单、缺失值、固定输出格式与诊断关闭语义；先验证正文生成和不泄漏多余字段。
+- [x] T3：新增 `data/diagnostics/DiagnosticsCollector.kt`，通过 Hilt 注入 ApplicationContext、现有 Store 和 SettingsRepository。复用已有绑定，不创建第二套服务状态系统；处理 API 26 起的版本号和系统语言读取兼容、单项失败、时间语义。
+- [x] T4：新增 `ui/settings/ReportIssueViewModel.kt`。用 StateFlow 暴露表单、错误、采集中状态及冻结预览；处理必填、长度上限、开关、重试、草稿恢复及预览失效。UI 收集状态遵循 lifecycle；分享操作由显式点击发起，避免重组／重建重复启动。
+- [x] T5：新增 `ui/settings/ReportIssueScreen.kt`，必要时在同文件拆分纯内容 Composable。完成三项输入、默认勾选、完整诊断预览和反馈预览；复用当前主题；适配键盘、窄屏、大字体及日夜模式。
+- [x] T6：修改 `FeedbackAndSupportScreen.kt` 和 `NavGraph.kt`。新增明显入口并置于长问卷海报之前；保留问卷和赞助。检查从设置进入子页的回退与未保存设置策略；`FeedbackAndSupportContent.kt` 仅在实际需要时改动。
+- [x] T7：新增轻量 `ui/settings/IssueReportShare.kt`，集中系统分享与显式复制动作；添加 `res/values/strings_feedback.xml` 和 `res/values-en/strings_feedback.xml`。分享／复制与完整预览一致，失败可恢复。
 - [ ] T8：补充并运行必要的本地回归测试和构建／静态检查，记录结果；不要用“测试文件已编写”代替“测试已通过”。
 - [ ] T9：在另获设备操作授权后开展系统分享、邮件／微信接收、复制、取消、旋转及语言切换的设备验收，记录机型、系统、实际 APK 版本和结果；更新任务状态和开发日志。
 
-依赖：T2 → T3 → T4 → T5；T6、T7 接入已有表单／预览后，执行 T8；T9 以可安装构建和明确设备授权为前提。本轮停在 T1，不开始实施。
+依赖：T2 → T3 → T4 → T5；T6、T7 接入已有表单／预览后，执行 T8；T9 以可安装构建和明确设备授权为前提。
+
+### 实施进展（2026-09-14 更新）
+
+T2–T7 源码已按本计划写入：`domain/feedback/DiagnosticSnapshot.kt`、`PreparedIssueReport.kt`、`IssueReportFormatter.kt`，`data/diagnostics/DiagnosticsCollector.kt`，`ui/settings/ReportIssueViewModel.kt`、`ReportIssueScreen.kt`、`IssueReportShare.kt`，`res/values/strings_feedback.xml`、`res/values-en/strings_feedback.xml`，以及 `FeedbackAndSupportScreen.kt`／`NavGraph.kt` 的入口与路由改动；同时补充 `IssueReportFormatterTest`、`DiagnosticsCollectorTest`、`ReportIssueViewModelTest` 三个测试源码。
+
+这些勾选只表示源码已写入，**既不表示编译通过，也不表示测试已运行**。T8（本地测试、构建、静态检查）与 T9（设备验收）仍未执行：本轮没有运行 Gradle、没有安装 APK、没有操作设备。首版 2,000 字符上限与白名单字段仍可按实现结果调整，调整时同步本文与测试。
 
 ## 6. 实施阶段验证标准
 

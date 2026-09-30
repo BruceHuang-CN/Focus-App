@@ -58,8 +58,19 @@ class TaskViewModel @Inject constructor(
         viewModelScope.launch { repository.delete(task) }
     }
 
-    fun complete(id: Long) {
-        viewModelScope.launch { repository.setCompleted(id) }
+    private val completing = mutableSetOf<Long>()
+    fun complete(id: Long, onCompleted: () -> Unit = {}, onFailure: () -> Unit = {}) {
+        if (!completing.add(id)) return
+        viewModelScope.launch {
+            try {
+                repository.setCompleted(id)
+                onCompleted()
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                onFailure()
+            } finally { completing.remove(id) }
+        }
     }
 
     fun restore(id: Long) {

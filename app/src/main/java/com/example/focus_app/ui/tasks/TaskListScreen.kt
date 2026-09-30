@@ -16,7 +16,11 @@ import com.example.focus_app.domain.model.FocusTask
 import com.example.focus_app.domain.model.TaskGroup
 
 @Composable
-fun TaskListScreen(onBack: () -> Unit, viewModel: TaskViewModel = hiltViewModel()) {
+fun TaskListScreen(
+    onBack: () -> Unit,
+    onCelebrate: () -> Unit,
+    viewModel: TaskViewModel = hiltViewModel()
+) {
     val textContext = androidx.compose.ui.platform.LocalContext.current
     val tasks by viewModel.tasks.collectAsStateWithLifecycle()
     val groups by viewModel.groups.collectAsStateWithLifecycle()
@@ -70,8 +74,12 @@ fun TaskListScreen(onBack: () -> Unit, viewModel: TaskViewModel = hiltViewModel(
         onDeleteGroup = { deleteGroupId = it }, onActivateGroup = { activateGroupId = it },
         onAddTask = { targetGroup = it; editId = 0; editor = "task"; inherit = true; message = null },
         onEditTask = { editId = it.id; targetGroup = it.groupId; inherit = it.inheritsGroupSchedule; editor = "task"; message = null },
-        onCompleteTask = { if (it.isCompleted) viewModel.restore(it.id) else viewModel.complete(it.id) },
+        onCompleteTask = { if (it.isCompleted) viewModel.restore(it.id) else viewModel.complete(it.id, onCompleted = onCelebrate, onFailure = { message = textContext.getString(R.string.polish_complete_failed) }) },
         onDeleteTask = viewModel::delete, onMoveTask = { moveId = it.id }, onActivateTask = { activateTaskId = it.id })
+    if (message != null) AlertDialog(onDismissRequest = { message = null },
+        text = { Text(message.orEmpty()) }, confirmButton = {
+            TextButton(onClick = { message = null }) { Text(textContext.getString(R.string.core_close)) }
+        })
     (activateGroupId ?: activateTaskId)?.let { id ->
         AlertDialog(onDismissRequest = { activateGroupId = null; activateTaskId = null }, title = { Text(if (activateTaskId != null) textContext.getString(R.string.core_activate_task) else textContext.getString(R.string.core_activate_group)) },
             text = { Column {

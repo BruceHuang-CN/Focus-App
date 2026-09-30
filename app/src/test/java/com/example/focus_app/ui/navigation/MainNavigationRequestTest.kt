@@ -5,9 +5,9 @@ import org.junit.Test
 
 class MainNavigationRequestTest {
     @Test
-    fun task_request_starts_on_tasks_after_onboarding() {
+    fun task_request_keeps_home_as_stable_graph_root() {
         assertEquals(
-            Screen.Tasks.route,
+            Screen.Home.route,
             mainStartDestination(onboardingDone = true, openTasksRequested = true)
         )
     }

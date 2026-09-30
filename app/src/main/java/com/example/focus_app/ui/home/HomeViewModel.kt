@@ -36,6 +36,7 @@ data class HomeUiState(
     val streakDays: Int = 0,
     val guardianEnabled: Boolean = true,
     val activeGroupName: String = "",
+    val targetAppCount: Int = 0,
     val reminderWindowMinutes: Int = 60,
     val windowReminderCount: Int = 0,
     val windowReminderLimit: Int = 3,
@@ -105,12 +106,13 @@ class HomeViewModel @Inject constructor(
                 appGroupRepository.groups,
                 appGroupRepository.activeGroupId
             ) { settings, groups, activeGroupId ->
-                settings.guardianEnabled to groups.firstOrNull { it.id == activeGroupId }?.name
-            }.collect { (guardianEnabled, activeGroupName) ->
+                Triple(settings.guardianEnabled, groups.firstOrNull { it.id == activeGroupId }?.name, settings.targetApps.size)
+            }.collect { (guardianEnabled, activeGroupName, targetAppCount) ->
                 _uiState.update {
                     it.copy(
                         guardianEnabled = guardianEnabled,
-                        activeGroupName = activeGroupName.orEmpty()
+                        activeGroupName = activeGroupName.orEmpty(),
+                        targetAppCount = targetAppCount
                     )
                 }
             }
@@ -157,9 +159,20 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    fun completeCurrentTask() {
-        _uiState.value.activeTask?.let { task ->
-            viewModelScope.launch { taskRepository.setCompleted(task.id) }
+    private var completingTask = false
+    fun completeCurrentTask(onCompleted: () -> Unit = {}, onFailure: () -> Unit = {}) {
+        val task = _uiState.value.activeTask ?: return
+        if (completingTask) return
+        completingTask = true
+        viewModelScope.launch {
+            try {
+                taskRepository.setCompleted(task.id)
+                onCompleted()
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                onFailure()
+            } finally { completingTask = false }
         }
     }
 

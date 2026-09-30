@@ -2,6 +2,40 @@
 
 本文件记录开发过程中发现的问题、根因分析与修复，随代码一并提交到仓库。
 
+## 2026-09-30（回神 1.0.2 分支交付）
+
+本次汇总首页单卡片、完成任务庆祝、呼吸汇聚、反馈可读性与诊断、官网版本检查，以及此前已集成的每日总结和导航改动。
+437 项单元测试、Debug APK 和 Android 测试 APK 构建通过；源码提交和推送不代表真机视觉或生产联调验收。
+范围与证据详见 [分支交付记录](delivery/2026-09-30-huishenfeedback.md)。保留历史章节原有结论与日期。
+
+## 2026-09-24（App 反馈直传 Cloudflare，本地测试与构建通过）
+
+按 `docs/superpowers/plans/2026-09-24-app-feedback-cloudflare-plan.md` 把问题反馈从“预览后系统分享”升级为“App 内直接提交”，并同步实现网站端接收与开发者管理页。
+
+- 诊断分级：`DiagnosticLevel` 定义 none／basic／detailed 白名单；`buildAppFeedbackRequest` 按级别投影，basic 不携带 detailed 字段，none 时 `diagnostics` 为 null。
+- 系统语言修复：`AndroidDeviceInfoSource` 改用 `LocaleManagerCompat.getSystemLocales(context)`，真正读取系统语言（系统中文、App 英文时不再误报）；该字段只在 detailed 上传。
+- 网络层：新增独立 `FeedbackApi` + Hilt 模块（固定 `https://brucehere.com/`，不跟随重定向，无日志拦截器），`FeedbackRepository` 把 201／200／400·413·415／409／429／503 映射为明确结果；错误码从 `errorBody` 解析。
+- 提交流程：`ReportIssueViewModel` 冻结 `PreparedSubmission`（id + payload + 展示正文），预览／复制／分享／上传共用同一份数据；首次发送前把待发送请求原子写入 App 私有文件（`FileFeedbackDraftStore`），失败重试与进程恢复沿用同一个 id，成功后清理；进程恢复只提示手动重试，不自动发送。
+- 界面：主按钮改为“提交反馈”，复现过程与预期折叠，基础／详细诊断分级勾选，“查看”就地预览，成功后显示回执编号并可“再反馈一个问题”；分享／复制降级为备用方式。
+- 测试：`FeedbackPayloadTest`、`FeedbackRepositoryTest`（MockWebServer）、`FeedbackDraftStoreTest`，重写 `ReportIssueViewModelTest`，更新 `IssueReportFormatterTest`；`./gradlew.bat :app:testDebugUnitTest` 共 397 项通过，`:app:compileDebugAndroidTestKotlin :app:assembleDebug` 构建成功。
+- 未完成：未做真机／系统中文＋App 英文的设备验收，未安装 APK；网站端未部署、未推送 Git。
+
+实现过程中修复的两个缺陷：诊断关闭时 `ensureSnapshot` 返回 null 被误当作“中途中止”而阻断提交；以及 Android 仓储对 4xx／5xx 只读 `body()` 导致错误码总是回退默认值，改为读取 `errorBody()`。
+
+## 2026-09-14（问题反馈机制源码实现，未编译）
+
+按 `docs/superpowers/plans/2026-09-14-issue-feedback-plan.md` 的 T2–T7 实现“设置 → 反馈与支持 → 问题反馈 → 填写 → 预览 → 分享或复制”的最小白名单流程。只做 Android 端：不新增服务器、反馈数据库、邮件接口、第三方诊断 SDK、权限或后台任务，也不自动上传。
+
+- 新增 `domain/feedback/DiagnosticSnapshot.kt`：不可变白名单快照；历史时间用三态区分“有记录／暂无记录／无法读取”，缺失时间不显示为 1970 年。
+- 新增 `domain/feedback/PreparedIssueReport.kt` 与 `IssueReportFormatter.kt`：纯 Kotlin 固定分节正文（回神问题反馈／问题描述／复现过程／预期结果／可选诊断信息），选填为空统一“未填写”，采集时间保留毫秒并注明时区；关闭诊断时正文不含设备、版本、设置、服务记录和采集时间。
+- 新增 `data/diagnostics/DiagnosticsCollector.kt`：Hilt 注入现有 `AccessibilityDiagnosticsStore` 与 `SettingsRepository`；只读 serviceBound 和三个历史时间，以及 guardianEnabled、detectionMode、reminderDelaySeconds、reminderWindowMinutes、maxRemindersPerWindow 五个设置摘要。设备厂商／型号、实际安装包 versionName／versionCode、系统首选语言（与应用自选语言分开）单独读取；单项失败保留其他字段并标记“无法读取”，协程取消正常传播，不写入服务记录或设置。
+- 新增 `ui/settings/ReportIssueViewModel.kt`：StateFlow 暴露表单、必填校验、2,000 字上限（保留原文、不静默截断）、采集中状态、诊断快照与冻结预览。编辑输入、关闭诊断开关、刷新诊断都会使旧完整预览失效；采集中关闭开关后迟到结果不再附加诊断；草稿写入 SavedStateHandle。
+- 新增 `ui/settings/ReportIssueScreen.kt`、`IssueReportShare.kt` 及 `res/values`、`res/values-en` 的 `strings_feedback.xml`：三项输入、默认开启的诊断开关、诊断预览对话框、完整预览与系统分享／复制。分享使用 ACTION_SEND + text/plain + EXTRA_TEXT + createChooser，分享和复制都使用已预览的同一字符串，页面明确说明打开分享面板不等于送达。
+- 修改 `FeedbackAndSupportScreen.kt`（长问卷海报之前增加问题反馈入口，保留问卷与微信／支付宝支持）和 `NavGraph.kt`（新增 `Screen.ReportIssue` 与回退）。
+- 新增单元测试源码：`IssueReportFormatterTest`、`DiagnosticsCollectorTest`、`ReportIssueViewModelTest`，覆盖空白或纯空格描述、选填空值、关闭诊断、快照复用、预览失效、迟到结果、长度上限、草稿恢复与取消传播。
+
+本轮未运行 Gradle、未编译、未执行任何测试、未安装 APK、未操作设备；上述“新增／修改”只表示源码已写入，不代表编译或真机验收通过。本地验证命令：``.\gradlew.bat :app:testDebugUnitTest :app:assembleDebug :app:lintDebug`` 与 `git diff --check`；设备验收仍需另行授权。
+
 ## 2026-09-13（阶段成果整理与分支交付）
 
 本次汇总此前未提交的源码及文档。以下“完成”指实现已写入源码，不代表编译或真机验收通过；历史章节中的“未推送／待执行”描述保留其记录时点含义，以本节为当前交付说明。
@@ -596,3 +630,13 @@ ColorOS 等系统的后台策略如果对 Focus 执行真正的 `force-stop`，A
 应出现悬浮窗弹窗或通知；首次引导完成后检查设置中的检测方式与无障碍开关状态。
 
 ---
+
+## 2026-09-19 首页、任务反馈与 AI 每日总结（工作区交付）
+
+- 首页精简为守护与任务；心情迁移统计，主标签统一导航，任务通知固定首页根入口。
+- 呼吸点击增加并加速粒子，保持原 5 秒；任务成功持久化后显示短暂成就特效。
+- 新增自定义时间的每日 AI 总结，复用用户端点／模型／KeyStore，使用最小统计摘要；结果保存在本机，通知点击统计。
+- WorkManager 按本地日历排程，停用／改时／时区变化使旧请求失效；默认关闭，明确费用及延迟提示。
+- 最终 376 项 JVM 测试通过，Debug APK 与 AndroidTest Kotlin 编译通过；未执行真机 UI 测试或真实 API 调用。
+- Lint 47 errors、74 warnings，error 报告行均存在于本轮前源码，未隐去或扩展修复。完整证据在当前 Codex 工作区 outputs。
+- 原有反馈功能、IDE 改动、ZIP 保留；未提交／推送。计划：superpowers/plans/2026-09-19-home-summary-polish.md。

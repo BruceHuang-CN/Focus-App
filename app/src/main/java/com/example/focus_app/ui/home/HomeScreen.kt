@@ -3,13 +3,16 @@ package com.example.focus_app.ui.home
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.provider.Settings
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -34,6 +37,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -61,7 +65,9 @@ internal data class HomePermissionItem(
 fun HomeScreen(
     navigateToMood: () -> Unit,
     navigateToTasks: () -> Unit,
+    onCelebrate: () -> Unit,
     navigateToTutorial: () -> Unit = {},
+    navigateToAppGroups: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel(),
     moodViewModel: MoodViewModel = hiltViewModel()
 ) {
@@ -120,8 +126,13 @@ fun HomeScreen(
         uiState = uiState,
         onRecordMood = navigateToMood,
         onManageTasks = navigateToTasks,
+        onManageApps = navigateToAppGroups,
         onContinueTutorial = if (showTutorial) navigateToTutorial else null,
-        onCompleteCurrentTask = viewModel::completeCurrentTask,
+        onCompleteCurrentTask = {
+            viewModel.completeCurrentTask(onCompleted = onCelebrate, onFailure = {
+                scope.launch { snackbar.showSnackbar(textContext.getString(R.string.polish_complete_failed)) }
+            })
+        },
         onGuardianEnabledChange = viewModel::setGuardianEnabled,
         onResetReminderQuota = viewModel::resetReminderQuota,
         onRegenerateReminderMessages = viewModel::regenerateReminderMessages,
@@ -165,6 +176,7 @@ internal fun HomeContent(
     onPermissionClick: (String) -> Unit,
     onSaveMood: (String, String, () -> Unit) -> Unit,
     onContinueTutorial: (() -> Unit)? = null,
+    onManageApps: () -> Unit = {},
     snackbarHostState: SnackbarHostState? = null
 ) {
     val textContext = androidx.compose.ui.platform.LocalContext.current
@@ -175,240 +187,478 @@ internal fun HomeContent(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         snackbarHost = { SnackbarHost(snackbar) }
     ) { padding ->
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding)
-                .background(Brush.verticalGradient(listOf(
-                    colors.primaryContainer.copy(alpha = 0.32f), colors.background
-                ))).imePadding(),
-            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+        Column(
+            modifier = Modifier.fillMaxSize()
+                .padding(padding)
+                .background(
+                    Brush.verticalGradient(
+                        listOf(colors.primaryContainer.copy(alpha = 0.18f), colors.background)
+                    )
+                )
         ) {
-            item(key = "brand") {
-                Row(
-                    modifier = Modifier.padding(start = 4.dp, top = 4.dp, bottom = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+            Row(
+                modifier = Modifier.fillMaxWidth()
+                    .heightIn(min = 56.dp)
+                    .padding(horizontal = 24.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Image(
+                    painter = painterResource(R.drawable.ic_app_logo),
+                    contentDescription = null,
+                    modifier = Modifier.size(32.dp).clip(CircleShape)
+                )
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    text = textContext.getString(R.string.core_brand),
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = colors.onBackground
+                )
+            }
+            BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().imePadding()) {
+                // Only the minimum height follows the viewport. Expanded content can grow
+                // beyond it, so every permission and action remains scrollable.
+                Box(
+                    Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
+                        .heightIn(min = maxHeight)
+                        .padding(horizontal = 20.dp, vertical = 28.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Image(painterResource(R.drawable.ic_app_logo), contentDescription = null,
-                        modifier = Modifier.size(44.dp).clip(CircleShape))
-                    Text(textContext.getString(R.string.core_brand), fontSize = 28.sp, fontWeight = FontWeight.Bold, color = colors.onBackground)
-                }
-            }
-            if (onContinueTutorial != null) item(key = "tutorial") {
-                OutlinedButton(onClick = onContinueTutorial, modifier = Modifier.fillMaxWidth()) {
-                    Text(textContext.getString(R.string.core_continue_tutorial))
-                }
-            }
-            item(key = "task") {
-                CurrentTaskCard(uiState.activeTask, onManageTasks, onCompleteCurrentTask)
-            }
-            item(key = "mood") {
-                HomeMoodCard(uiState.latestMood, onRecordMood, onSaveMood)
-            }
-            item(key = "guardian") {
-                HomeGuardianCard(uiState, permissions, onGuardianEnabledChange,
-                    onResetReminderQuota, onRegenerateReminderMessages, onPermissionClick)
-            }
-        }
-    }
-}
-
-@Composable
-private fun HomeCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
-    val textContext = androidx.compose.ui.platform.LocalContext.current
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.08f))
-    ) {
-        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
-    }
-}
-
-@Composable
-private fun CurrentTaskCard(task: FocusTask?, onManage: () -> Unit, onComplete: () -> Unit) {
-    val textContext = androidx.compose.ui.platform.LocalContext.current
-    HomeCard {
-        Row(Modifier.fillMaxWidth().clickable(role = Role.Button, onClick = onManage).heightIn(min = 48.dp),
-            verticalAlignment = Alignment.CenterVertically) {
-            Text(textContext.getString(R.string.core_current_task), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold,
-                modifier = Modifier.weight(1f))
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, textContext.getString(R.string.core_manage_tasks), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        Text(task?.title ?: textContext.getString(R.string.core_focus_one), style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold)
-        if (task != null) {
-            Text(task.scheduleLabel(), style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween) {
-                Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = CircleShape) {
-                    Text(textContext.getString(R.string.core_in_progress), Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        style = MaterialTheme.typography.labelLarge)
-                }
-                TextButton(onClick = onComplete) { Text(textContext.getString(R.string.core_complete_task)) }
-            }
-        } else {
-            Text(textContext.getString(R.string.core_choose_task_help), color = MaterialTheme.colorScheme.onSurfaceVariant)
-            FilledTonalButton(onClick = onManage) { Text(textContext.getString(R.string.core_choose_task)) }
-        }
-    }
-}
-
-private val homeMoods = listOf("🔵" to "平静", "🌿" to "专注", "😐" to "有点累", "🙁" to "烦躁", "🙂" to "开心")
-
-@Composable
-private fun HomeMoodCard(
-    latestMood: String?,
-    onOpen: () -> Unit,
-    onSave: (String, String, () -> Unit) -> Unit
-) {
-    val textContext = androidx.compose.ui.platform.LocalContext.current
-    var selected by rememberSaveable { mutableStateOf<String?>(null) }
-    var note by rememberSaveable { mutableStateOf("") }
-    var saving by remember { mutableStateOf(false) }
-    HomeCard {
-        Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable(role = Role.Button, onClick = onOpen),
-            verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(textContext.getString(R.string.core_mood_record), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Text(latestMood?.let { textContext.getString(R.string.core_latest_mood, com.example.focus_app.ui.mood.moodDisplayLabel(textContext, it)) } ?: textContext.getString(R.string.core_record_state),
-                    style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, textContext.getString(R.string.core_more_moods))
-        }
-        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            homeMoods.forEach { (symbol, label) ->
-                val active = selected == label
-                Surface(
-                    onClick = { selected = label }, enabled = !saving,
-                    shape = RoundedCornerShape(16.dp),
-                    color = if (active) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.38f),
-                    border = if (active) BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else null,
-                    modifier = Modifier.widthIn(min = 60.dp).semantics { stateDescription = if (active) textContext.getString(R.string.core_selected) else textContext.getString(R.string.core_unselected) }
-                ) {
-                    Column(Modifier.padding(horizontal = 10.dp, vertical = 12.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(symbol, fontSize = 24.sp)
-                        Text(com.example.focus_app.ui.mood.moodDisplayLabel(textContext, label), style = MaterialTheme.typography.labelLarge)
+                    Box(
+                        modifier = Modifier.widthIn(max = 520.dp).fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        HomeTaskGuardianCard(
+                            uiState = uiState,
+                            permissions = permissions,
+                            onManageTasks = onManageTasks,
+                            onManageApps = onManageApps,
+                            onCompleteCurrentTask = onCompleteCurrentTask,
+                            onGuardianEnabledChange = onGuardianEnabledChange,
+                            onResetReminderQuota = onResetReminderQuota,
+                            onRegenerateReminderMessages = onRegenerateReminderMessages,
+                            onPermissionClick = onPermissionClick,
+                            modifier = Modifier.fillMaxWidth()
+                        )
                     }
                 }
             }
         }
-        OutlinedTextField(
-            value = note, onValueChange = { note = it.take(100) }, enabled = !saving,
-            modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp),
-            placeholder = { Text(textContext.getString(R.string.core_today_note)) },
-            supportingText = { Text("${note.length}/100") }, maxLines = 3
-        )
-        if (selected != null) {
-            Button(
-                enabled = !saving,
-                onClick = {
-                    selected?.let { mood ->
-                        saving = true
-                        onSave(mood, note) { selected = null; note = ""; saving = false }
-                    }
-                }, modifier = Modifier.align(Alignment.End)
-            ) { Text(if (saving) textContext.getString(R.string.core_saving) else textContext.getString(R.string.core_record_mood)) }
-        }
     }
 }
 
 @Composable
-internal fun HomeGuardianCard(
+private fun HomeTaskGuardianCard(
     uiState: HomeUiState,
     permissions: List<HomePermissionItem>,
-    onToggle: (Boolean) -> Unit,
-    onResetQuota: () -> Unit,
-    onRegenerate: () -> Unit,
+    onManageTasks: () -> Unit,
+    onManageApps: () -> Unit,
+    onCompleteCurrentTask: () -> Unit,
+    onGuardianEnabledChange: (Boolean) -> Unit,
+    onResetReminderQuota: () -> Unit,
+    onRegenerateReminderMessages: () -> Unit,
     onPermissionClick: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val textContext = androidx.compose.ui.platform.LocalContext.current
-    var expanded by rememberSaveable { mutableStateOf(false) }
+    val colors = MaterialTheme.colorScheme
+    var guardianExpanded by rememberSaveable { mutableStateOf(false) }
+    var permissionDetailsExpanded by rememberSaveable { mutableStateOf(false) }
     var resetWindow by rememberSaveable { mutableStateOf(false) }
-    HomeCard(modifier) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(textContext.getString(R.string.core_guardian), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Text(if (uiState.guardianEnabled) textContext.getString(R.string.core_guardian_on) else textContext.getString(R.string.core_guardian_paused),
-                    color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodyMedium)
-            }
-            Switch(checked = uiState.guardianEnabled, onCheckedChange = onToggle,
-                modifier = Modifier.semantics { stateDescription = if (uiState.guardianEnabled) textContext.getString(R.string.core_guardian_on) else textContext.getString(R.string.core_guardian_off) })
-        }
-        Surface(color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
-            shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(textContext.getString(R.string.core_quota, uiState.reminderWindowMinutes,
-                    uiState.windowReminderCount.coerceAtLeast(0), uiState.windowReminderLimit.coerceAtLeast(0),
-                    (uiState.windowReminderLimit.coerceAtLeast(0) - uiState.windowReminderCount.coerceAtLeast(0)).coerceAtLeast(0)),
-                    style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(textContext.getString(R.string.core_app_group, uiState.activeGroupName.ifBlank { textContext.getString(R.string.core_no_app_group) }), style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-        OutlinedButton(onClick = { resetWindow = true }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
-            Text(if (uiState.isRegeneratingMessages) textContext.getString(R.string.core_generating_ai) else textContext.getString(R.string.core_reset_update))
-        }
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-        Row(
-            modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)
-                .semantics { stateDescription = if (expanded) textContext.getString(R.string.core_expanded) else textContext.getString(R.string.core_collapsed) }
-                .clickable(role = Role.Button) { expanded = !expanded },
-            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)
+    val missingPermissions = permissions.count { !it.ready }
+
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(28.dp),
+        colors = CardDefaults.cardColors(containerColor = colors.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+        border = BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.55f))
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Icon(Icons.Filled.Settings, null, tint = MaterialTheme.colorScheme.primary)
-            Column(Modifier.weight(1f)) {
-                Text(textContext.getString(R.string.core_permissions), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                val missing = permissions.count { !it.ready }
-                Text(if (missing == 0) textContext.getString(R.string.core_permissions_ready) else textContext.getString(R.string.core_permission_count, missing),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (missing == 0) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error)
+            Text(
+                text = textContext.getString(R.string.core_current_task),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = colors.primary,
+                textAlign = TextAlign.Center
+            )
+            val task = uiState.activeTask
+            if (task == null) {
+                Text(
+                    text = textContext.getString(R.string.core_focus_one),
+                    style = MaterialTheme.typography.headlineMedium.copy(fontSize = 30.sp, lineHeight = 38.sp),
+                    fontWeight = FontWeight.Bold,
+                    color = colors.onSurface,
+                    textAlign = TextAlign.Center
+                )
+                Text(
+                    text = textContext.getString(R.string.core_choose_task_help),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = colors.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
+                Button(
+                    onClick = onManageTasks,
+                    modifier = Modifier.widthIn(min = 180.dp).heightIn(min = 52.dp)
+                ) {
+                    Text(textContext.getString(R.string.core_choose_task))
+                }
+            } else {
+                Text(
+                    text = task.title,
+                    modifier = Modifier.fillMaxWidth(),
+                    style = MaterialTheme.typography.headlineMedium.copy(fontSize = 30.sp, lineHeight = 38.sp),
+                    fontWeight = FontWeight.Bold,
+                    color = colors.onSurface,
+                    textAlign = TextAlign.Center
+                )
+                Text(
+                    text = task.scheduleLabel(),
+                    modifier = Modifier.fillMaxWidth(),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = colors.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
+                Surface(color = colors.primaryContainer, shape = CircleShape) {
+                    Text(
+                        text = textContext.getString(R.string.core_in_progress),
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
+                        color = colors.onPrimaryContainer,
+                        style = MaterialTheme.typography.labelLarge
+                    )
+                }
+                Button(
+                    onClick = onCompleteCurrentTask,
+                    modifier = Modifier.widthIn(min = 180.dp).heightIn(min = 52.dp)
+                ) {
+                    Text(textContext.getString(R.string.core_complete_task))
+                }
+                TextButton(
+                    onClick = onManageTasks,
+                    modifier = Modifier.heightIn(min = 48.dp)
+                ) {
+                    Text(
+                        text = textContext.getString(R.string.core_manage_tasks),
+                        modifier = Modifier.padding(horizontal = 12.dp)
+                    )
+                }
             }
-            Icon(if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
-                if (expanded) textContext.getString(R.string.core_collapse_permissions) else textContext.getString(R.string.core_expand_permissions))
-        }
-        if (expanded) {
-            Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.32f)) {
-                Column(Modifier.padding(horizontal = 12.dp)) {
-                    permissions.forEachIndexed { index, item ->
-                        if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-                        Row(Modifier.fillMaxWidth().clickable(role = Role.Button) { onPermissionClick(item.id) }
-                            .padding(vertical = 12.dp).heightIn(min = 32.dp),
-                            verticalAlignment = Alignment.CenterVertically) {
-                            Text(item.title, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                            Text(item.status, Modifier.widthIn(max = 140.dp), style = MaterialTheme.typography.labelMedium,
-                                color = if (item.ready) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
-                            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+
+            HorizontalDivider(color = colors.outlineVariant.copy(alpha = 0.65f))
+            Row(
+                modifier = Modifier.fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .clickable(role = Role.Button) { guardianExpanded = !guardianExpanded }
+                    .semantics {
+                        stateDescription = if (guardianExpanded) {
+                            textContext.getString(R.string.core_expanded)
+                        } else {
+                            textContext.getString(R.string.core_collapsed)
                         }
                     }
+                    .heightIn(min = 64.dp)
+                    .padding(horizontal = 4.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Icon(Icons.Filled.Settings, contentDescription = null, tint = colors.primary)
+                        Text(
+                            text = textContext.getString(R.string.polish_guardian_settings),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = colors.onSurface
+                        )
+                    }
+                    Text(
+                        text = if (uiState.guardianEnabled) {
+                            textContext.getString(R.string.core_guardian_on)
+                        } else {
+                            textContext.getString(R.string.core_guardian_paused)
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (uiState.guardianEnabled) colors.primary else colors.onSurfaceVariant
+                    )
+                    if (missingPermissions > 0) {
+                        Text(
+                            text = textContext.getString(R.string.polish_pending_checks, permissions.filterNot { it.ready }.joinToString("、") { it.title }),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = colors.error
+                        )
+                    }
                 }
+                Icon(
+                    imageVector = if (guardianExpanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                    contentDescription = null,
+                    tint = colors.onSurfaceVariant
+                )
+            }
+
+            if (uiState.targetAppCount == 0) {
+                Text(
+                    textContext.getString(R.string.polish_no_guarded_apps),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colors.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
+                TextButton(onClick = onManageApps) {
+                    Text(textContext.getString(R.string.polish_choose_guarded_apps))
+                }
+            }
+
+            AnimatedVisibility(
+                visible = guardianExpanded,
+                enter = fadeIn() + expandVertically(expandFrom = Alignment.Top),
+                exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Top)
+            ) {
+                GuardianControlsContent(
+                    uiState = uiState,
+                    permissions = permissions,
+                    missingPermissions = missingPermissions,
+                    permissionDetailsExpanded = permissionDetailsExpanded,
+                    onPermissionDetailsExpandedChange = { permissionDetailsExpanded = it },
+                    onGuardianEnabledChange = onGuardianEnabledChange,
+                    onResetAndUpdate = { resetWindow = true },
+                    onManageApps = onManageApps,
+                    onPermissionClick = onPermissionClick
+                )
             }
         }
     }
+
     if (resetWindow) {
         AlertDialog(
-            onDismissRequest = { resetWindow = false }, title = { Text(textContext.getString(R.string.core_reset_update)) },
+            onDismissRequest = { resetWindow = false },
+            title = { Text(textContext.getString(R.string.core_reset_update)) },
             text = {
-                Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
                     Text(textContext.getString(R.string.core_reset_help))
-                    OutlinedButton(onClick = { resetWindow = false; onResetQuota() }, modifier = Modifier.fillMaxWidth()) {
+                    OutlinedButton(
+                        onClick = { resetWindow = false; onResetReminderQuota() },
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                    ) {
                         Text(textContext.getString(R.string.core_reset_quota))
                     }
-                    OutlinedButton(onClick = { resetWindow = false; onRegenerate() },
-                        enabled = !uiState.isRegeneratingMessages, modifier = Modifier.fillMaxWidth()) {
-                        Text(if (uiState.isRegeneratingMessages) textContext.getString(R.string.core_generating) else textContext.getString(R.string.core_reset_ai))
+                    OutlinedButton(
+                        onClick = { resetWindow = false; onRegenerateReminderMessages() },
+                        enabled = !uiState.isRegeneratingMessages,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                    ) {
+                        Text(
+                            if (uiState.isRegeneratingMessages) {
+                                textContext.getString(R.string.core_generating)
+                            } else {
+                                textContext.getString(R.string.core_reset_ai)
+                            }
+                        )
                     }
                 }
             },
-            confirmButton = { TextButton(onClick = { resetWindow = false }) { Text(textContext.getString(R.string.core_close)) } }
+            confirmButton = {
+                TextButton(onClick = { resetWindow = false }) {
+                    Text(textContext.getString(R.string.core_close))
+                }
+            }
         )
+    }
+}
+
+@Composable
+private fun GuardianControlsContent(
+    uiState: HomeUiState,
+    permissions: List<HomePermissionItem>,
+    missingPermissions: Int,
+    permissionDetailsExpanded: Boolean,
+    onPermissionDetailsExpandedChange: (Boolean) -> Unit,
+    onGuardianEnabledChange: (Boolean) -> Unit,
+    onResetAndUpdate: () -> Unit,
+    onManageApps: () -> Unit,
+    onPermissionClick: (String) -> Unit
+) {
+    val textContext = androidx.compose.ui.platform.LocalContext.current
+    val colors = MaterialTheme.colorScheme
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(
+                    text = textContext.getString(R.string.core_guardian),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = colors.onSurface
+                )
+                Text(
+                    text = if (uiState.guardianEnabled) {
+                        textContext.getString(R.string.core_guardian_on)
+                    } else {
+                        textContext.getString(R.string.core_guardian_paused)
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.onSurfaceVariant
+                )
+            }
+            Switch(
+                checked = uiState.guardianEnabled,
+                onCheckedChange = onGuardianEnabledChange,
+                modifier = Modifier.semantics {
+                    stateDescription = if (uiState.guardianEnabled) {
+                        textContext.getString(R.string.core_guardian_on)
+                    } else {
+                        textContext.getString(R.string.core_guardian_off)
+                    }
+                }
+            )
+        }
+
+        if (permissions.any { it.id == "accessibility" &&
+                it.status == textContext.getString(R.string.core_disconnected) }) {
+            Text(
+                textContext.getString(R.string.polish_accessibility_reconnect),
+                color = colors.error,
+                style = MaterialTheme.typography.bodyMedium
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .clickable(role = Role.Button) {
+                    onPermissionDetailsExpandedChange(!permissionDetailsExpanded)
+                }
+                .semantics {
+                    stateDescription = if (permissionDetailsExpanded) {
+                        textContext.getString(R.string.core_expanded)
+                    } else {
+                        textContext.getString(R.string.core_collapsed)
+                    }
+                }
+                .heightIn(min = 56.dp)
+                .padding(horizontal = 4.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    text = textContext.getString(R.string.core_permissions),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Medium,
+                    color = colors.onSurface
+                )
+                Text(
+                    text = if (missingPermissions == 0) {
+                        textContext.getString(R.string.core_permissions_ready)
+                    } else {
+                        textContext.getString(R.string.polish_pending_checks, permissions.filterNot { it.ready }.joinToString("、") { it.title })
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (missingPermissions == 0) colors.onSurfaceVariant else colors.error
+                )
+            }
+            Icon(
+                imageVector = if (permissionDetailsExpanded) {
+                    Icons.Filled.KeyboardArrowUp
+                } else {
+                    Icons.Filled.KeyboardArrowDown
+                },
+                contentDescription = null,
+                tint = colors.onSurfaceVariant
+            )
+        }
+
+        AnimatedVisibility(
+            visible = permissionDetailsExpanded,
+            enter = fadeIn() + expandVertically(expandFrom = Alignment.Top),
+            exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Top)
+        ) {
+            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
+                permissions.forEachIndexed { index, item ->
+                    if (index > 0) {
+                        HorizontalDivider(color = colors.outlineVariant.copy(alpha = 0.55f))
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth()
+                            .heightIn(min = 56.dp)
+                            .clickable(role = Role.Button) { onPermissionClick(item.id) },
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = item.title,
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = colors.onSurface
+                        )
+                        Text(
+                            text = item.status,
+                            modifier = Modifier.widthIn(max = 120.dp),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = if (item.ready) colors.primary else colors.error
+                        )
+                        Icon(
+                            Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                            contentDescription = null,
+                            tint = colors.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
+
+        HorizontalDivider(color = colors.outlineVariant.copy(alpha = 0.55f))
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(
+                text = textContext.getString(
+                    R.string.core_quota,
+                    uiState.reminderWindowMinutes,
+                    uiState.windowReminderCount.coerceAtLeast(0),
+                    uiState.windowReminderLimit.coerceAtLeast(0),
+                    (uiState.windowReminderLimit.coerceAtLeast(0) - uiState.windowReminderCount.coerceAtLeast(0))
+                        .coerceAtLeast(0)
+                ),
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.onSurfaceVariant
+            )
+            Text(
+                text = textContext.getString(
+                    R.string.core_app_group,
+                    uiState.activeGroupName.ifBlank { textContext.getString(R.string.core_no_app_group) }
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = colors.onSurfaceVariant
+            )
+        }
+        TextButton(onClick = onManageApps, modifier = Modifier.fillMaxWidth()) {
+            Text(textContext.getString(R.string.polish_manage_guarded_apps, uiState.targetAppCount))
+        }
+        OutlinedButton(
+            onClick = onResetAndUpdate,
+            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+        ) {
+            Text(
+                if (uiState.isRegeneratingMessages) {
+                    textContext.getString(R.string.core_generating_ai)
+                } else {
+                    textContext.getString(R.string.core_reset_update)
+                }
+            )
+        }
     }
 }
 
@@ -426,22 +676,73 @@ internal fun reminderQuotaLabel(minutes: Int, count: Int, limit: Int): String {
     return "本时间段（$minutes 分钟）已提醒 $safeCount/$safeLimit 次，剩余 $remaining 次"
 }
 
-@Preview(showBackground = true, widthDp = 393, heightDp = 852)
-@Preview(showBackground = true, widthDp = 320, heightDp = 740, fontScale = 1.3f)
-@Preview(showBackground = true, widthDp = 393, heightDp = 852, uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
+@Preview(name = "当前任务", showBackground = true, widthDp = 393, heightDp = 852)
+@Preview(name = "窄屏和放大文字", showBackground = true, widthDp = 320, heightDp = 740, fontScale = 1.3f)
+@Preview(name = "深色主题", showBackground = true, widthDp = 393, heightDp = 852, uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun HomeContentPreview() {
     val textContext = androidx.compose.ui.platform.LocalContext.current
     FocusAppTheme {
         HomeContent(
-            uiState = HomeUiState(activeTask = FocusTask(title = "写下这次北京之行的感想",
-                scheduleStartMinute = 1010, scheduleEndMinute = 1050), reminderWindowMinutes = 30,
-                windowReminderLimit = 5, activeGroupName = "短视频应用"),
-            onRecordMood = {}, onManageTasks = {}, onCompleteCurrentTask = {},
-            onGuardianEnabledChange = {}, onResetReminderQuota = {}, onRegenerateReminderMessages = {},
-            permissions = listOf(HomePermissionItem("overlay", textContext.getString(R.string.core_overlay_permission), textContext.getString(R.string.core_enabled), true),
-                HomePermissionItem("accessibility", textContext.getString(R.string.core_accessibility), textContext.getString(R.string.core_disabled), false)),
-            onPermissionClick = {}, onSaveMood = { _, _, done -> done() }
+            uiState = HomeUiState(
+                activeTask = FocusTask(
+                    title = "写下这次北京之行的感想，以及接下来想完成的几件事",
+                    scheduleStartMinute = 1010,
+                    scheduleEndMinute = 1050
+                ),
+                reminderWindowMinutes = 30,
+                windowReminderLimit = 5,
+                activeGroupName = "短视频应用"
+            ),
+            onRecordMood = {},
+            onManageTasks = {},
+            onCompleteCurrentTask = {},
+            onGuardianEnabledChange = {},
+            onResetReminderQuota = {},
+            onRegenerateReminderMessages = {},
+            permissions = listOf(
+                HomePermissionItem(
+                    "overlay",
+                    textContext.getString(R.string.core_overlay_permission),
+                    textContext.getString(R.string.core_enabled),
+                    true
+                ),
+                HomePermissionItem(
+                    "accessibility",
+                    textContext.getString(R.string.core_accessibility),
+                    textContext.getString(R.string.core_disabled),
+                    false
+                )
+            ),
+            onPermissionClick = {},
+            onSaveMood = { _, _, done -> done() }
+        )
+    }
+}
+
+@Preview(name = "无当前任务", showBackground = true, widthDp = 393, heightDp = 852)
+@Composable
+private fun HomeContentEmptyPreview() {
+    val textContext = androidx.compose.ui.platform.LocalContext.current
+    FocusAppTheme {
+        HomeContent(
+            uiState = HomeUiState(guardianEnabled = false),
+            onRecordMood = {},
+            onManageTasks = {},
+            onCompleteCurrentTask = {},
+            onGuardianEnabledChange = {},
+            onResetReminderQuota = {},
+            onRegenerateReminderMessages = {},
+            permissions = listOf(
+                HomePermissionItem(
+                    "overlay",
+                    textContext.getString(R.string.core_overlay_permission),
+                    textContext.getString(R.string.core_disabled),
+                    false
+                )
+            ),
+            onPermissionClick = {},
+            onSaveMood = { _, _, done -> done() }
         )
     }
 }
